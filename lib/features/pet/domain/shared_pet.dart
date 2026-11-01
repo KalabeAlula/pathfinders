@@ -1,0 +1,95 @@
+import 'pet_care_action.dart';
+
+enum PetMood { happy, content, hungry, sleepy, dirty, playing }
+
+/// The circle's shared companion. Stats are doubles so slow decay is not lost
+/// to rounding between render ticks; screens round for display.
+class SharedPet {
+  const SharedPet({
+    required this.name,
+    required this.species,
+    required this.level,
+    required this.experience,
+    required this.hunger,
+    required this.energy,
+    required this.hygiene,
+    required this.happiness,
+    required this.updatedAt,
+    this.lastAction,
+    this.lastActionAt,
+  });
+
+  static const double maxStat = 100;
+  static const int experiencePerLevel = 100;
+  static const Duration playingWindow = Duration(minutes: 2);
+
+  final String name;
+  final String species;
+  final int level;
+  final int experience;
+  final double hunger;
+  final double energy;
+  final double hygiene;
+  final double happiness;
+  final DateTime updatedAt;
+  final PetCareAction? lastAction;
+  final DateTime? lastActionAt;
+
+  int get xpIntoLevel => experience % experiencePerLevel;
+
+  double get levelProgress => xpIntoLevel / experiencePerLevel;
+
+  PetMood moodAt(DateTime now) {
+    final actionAt = lastActionAt;
+    if (lastAction == PetCareAction.play &&
+        actionAt != null &&
+        now.difference(actionAt) < playingWindow) {
+      return PetMood.playing;
+    }
+    if (energy < 25) return PetMood.sleepy;
+    if (hunger < 30) return PetMood.hungry;
+    if (hygiene < 30) return PetMood.dirty;
+    if (happiness >= 70) return PetMood.happy;
+    return PetMood.content;
+  }
+
+  SharedPet caredFor(PetCareAction action, DateTime at) {
+    final totalExperience = experience + action.experience;
+    return SharedPet(
+      name: name,
+      species: species,
+      level: 1 + totalExperience ~/ experiencePerLevel,
+      experience: totalExperience,
+      hunger: _clamp(hunger + action.hunger),
+      energy: _clamp(energy + action.energy),
+      hygiene: _clamp(hygiene + action.hygiene),
+      happiness: _clamp(happiness + action.happiness),
+      updatedAt: at,
+      lastAction: action,
+      lastActionAt: at,
+    );
+  }
+
+  /// Applies the slow drift that happens while nobody is caring for the pet.
+  /// Rates are per hour; [now] becomes the new reference point.
+  SharedPet decayed(Duration elapsed, DateTime now) {
+    if (elapsed <= Duration.zero) return this;
+    final hours = elapsed.inSeconds / 3600;
+    return SharedPet(
+      name: name,
+      species: species,
+      level: level,
+      experience: experience,
+      hunger: _clamp(hunger - hours * 6),
+      energy: _clamp(energy - hours * 4),
+      hygiene: _clamp(hygiene - hours * 3),
+      happiness: _clamp(happiness - hours * 2.5),
+      updatedAt: now,
+      lastAction: lastAction,
+      lastActionAt: lastActionAt,
+    );
+  }
+
+  static double _clamp(double value) =>
+      value.clamp(0, maxStat).toDouble();
+}
