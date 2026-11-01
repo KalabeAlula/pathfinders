@@ -43,6 +43,7 @@ dependencies:
   geolocator: ^14.1.2
   battery_plus: ^7.1.2
   permission_handler: ^13.0.2
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:

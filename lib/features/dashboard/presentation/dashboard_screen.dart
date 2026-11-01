@@ -16,10 +16,12 @@ import '../../location/domain/privacy_mode.dart';
 import '../../location/presentation/widgets/live_map_card.dart';
 import '../../memories/application/memories_providers.dart';
 import '../../memories/domain/memory_post.dart';
+import '../../memories/presentation/widgets/memory_composer_sheet.dart';
 import '../../memories/presentation/widgets/memory_snippet_card.dart';
 import '../../milestones/application/milestones_providers.dart';
 import '../../milestones/domain/shared_milestone.dart';
 import '../../milestones/presentation/widgets/countdown_card.dart';
+import '../../milestones/presentation/widgets/milestone_composer_sheet.dart';
 import '../../nudges/application/nudge_providers.dart';
 import '../../nudges/domain/nudge.dart';
 import '../../nudges/presentation/widgets/nudge_overlay.dart';
@@ -43,20 +45,24 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pet = ref.watch(petControllerProvider);
-    final milestone = ref.watch(nextMilestoneProvider);
     final activeNudge = ref.watch(nudgeControllerProvider);
     final telemetry = ref.watch(telemetryControllerProvider(currentUserId));
     final now = ref.watch(appClockProvider).value ?? DateTime.now();
 
-    // Mock memories are still seeded from the demo world, so keep only the
-    // ones authored by people who are actually in this circle.
-    final memberIds = snapshot.circle.memberIds.toSet();
-    final memories = ref
-            .watch(recentMemoriesProvider)
-            .value
-            ?.where((memory) => memberIds.contains(memory.authorId))
-            .toList(growable: false) ??
+    final circleId = snapshot.circle.id;
+    final memories = ref.watch(recentMemoriesProvider(circleId)).value ??
         const <MemoryPost>[];
+    final milestones =
+        ref.watch(milestonesProvider(circleId)).value ??
+            const <SharedMilestone>[];
+
+    SharedMilestone? milestone;
+    for (final item in milestones) {
+      if (item.daysFrom(now) >= 0) {
+        milestone = item;
+        break;
+      }
+    }
 
     void openMember(CircleMember member) {
       showMemberDetailSheet(
@@ -79,7 +85,7 @@ class DashboardScreen extends ConsumerWidget {
                 currentUserId: currentUserId,
                 pet: pet,
                 memories: memories,
-                milestone: milestone.value,
+                milestone: milestone,
                 now: now,
                 sharingNotice: _sharingNotice(telemetry),
                 onMemberTap: openMember,
@@ -97,6 +103,16 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                 onCopyInvite: () =>
                     _copyInviteCode(context, snapshot.circle.inviteCode),
+                onAddMemory: () => showMemoryComposer(
+                  context,
+                  circleId: circleId,
+                  authorId: currentUserId,
+                ),
+                onAddMilestone: () => showMilestoneComposer(
+                  context,
+                  circleId: circleId,
+                  createdBy: currentUserId,
+                ),
               ),
             ),
             if (activeNudge != null)
@@ -149,6 +165,8 @@ class _DashboardBody extends StatelessWidget {
     required this.onCare,
     required this.onNudge,
     required this.onCopyInvite,
+    required this.onAddMemory,
+    required this.onAddMilestone,
   });
 
   final CircleSnapshot snapshot;
@@ -163,6 +181,8 @@ class _DashboardBody extends StatelessWidget {
   final ValueChanged<PetCareAction> onCare;
   final VoidCallback onNudge;
   final VoidCallback onCopyInvite;
+  final VoidCallback onAddMemory;
+  final VoidCallback onAddMilestone;
 
   @override
   Widget build(BuildContext context) {
@@ -207,6 +227,7 @@ class _DashboardBody extends StatelessWidget {
               SizedBox(
                 height: 196,
                 child: LiveMapCard(
+                  circleId: snapshot.circle.id,
                   members: snapshot.members,
                   currentUserId: currentUserId,
                   onMemberTap: onMemberTap,
@@ -229,9 +250,10 @@ class _DashboardBody extends StatelessWidget {
                       .memberById(latestMemory.authorId)
                       ?.profile,
                   now: now,
+                  onTap: onAddMemory,
                 )
               else
-                const _EmptyMemoryCard(),
+                _EmptyMemoryCard(onTap: onAddMemory),
               const SizedBox(height: AppSpacing.md),
               SizedBox(
                 height: 124,
@@ -240,8 +262,12 @@ class _DashboardBody extends StatelessWidget {
                     Expanded(
                       flex: 3,
                       child: milestone == null
-                          ? const _EmptyMilestoneCard()
-                          : CountdownCard(milestone: milestone!, now: now),
+                          ? _EmptyMilestoneCard(onTap: onAddMilestone)
+                          : CountdownCard(
+                              milestone: milestone!,
+                              now: now,
+                              onTap: onAddMilestone,
+                            ),
                     ),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
@@ -333,13 +359,17 @@ class _SharingBanner extends StatelessWidget {
 }
 
 class _EmptyMemoryCard extends StatelessWidget {
-  const _EmptyMemoryCard();
+  const _EmptyMemoryCard({required this.onTap});
+
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return BentoCard(
       padding: const EdgeInsets.all(AppSpacing.lg),
+      onTap: onTap,
+      semanticLabel: 'Add your first memory.',
       child: Row(
         children: [
           Container(
@@ -378,6 +408,12 @@ class _EmptyMemoryCard extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(width: 4),
+          Icon(
+            Icons.add_circle_outline_rounded,
+            size: 20,
+            color: scheme.onSurfaceVariant,
+          ),
         ],
       ),
     );
@@ -385,20 +421,34 @@ class _EmptyMemoryCard extends StatelessWidget {
 }
 
 class _EmptyMilestoneCard extends StatelessWidget {
-  const _EmptyMilestoneCard();
+  const _EmptyMilestoneCard({required this.onTap});
+
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return BentoCard(
       padding: const EdgeInsets.all(AppSpacing.lg),
+      onTap: onTap,
+      semanticLabel: 'Add your first countdown.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.event_available_rounded,
-            size: 18,
-            color: scheme.onSurfaceVariant,
+          Row(
+            children: [
+              Icon(
+                Icons.event_available_rounded,
+                size: 18,
+                color: scheme.onSurfaceVariant,
+              ),
+              const Spacer(),
+              Icon(
+                Icons.add_circle_outline_rounded,
+                size: 18,
+                color: scheme.onSurfaceVariant,
+              ),
+            ],
           ),
           const Spacer(),
           Text(

@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:battery_plus/battery_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart' as permissions;
 
 import '../domain/device_telemetry.dart';
 import '../domain/geo_point.dart';
@@ -47,16 +49,89 @@ class GeolocatorTelemetrySource implements DeviceTelemetrySource {
     }
   }
 
-  static TelemetryPermission _map(LocationPermission permission) {
-    return switch (permission) {
-      LocationPermission.always ||
-      LocationPermission.whileInUse =>
-        TelemetryPermission.granted,
-      LocationPermission.deniedForever => TelemetryPermission.deniedForever,
-      LocationPermission.denied ||
-      LocationPermission.unableToDetermine =>
-        TelemetryPermission.denied,
-    };
+  @override
+  Future<bool> hasBackgroundAccess() async {
+    if (kIsWeb) return false;
+    try {
+      return await Geolocator.checkPermission() == LocationPermission.always;
+    } on MissingPluginException {
+      return false;
+    } on UnsupportedError {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> requestBackgroundAccess() async {
+    if (kIsWeb) return false;
+    try {
+      if (await hasBackgroundAccess()) return true;
+
+      final status = await permissions.Permission.locationAlways.request();
+      if (status.isGranted) return true;
+
+      // Android 11+ refuses to show the background prompt inline and iOS stops
+      // prompting once the member has answered, so Settings is the only route.
+      await openAppSettings();
+      return await hasBackgroundAccess();
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> requestNotificationPermission() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return true;
+    try {
+      final current = await permissions.Permission.notification.status;
+      if (current.isGranted) return true;
+      final result = await permissions.Permission.notification.request();
+      return result.isGranted;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  @override
+  Stream<DeviceReading> positionUpdates({
+    required Duration interval,
+    required double distanceFilter,
+  }) {
+    final settings = defaultTargetPlatform == TargetPlatform.android
+        ? AndroidSettings(
+            accuracy: LocationAccuracy.high,
+            intervalDuration: interval,
+            distanceFilter: distanceFilter.round(),
+            // This is what keeps fixes coming once the app leaves the screen:
+            // the foreground service holds the process up and the persistent
+            // notification is the member's reminder that sharing is live.
+            foregroundNotificationConfig: const ForegroundNotificationConfig(
+              notificationTitle: 'Pathfinders is sharing your location',
+              notificationText:
+                  'Your circle can see where you are until you pause sharing.',
+              notificationChannelName: 'Location sharing',
+              notificationIcon: AndroidResource(
+                name: 'ic_stat_pathfinders',
+                defType: 'drawable',
+              ),
+              setOngoing: true,
+            ),
+          )
+        : AppleSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: distanceFilter.round(),
+            allowBackgroundLocationUpdates: true,
+            showBackgroundLocationIndicator: true,
+            pauseLocationUpdatesAutomatically: false,
+            activityType: ActivityType.other,
+          );
+
+    return Geolocator.getPositionStream(locationSettings: settings)
+        .map(_toReading);
   }
 
   @override
@@ -68,16 +143,7 @@ class GeolocatorTelemetrySource implements DeviceTelemetrySource {
           timeLimit: _fixTimeout,
         ),
       );
-      final speed = position.speed;
-      return DeviceReading(
-        point: GeoPoint(
-          latitude: position.latitude,
-          longitude: position.longitude,
-        ),
-        accuracyMeters:
-            position.accuracy.isFinite ? position.accuracy : 0,
-        speedKph: speed.isFinite && speed > 0 ? speed * 3.6 : 0,
-      );
+      return _toReading(position);
     } on TimeoutException {
       return null;
     } on LocationServiceDisabledException {
@@ -111,4 +177,28 @@ class GeolocatorTelemetrySource implements DeviceTelemetrySource {
 
   @override
   Future<void> openLocationSettings() => Geolocator.openLocationSettings();
+
+  static DeviceReading _toReading(Position position) {
+    final speed = position.speed;
+    return DeviceReading(
+      point: GeoPoint(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      ),
+      accuracyMeters: position.accuracy.isFinite ? position.accuracy : 0,
+      speedKph: speed.isFinite && speed > 0 ? speed * 3.6 : 0,
+    );
+  }
+
+  static TelemetryPermission _map(LocationPermission permission) {
+    return switch (permission) {
+      LocationPermission.always ||
+      LocationPermission.whileInUse =>
+        TelemetryPermission.granted,
+      LocationPermission.deniedForever => TelemetryPermission.deniedForever,
+      LocationPermission.denied ||
+      LocationPermission.unableToDetermine =>
+        TelemetryPermission.denied,
+    };
+  }
 }

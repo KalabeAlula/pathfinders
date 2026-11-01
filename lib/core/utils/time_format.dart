@@ -38,6 +38,29 @@ String formatVoiceNote(int seconds) {
   return '$minutesPart:$secondsPart';
 }
 
+/// "850 m" / "4.2 km" for a driving route.
+String formatRouteDistance(double meters) {
+  if (!meters.isFinite || meters < 0) return '—';
+  if (meters < 950) return '${meters.round()} m';
+  final kilometers = meters / 1000;
+  return kilometers < 10
+      ? '${kilometers.toStringAsFixed(1)} km'
+      : '${kilometers.round()} km';
+}
+
+/// Compact travel time for map chips: "6m", "1h 20m".
+String formatRouteEta(Duration duration) {
+  if (duration.inSeconds < 60) return 'now';
+  final minutes = duration.inMinutes;
+  if (minutes < 60) return '${minutes}m';
+  final hours = duration.inHours;
+  final rest = minutes.remainder(60);
+  return rest == 0 ? '${hours}h' : '${hours}h ${rest}m';
+}
+
+/// The clock time a route lands, e.g. "4:35 PM".
+String formatArrivalClock(DateTime eta) => DateFormat('h:mm a').format(eta);
+
 String greetingFor(DateTime now) {
   if (now.hour < 5) return 'Still up';
   if (now.hour < 12) return 'Good morning';

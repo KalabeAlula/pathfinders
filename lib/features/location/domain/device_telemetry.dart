@@ -48,8 +48,27 @@ abstract interface class DeviceTelemetrySource {
   /// May show the system prompt. Only called after the member opts in.
   Future<TelemetryPermission> requestPermission();
 
+  /// Whether the OS will hand over fixes while the app is off-screen.
+  Future<bool> hasBackgroundAccess();
+
+  /// Raises sharing to "always" and reports the result. On Android 11+ this
+  /// detours through system settings, because the OS stopped showing the
+  /// background prompt inline.
+  Future<bool> requestBackgroundAccess();
+
+  /// True when the member will see the tracking notification. Android hides
+  /// it without permission, which is the only sign that sharing still runs.
+  Future<bool> requestNotificationPermission();
+
   /// A single fix, or null when the device cannot produce one right now.
   Future<DeviceReading?> currentReading();
+
+  /// Fixes as the OS delivers them, including while the app is off-screen.
+  /// [interval] and [distanceFilter] are hints the platform may round.
+  Stream<DeviceReading> positionUpdates({
+    required Duration interval,
+    required double distanceFilter,
+  });
 
   Future<BatteryReading> battery();
 

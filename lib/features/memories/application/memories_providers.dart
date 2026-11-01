@@ -1,14 +1,19 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../data/mock_memories_repository.dart';
+import '../../auth/application/auth_providers.dart';
+import '../data/supabase_memories_repository.dart';
 import '../domain/memories_repository.dart';
 import '../domain/memory_post.dart';
 
 part 'memories_providers.g.dart';
 
 @Riverpod(keepAlive: true)
-MemoriesRepository memoriesRepository(Ref ref) => MockMemoriesRepository();
+MemoriesRepository memoriesRepository(Ref ref, String circleId) =>
+    SupabaseMemoriesRepository(
+      ref.watch(supabaseClientProvider),
+      circleId: circleId,
+    );
 
 @riverpod
-Stream<List<MemoryPost>> recentMemories(Ref ref) =>
-    ref.watch(memoriesRepositoryProvider).watchMemories();
+Stream<List<MemoryPost>> recentMemories(Ref ref, String circleId) =>
+    ref.watch(memoriesRepositoryProvider(circleId)).watchMemories();

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -179,6 +180,10 @@ class MemberDetailSheet extends ConsumerWidget {
                   ref.read(telemetryControllerProvider(currentUserId).notifier)
                       .openLocationSettings(),
                 ),
+                onEnableBackground: () => unawaited(
+                  ref.read(telemetryControllerProvider(currentUserId).notifier)
+                      .requestBackgroundAccess(),
+                ),
               ),
               const SizedBox(height: 24),
               SizedBox(
@@ -287,6 +292,7 @@ class _SharingSection extends StatelessWidget {
     required this.onRequestAccess,
     required this.onAppSettings,
     required this.onLocationSettings,
+    required this.onEnableBackground,
   });
 
   final TelemetryState state;
@@ -294,6 +300,7 @@ class _SharingSection extends StatelessWidget {
   final VoidCallback onRequestAccess;
   final VoidCallback onAppSettings;
   final VoidCallback onLocationSettings;
+  final VoidCallback onEnableBackground;
 
   @override
   Widget build(BuildContext context) {
@@ -342,7 +349,97 @@ class _SharingSection extends StatelessWidget {
           ),
           if (mode != PrivacyMode.values.last) const SizedBox(height: 8),
         ],
+        if (permission == TelemetryPermission.granted && !kIsWeb) ...[
+          const SizedBox(height: 12),
+          _BackgroundSharingTile(
+            state: state,
+            onEnable: onEnableBackground,
+          ),
+        ],
       ],
+    );
+  }
+}
+
+class _BackgroundSharingTile extends StatelessWidget {
+  const _BackgroundSharingTile({required this.state, required this.onEnable});
+
+  final TelemetryState state;
+  final VoidCallback onEnable;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final granted = state.backgroundGranted;
+
+    final subtitle = switch ((granted, state.mode)) {
+      (false, _) => 'Off — your crew only sees you while the app is open.',
+      (true, PrivacyMode.paused) =>
+        'On — picks up again when you resume sharing.',
+      (true, _) => 'On — keeps updating until you pause, even off-screen.',
+    };
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(AppRadius.tile),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(
+              granted
+                  ? Icons.smartphone_rounded
+                  : Icons.phone_iphone_rounded,
+              size: 20,
+              color: granted ? scheme.primary : scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Sharing with the app closed',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                if (granted && state.notificationsGranted == false) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Notifications are off, so Android will not show that '
+                    'sharing is running.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.error,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (!granted)
+            TextButton(
+              onPressed: onEnable,
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+              ),
+              child: const Text('Turn on'),
+            ),
+        ],
+      ),
     );
   }
 }

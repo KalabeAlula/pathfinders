@@ -141,18 +141,18 @@ final class DeviceTelemetrySourceProvider
 String _$deviceTelemetrySourceHash() =>
     r'0a3d298064c4ea7d0e6454847e6d45b122ef93cf';
 
-/// Drives this device's half of the circle telemetry: permission, a fix every
-/// [reportInterval], battery, and the member's sharing mode.
+/// Drives this device's half of the circle telemetry: permission, a fix stream
+/// that keeps running off-screen, battery, and the member's sharing mode.
 
 @ProviderFor(TelemetryController)
 final telemetryControllerProvider = TelemetryControllerFamily._();
 
-/// Drives this device's half of the circle telemetry: permission, a fix every
-/// [reportInterval], battery, and the member's sharing mode.
+/// Drives this device's half of the circle telemetry: permission, a fix stream
+/// that keeps running off-screen, battery, and the member's sharing mode.
 final class TelemetryControllerProvider
     extends $NotifierProvider<TelemetryController, TelemetryState> {
-  /// Drives this device's half of the circle telemetry: permission, a fix every
-  /// [reportInterval], battery, and the member's sharing mode.
+  /// Drives this device's half of the circle telemetry: permission, a fix stream
+  /// that keeps running off-screen, battery, and the member's sharing mode.
   TelemetryControllerProvider._({
     required TelemetryControllerFamily super.from,
     required String super.argument,
@@ -198,10 +198,10 @@ final class TelemetryControllerProvider
 }
 
 String _$telemetryControllerHash() =>
-    r'cd03251198082ad72804e809bd409460abc38781';
+    r'7b4b392187c6d1714d953de7a25594537874e387';
 
-/// Drives this device's half of the circle telemetry: permission, a fix every
-/// [reportInterval], battery, and the member's sharing mode.
+/// Drives this device's half of the circle telemetry: permission, a fix stream
+/// that keeps running off-screen, battery, and the member's sharing mode.
 
 final class TelemetryControllerFamily extends $Family
     with
@@ -221,8 +221,8 @@ final class TelemetryControllerFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Drives this device's half of the circle telemetry: permission, a fix every
-  /// [reportInterval], battery, and the member's sharing mode.
+  /// Drives this device's half of the circle telemetry: permission, a fix stream
+  /// that keeps running off-screen, battery, and the member's sharing mode.
 
   TelemetryControllerProvider call(String userId) =>
       TelemetryControllerProvider._(argument: userId, from: this);
@@ -231,8 +231,8 @@ final class TelemetryControllerFamily extends $Family
   String toString() => r'telemetryControllerProvider';
 }
 
-/// Drives this device's half of the circle telemetry: permission, a fix every
-/// [reportInterval], battery, and the member's sharing mode.
+/// Drives this device's half of the circle telemetry: permission, a fix stream
+/// that keeps running off-screen, battery, and the member's sharing mode.
 
 abstract class _$TelemetryController extends $Notifier<TelemetryState> {
   late final _$args = ref.$arg as String;

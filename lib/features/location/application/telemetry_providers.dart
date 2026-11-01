@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../auth/application/auth_providers.dart';
@@ -7,6 +8,7 @@ import '../data/geolocator_telemetry_source.dart';
 import '../data/supabase_telemetry_repository.dart';
 import '../domain/device_telemetry.dart';
 import '../domain/privacy_mode.dart';
+import '../domain/telemetry_cadence.dart';
 import '../domain/telemetry_failure.dart';
 import '../domain/telemetry_repository.dart';
 
@@ -27,15 +29,31 @@ class TelemetryState {
   const TelemetryState({
     this.mode = PrivacyMode.exact,
     this.permission,
+    this.backgroundGranted = false,
+    this.notificationsGranted,
     this.ready = false,
     this.lastSentAt,
+    this.lastReading,
     this.error,
   });
 
   final PrivacyMode mode;
   final TelemetryPermission? permission;
+
+  /// Whether the OS will still deliver fixes with the app off-screen.
+  final bool backgroundGranted;
+
+  /// Whether the member will see the foreground-service notification. Null
+  /// until we have asked (or when the platform has no such switch).
+  final bool? notificationsGranted;
+
   final bool ready;
   final DateTime? lastSentAt;
+
+  /// The most recent device fix, for screens that need the local position
+  /// immediately rather than after a database round trip.
+  final DeviceReading? lastReading;
+
   final String? error;
 
   /// True when this device is allowed to send a fix and the member wants one
@@ -43,6 +61,9 @@ class TelemetryState {
   bool get isSharing =>
       permission == TelemetryPermission.granted &&
       mode != PrivacyMode.paused;
+
+  /// True when sharing keeps running after the member leaves the app.
+  bool get isSharingInBackground => isSharing && backgroundGranted;
 
   /// True when the member asked for sharing but the platform is blocking it.
   bool get isBlocked =>
@@ -53,44 +74,70 @@ class TelemetryState {
   TelemetryState copyWith({
     PrivacyMode? mode,
     TelemetryPermission? permission,
+    bool? backgroundGranted,
+    bool? notificationsGranted,
     bool? ready,
     DateTime? lastSentAt,
+    DeviceReading? lastReading,
     String? error,
     bool clearError = false,
   }) {
     return TelemetryState(
       mode: mode ?? this.mode,
       permission: permission ?? this.permission,
+      backgroundGranted: backgroundGranted ?? this.backgroundGranted,
+      notificationsGranted: notificationsGranted ?? this.notificationsGranted,
       ready: ready ?? this.ready,
       lastSentAt: lastSentAt ?? this.lastSentAt,
+      lastReading: lastReading ?? this.lastReading,
       error: clearError ? null : (error ?? this.error),
     );
   }
 }
 
-/// Drives this device's half of the circle telemetry: permission, a fix every
-/// [reportInterval], battery, and the member's sharing mode.
+/// Drives this device's half of the circle telemetry: permission, a fix stream
+/// that keeps running off-screen, battery, and the member's sharing mode.
 @riverpod
 class TelemetryController extends _$TelemetryController {
-  static const Duration reportInterval = Duration(seconds: 30);
-
-  Timer? _timer;
+  Timer? _keepAlive;
+  Duration? _keepAlivePeriod;
+  StreamSubscription<DeviceReading>? _fixes;
+  AppLifecycleListener? _lifecycle;
+  TelemetryCadence? _cadence;
+  DeviceReading? _lastReading;
   bool _sending = false;
+  bool _askedForNotifications = false;
   String _userId = '';
 
   @override
   TelemetryState build(String userId) {
     _userId = userId;
+    _lifecycle = AppLifecycleListener(
+      onResume: () => unawaited(_refreshPermission()),
+    );
     ref.onDispose(() {
-      _timer?.cancel();
-      _timer = null;
+      _keepAlive?.cancel();
+      _keepAlive = null;
+      unawaited(_fixes?.cancel());
+      _fixes = null;
+      _lifecycle?.dispose();
+      _lifecycle = null;
     });
     unawaited(_bootstrap());
     return const TelemetryState();
   }
 
   /// Re-asks for access, e.g. after the member returns from system settings.
-  Future<void> requestAccess() => _startReporting(requestPermission: true);
+  Future<void> requestAccess() => _refreshPermission(request: true);
+
+  /// Raises sharing to "always", which is what lets fixes keep arriving after
+  /// the app leaves the screen.
+  Future<void> requestBackgroundAccess() async {
+    final granted =
+        await ref.read(deviceTelemetrySourceProvider).requestBackgroundAccess();
+    if (!ref.mounted) return;
+    _emit(state.copyWith(backgroundGranted: granted));
+  }
 
   Future<void> setMode(PrivacyMode mode) async {
     if (mode == state.mode) return;
@@ -99,8 +146,11 @@ class TelemetryController extends _$TelemetryController {
     _emit(state.copyWith(mode: mode, clearError: true));
 
     try {
-      await ref.read(telemetryRepositoryProvider(_userId)).setPrivacyMode(mode);
-      if (mode != PrivacyMode.paused) unawaited(_tick());
+      await ref
+          .read(telemetryRepositoryProvider(_userId))
+          .setPrivacyMode(mode);
+      if (!ref.mounted) return;
+      await _syncTracking();
     } on TelemetryFailure catch (error) {
       _emit(state.copyWith(mode: previous, error: error.message));
     }
@@ -120,30 +170,57 @@ class TelemetryController extends _$TelemetryController {
     } on TelemetryFailure catch (error) {
       _emit(state.copyWith(ready: true, error: error.message));
     }
-    await _startReporting(requestPermission: false);
+    await _refreshPermission();
   }
 
-  Future<void> _startReporting({required bool requestPermission}) async {
+  Future<void> _refreshPermission({bool request = false}) async {
     final source = ref.read(deviceTelemetrySourceProvider);
-    final permission = requestPermission
+    final permission = request
         ? await source.requestPermission()
         : await source.checkPermission();
+    final background = permission == TelemetryPermission.granted &&
+        await source.hasBackgroundAccess();
     if (!ref.mounted) return;
 
-    _emit(state.copyWith(permission: permission, clearError: true));
+    _emit(
+      state.copyWith(
+        permission: permission,
+        backgroundGranted: background,
+        clearError: true,
+      ),
+    );
+    await _syncTracking();
+  }
 
-    if (permission != TelemetryPermission.granted) {
-      _timer?.cancel();
-      _timer = null;
+  Future<void> _syncTracking() async {
+    final canShare = state.permission == TelemetryPermission.granted &&
+        state.mode != PrivacyMode.paused;
+
+    if (!canShare) {
+      // A paused member must never put a remembered point on the wire.
+      _lastReading = null;
+      await _stopFixes();
+      _restartKeepAlive(TelemetryCadence.batteryOnly.keepAlive);
+      await _send();
       return;
     }
 
-    _timer?.cancel();
-    _timer = Timer.periodic(reportInterval, (_) => unawaited(_tick()));
-    await _tick();
+    await _ensureNotificationAccess();
+    await _send();
   }
 
-  Future<void> _tick() async {
+  Future<void> _ensureNotificationAccess() async {
+    if (_askedForNotifications) return;
+    _askedForNotifications = true;
+
+    final granted = await ref
+        .read(deviceTelemetrySourceProvider)
+        .requestNotificationPermission();
+    if (!ref.mounted) return;
+    _emit(state.copyWith(notificationsGranted: granted));
+  }
+
+  Future<void> _send() async {
     if (_sending || !ref.mounted) return;
     _sending = true;
 
@@ -151,11 +228,27 @@ class TelemetryController extends _$TelemetryController {
       final source = ref.read(deviceTelemetrySourceProvider);
       final battery = await source.battery();
       final paused = state.mode == PrivacyMode.paused;
+      final canShare =
+          state.permission == TelemetryPermission.granted && !paused;
 
-      // A paused member never puts coordinates on the wire; the reading still
-      // carries battery so presence stays honest.
-      final reading = paused ? null : await source.currentReading();
+      if (canShare) {
+        final cadence = TelemetryCadence.forBattery(
+          percent: battery.percent,
+          isCharging: battery.isCharging,
+        );
+        if (_fixes == null || cadence != _cadence) {
+          _cadence = cadence;
+          _startFixes(cadence);
+        }
+        _restartKeepAlive(cadence.keepAlive);
+        await _primeReading(source);
+      } else {
+        _lastReading = null;
+        await _stopFixes();
+        _restartKeepAlive(TelemetryCadence.batteryOnly.keepAlive);
+      }
 
+      final reading = canShare ? _lastReading : null;
       await ref.read(telemetryRepositoryProvider(_userId)).report(
             point: reading?.point,
             accuracyMeters: reading?.accuracyMeters ?? 0,
@@ -164,6 +257,7 @@ class TelemetryController extends _$TelemetryController {
             isCharging: battery.isCharging,
           );
 
+      if (!ref.mounted) return;
       _emit(state.copyWith(lastSentAt: DateTime.now(), clearError: true));
     } on TelemetryFailure catch (error) {
       _emit(state.copyWith(error: error.message));
@@ -176,6 +270,67 @@ class TelemetryController extends _$TelemetryController {
     } finally {
       _sending = false;
     }
+  }
+
+  /// Gives the map something to show before the first streamed fix lands.
+  Future<void> _primeReading(DeviceTelemetrySource source) async {
+    if (_lastReading != null) return;
+    final reading = await source.currentReading();
+    _lastReading ??= reading;
+    if (reading != null && ref.mounted) {
+      _emit(state.copyWith(lastReading: reading));
+    }
+  }
+
+  void _startFixes(TelemetryCadence cadence) {
+    final old = _fixes;
+    StreamSubscription<DeviceReading>? sub;
+
+    try {
+      sub = ref
+          .read(deviceTelemetrySourceProvider)
+          .positionUpdates(
+            interval: cadence.interval,
+            distanceFilter: cadence.distanceFilter,
+          )
+          .listen(
+            (reading) {
+              if (!ref.mounted) return;
+              _lastReading = reading;
+              _emit(state.copyWith(lastReading: reading));
+              unawaited(_send());
+            },
+            onError: (Object _) {
+              // Access can be withdrawn while the stream runs. Drop it and let
+              // the next heartbeat rebuild it rather than retrying in a loop.
+              if (identical(_fixes, sub)) {
+                _fixes = null;
+                _cadence = null;
+              }
+              unawaited(sub?.cancel());
+            },
+            cancelOnError: true,
+          );
+    } catch (_) {
+      _cadence = null;
+    }
+
+    _fixes = sub;
+    unawaited(old?.cancel());
+  }
+
+  Future<void> _stopFixes() async {
+    final sub = _fixes;
+    _fixes = null;
+    _cadence = null;
+    await sub?.cancel();
+  }
+
+  void _restartKeepAlive(Duration period) {
+    if (_keepAlivePeriod == period && _keepAlive != null) return;
+    _keepAlive?.cancel();
+    _keepAlivePeriod = period;
+    _keepAlive = Timer.periodic(period, (_) => unawaited(_send()));
   }
 
   void _emit(TelemetryState next) {

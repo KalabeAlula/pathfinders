@@ -10,7 +10,7 @@ part of 'milestones_providers.dart';
 // ignore_for_file: type=lint, type=warning
 
 @ProviderFor(milestonesRepository)
-final milestonesRepositoryProvider = MilestonesRepositoryProvider._();
+final milestonesRepositoryProvider = MilestonesRepositoryFamily._();
 
 final class MilestonesRepositoryProvider
     extends
@@ -20,19 +20,26 @@ final class MilestonesRepositoryProvider
           MilestonesRepository
         >
     with $Provider<MilestonesRepository> {
-  MilestonesRepositoryProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'milestonesRepositoryProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
+  MilestonesRepositoryProvider._({
+    required MilestonesRepositoryFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'milestonesRepositoryProvider',
+         isAutoDispose: false,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
 
   @override
   String debugGetCreateSourceHash() => _$milestonesRepositoryHash();
+
+  @override
+  String toString() {
+    return r'milestonesRepositoryProvider'
+        ''
+        '($argument)';
+  }
 
   @$internal
   @override
@@ -42,7 +49,8 @@ final class MilestonesRepositoryProvider
 
   @override
   MilestonesRepository create(Ref ref) {
-    return milestonesRepository(ref);
+    final argument = this.argument as String;
+    return milestonesRepository(ref, argument);
   }
 
   /// {@macro riverpod.override_with_value}
@@ -52,46 +60,112 @@ final class MilestonesRepositoryProvider
       providerOverride: $SyncValueProvider<MilestonesRepository>(value),
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MilestonesRepositoryProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
 }
 
 String _$milestonesRepositoryHash() =>
-    r'4452a30921f37a56df3514dd94b9d5c0ce32f790';
+    r'd2b0b1369f3924b7f2decb67fd1682b20712efef';
 
-@ProviderFor(nextMilestone)
-final nextMilestoneProvider = NextMilestoneProvider._();
-
-final class NextMilestoneProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<SharedMilestone?>,
-          SharedMilestone?,
-          Stream<SharedMilestone?>
-        >
-    with $FutureModifier<SharedMilestone?>, $StreamProvider<SharedMilestone?> {
-  NextMilestoneProvider._()
+final class MilestonesRepositoryFamily extends $Family
+    with $FunctionalFamilyOverride<MilestonesRepository, String> {
+  MilestonesRepositoryFamily._()
     : super(
-        from: null,
-        argument: null,
         retry: null,
-        name: r'nextMilestoneProvider',
-        isAutoDispose: true,
+        name: r'milestonesRepositoryProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
+        isAutoDispose: false,
       );
 
+  MilestonesRepositoryProvider call(String circleId) =>
+      MilestonesRepositoryProvider._(argument: circleId, from: this);
+
   @override
-  String debugGetCreateSourceHash() => _$nextMilestoneHash();
+  String toString() => r'milestonesRepositoryProvider';
+}
+
+@ProviderFor(milestones)
+final milestonesProvider = MilestonesFamily._();
+
+final class MilestonesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<SharedMilestone>>,
+          List<SharedMilestone>,
+          Stream<List<SharedMilestone>>
+        >
+    with
+        $FutureModifier<List<SharedMilestone>>,
+        $StreamProvider<List<SharedMilestone>> {
+  MilestonesProvider._({
+    required MilestonesFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'milestonesProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$milestonesHash();
+
+  @override
+  String toString() {
+    return r'milestonesProvider'
+        ''
+        '($argument)';
+  }
 
   @$internal
   @override
-  $StreamProviderElement<SharedMilestone?> $createElement(
+  $StreamProviderElement<List<SharedMilestone>> $createElement(
     $ProviderPointer pointer,
   ) => $StreamProviderElement(pointer);
 
   @override
-  Stream<SharedMilestone?> create(Ref ref) {
-    return nextMilestone(ref);
+  Stream<List<SharedMilestone>> create(Ref ref) {
+    final argument = this.argument as String;
+    return milestones(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MilestonesProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
   }
 }
 
-String _$nextMilestoneHash() => r'2504db4ff98c70a85e8126419ae11fc3e18da7f7';
+String _$milestonesHash() => r'1e6722001bbc58a106ac442c4397a2595b55da52';
+
+final class MilestonesFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<List<SharedMilestone>>, String> {
+  MilestonesFamily._()
+    : super(
+        retry: null,
+        name: r'milestonesProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  MilestonesProvider call(String circleId) =>
+      MilestonesProvider._(argument: circleId, from: this);
+
+  @override
+  String toString() => r'milestonesProvider';
+}

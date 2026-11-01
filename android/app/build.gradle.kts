@@ -6,7 +6,9 @@ plugins {
 
 android {
     namespace = "com.pathfinders.pathfinders"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler_android requires API 37. targetSdk stays on Flutter's
+    // default, so app runtime behaviour does not change.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

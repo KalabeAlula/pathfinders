@@ -4,6 +4,13 @@
     <!-- Live circle sharing runs while the app is open; see the sharing sheet. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- "Always" is what lets fixes keep arriving once the app leaves the screen. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
+    <!-- The location foreground service geolocator starts for a continuous stream. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <!-- Android 13+ hides the service notification without this. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="pathfinders"
         android:name="${applicationName}"

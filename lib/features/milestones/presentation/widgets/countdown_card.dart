@@ -9,10 +9,12 @@ class CountdownCard extends StatelessWidget {
     super.key,
     required this.milestone,
     required this.now,
+    this.onTap,
   });
 
   final SharedMilestone milestone;
   final DateTime now;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +29,8 @@ class CountdownCard extends StatelessWidget {
           '${milestone.title}, ${formatCountdown(days)}. ${milestone.subtitle ?? ''}',
       child: BentoCard(
         padding: const EdgeInsets.all(16),
+        onTap: onTap,
+        semanticLabel: 'Next countdown. Add another.',
         gradient: LinearGradient(
           colors: kind.colors,
           begin: Alignment.topLeft,
@@ -52,6 +56,13 @@ class CountdownCard extends StatelessWidget {
                               letterSpacing: 1.1,
                             ),
                       ),
+                      if (onTap != null) const Spacer(),
+                      if (onTap != null)
+                        Icon(
+                          Icons.add_circle_outline_rounded,
+                          size: 12,
+                          color: faded,
+                        ),
                     ],
                   ),
                   const Spacer(),

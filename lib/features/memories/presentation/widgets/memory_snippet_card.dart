@@ -12,17 +12,21 @@ class MemorySnippetCard extends StatelessWidget {
     required this.memory,
     required this.author,
     required this.now,
+    this.onTap,
   });
 
   final MemoryPost memory;
   final UserProfile? author;
   final DateTime now;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return BentoCard(
       padding: const EdgeInsets.all(14),
+      onTap: onTap,
+      semanticLabel: 'Latest memory. Add another.',
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -149,6 +153,12 @@ class MemorySnippetCard extends StatelessWidget {
                             ),
                           ],
                         ),
+                      ),
+                    if (onTap != null)
+                      Icon(
+                        Icons.add_circle_outline_rounded,
+                        size: 13,
+                        color: scheme.onSurfaceVariant,
                       ),
                   ],
                 ),

@@ -10,7 +10,7 @@ part of 'memories_providers.dart';
 // ignore_for_file: type=lint, type=warning
 
 @ProviderFor(memoriesRepository)
-final memoriesRepositoryProvider = MemoriesRepositoryProvider._();
+final memoriesRepositoryProvider = MemoriesRepositoryFamily._();
 
 final class MemoriesRepositoryProvider
     extends
@@ -20,19 +20,26 @@ final class MemoriesRepositoryProvider
           MemoriesRepository
         >
     with $Provider<MemoriesRepository> {
-  MemoriesRepositoryProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'memoriesRepositoryProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
+  MemoriesRepositoryProvider._({
+    required MemoriesRepositoryFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'memoriesRepositoryProvider',
+         isAutoDispose: false,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
 
   @override
   String debugGetCreateSourceHash() => _$memoriesRepositoryHash();
+
+  @override
+  String toString() {
+    return r'memoriesRepositoryProvider'
+        ''
+        '($argument)';
+  }
 
   @$internal
   @override
@@ -42,7 +49,8 @@ final class MemoriesRepositoryProvider
 
   @override
   MemoriesRepository create(Ref ref) {
-    return memoriesRepository(ref);
+    final argument = this.argument as String;
+    return memoriesRepository(ref, argument);
   }
 
   /// {@macro riverpod.override_with_value}
@@ -52,13 +60,41 @@ final class MemoriesRepositoryProvider
       providerOverride: $SyncValueProvider<MemoriesRepository>(value),
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MemoriesRepositoryProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
 }
 
 String _$memoriesRepositoryHash() =>
-    r'8912d9e9593a0e7c0d00fe3da8cc409aace344f4';
+    r'f264191c577769880cfad4651b05877a9a2c5f2c';
+
+final class MemoriesRepositoryFamily extends $Family
+    with $FunctionalFamilyOverride<MemoriesRepository, String> {
+  MemoriesRepositoryFamily._()
+    : super(
+        retry: null,
+        name: r'memoriesRepositoryProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: false,
+      );
+
+  MemoriesRepositoryProvider call(String circleId) =>
+      MemoriesRepositoryProvider._(argument: circleId, from: this);
+
+  @override
+  String toString() => r'memoriesRepositoryProvider';
+}
 
 @ProviderFor(recentMemories)
-final recentMemoriesProvider = RecentMemoriesProvider._();
+final recentMemoriesProvider = RecentMemoriesFamily._();
 
 final class RecentMemoriesProvider
     extends
@@ -68,19 +104,26 @@ final class RecentMemoriesProvider
           Stream<List<MemoryPost>>
         >
     with $FutureModifier<List<MemoryPost>>, $StreamProvider<List<MemoryPost>> {
-  RecentMemoriesProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'recentMemoriesProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
+  RecentMemoriesProvider._({
+    required RecentMemoriesFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'recentMemoriesProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
 
   @override
   String debugGetCreateSourceHash() => _$recentMemoriesHash();
+
+  @override
+  String toString() {
+    return r'recentMemoriesProvider'
+        ''
+        '($argument)';
+  }
 
   @$internal
   @override
@@ -90,8 +133,37 @@ final class RecentMemoriesProvider
 
   @override
   Stream<List<MemoryPost>> create(Ref ref) {
-    return recentMemories(ref);
+    final argument = this.argument as String;
+    return recentMemories(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is RecentMemoriesProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
   }
 }
 
-String _$recentMemoriesHash() => r'4561ae1342acec8b14fc8cafd3ded011588d26fe';
+String _$recentMemoriesHash() => r'c3e1db5070b1b48a7e022e1bff01a5fab3dfdf33';
+
+final class RecentMemoriesFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<List<MemoryPost>>, String> {
+  RecentMemoriesFamily._()
+    : super(
+        retry: null,
+        name: r'recentMemoriesProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  RecentMemoriesProvider call(String circleId) =>
+      RecentMemoriesProvider._(argument: circleId, from: this);
+
+  @override
+  String toString() => r'recentMemoriesProvider';
+}

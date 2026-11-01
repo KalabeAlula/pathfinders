@@ -1,0 +1,149 @@
+import 'dart:async';
+import 'dart:developer' as developer;
+
+import 'package:supabase_flutter/supabase_flutter.dart' as sb;
+
+import '../domain/milestones_failure.dart';
+import '../domain/milestones_repository.dart';
+import '../domain/shared_milestone.dart';
+
+/// Reads and writes the shared countdown for one circle.
+class SupabaseMilestonesRepository implements MilestonesRepository {
+  SupabaseMilestonesRepository(this._client, {required this.circleId});
+
+  final sb.SupabaseClient _client;
+  final String circleId;
+
+  static const _columns =
+      'id, title, subtitle, due_on, kind, created_at';
+
+  @override
+  Stream<List<SharedMilestone>> watchMilestones() async* {
+    final changes = StreamController<void>.broadcast();
+    Timer? debounce;
+
+    void scheduleRefresh() {
+      debounce?.cancel();
+      debounce = Timer(const Duration(milliseconds: 250), () {
+        if (!changes.isClosed) changes.add(null);
+      });
+    }
+
+    final channel = _client
+        .channel('milestones-changes-$circleId')
+        .onPostgresChanges(
+          event: sb.PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'milestones',
+          callback: (_) => scheduleRefresh(),
+        )
+      ..subscribe();
+
+    try {
+      yield await _fetch();
+      await for (final _ in changes.stream) {
+        try {
+          yield await _fetch();
+        } catch (error) {
+          // Keep showing the last good list; the next event retries.
+          developer.log(
+            'Could not refresh milestones',
+            name: 'pathfinders.milestones',
+            error: error,
+          );
+        }
+      }
+    } finally {
+      debounce?.cancel();
+      await changes.close();
+      await _client.removeChannel(channel);
+    }
+  }
+
+  @override
+  Future<void> addMilestone({
+    required String createdBy,
+    required String title,
+    required DateTime date,
+    required MilestoneKind kind,
+    String? subtitle,
+  }) async {
+    final note = subtitle?.trim();
+    try {
+      await _client.from('milestones').insert({
+        'circle_id': circleId,
+        'created_by': createdBy,
+        'title': title.trim(),
+        'due_on': _dateOnly(date),
+        'kind': kind.name,
+        if (note != null && note.isNotEmpty) 'subtitle': note,
+      });
+    } on sb.PostgrestException catch (error) {
+      throw _mapFailure(
+        error,
+        fallback: 'Could not save that countdown. Check your connection and '
+            'try again.',
+      );
+    } on Exception {
+      throw const MilestonesFailure(
+        'Could not save that countdown. Check your connection and try again.',
+      );
+    }
+  }
+
+  Future<List<SharedMilestone>> _fetch() async {
+    try {
+      final rows = await _client
+          .from('milestones')
+          .select(_columns)
+          .eq('circle_id', circleId)
+          .order('due_on', ascending: true);
+
+      return [
+        for (final row in rows)
+          SharedMilestone(
+            id: row['id'] as String,
+            title: row['title'] as String,
+            date: DateTime.parse(row['due_on'] as String),
+            kind: _kind(row['kind']),
+            subtitle: _optionalLabel(row['subtitle']),
+          ),
+      ];
+    } on sb.PostgrestException catch (error) {
+      throw _mapFailure(
+        error,
+        fallback: 'Could not reach your milestones. Check your connection and '
+            'try again.',
+      );
+    }
+  }
+
+  static MilestoneKind _kind(Object? value) => MilestoneKind.values.firstWhere(
+        (kind) => kind.name == value,
+        orElse: () => MilestoneKind.goal,
+      );
+
+  static String? _optionalLabel(Object? value) {
+    if (value is! String) return null;
+    final label = value.trim();
+    return label.isEmpty ? null : label;
+  }
+
+  static String _dateOnly(DateTime date) {
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
+  }
+
+  static MilestonesFailure _mapFailure(
+    sb.PostgrestException error, {
+    required String fallback,
+  }) {
+    final message = switch (error.code) {
+      '23514' || '22001' => 'That title or note is a little too long.',
+      '42501' || 'PGRST301' => 'Sign in again to save this countdown.',
+      _ => null,
+    };
+    return MilestonesFailure(message ?? fallback, code: error.code);
+  }
+}
