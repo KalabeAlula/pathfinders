@@ -1,0 +1,980 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart' hide NavigationDestination;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
+
+import '../../../app/theme/app_tokens.dart';
+import '../../../core/config/mapbox_config.dart';
+import '../../circle/domain/circle_member.dart';
+import '../../location/application/telemetry_providers.dart';
+import '../../location/domain/geo_point.dart';
+import '../../location/presentation/widgets/map_circle_view.dart';
+import '../../location/presentation/widgets/map_marker_images.dart';
+import '../../location/presentation/widgets/mapbox_live_annotations.dart';
+import '../../location/presentation/widgets/mapbox_standard_style.dart';
+import '../application/destination_draft_providers.dart';
+import '../application/navigation_providers.dart';
+import '../domain/navigation_destination.dart';
+import '../domain/navigation_failure.dart';
+import '../domain/route_geometry.dart';
+import 'venue_selection.dart';
+
+const _fallbackCenter = GeoPoint(latitude: 8.999, longitude: 38.775);
+
+/// Full-screen Mapbox picker for the circle's shared destination.
+///
+/// A tap (or long-press) drops the pin where the finger landed. Afterwards the
+/// pin stays glued to the middle of the map, so dragging the map is the way to
+/// fine-tune the exact spot.
+class DestinationPickerScreen extends ConsumerStatefulWidget {
+  const DestinationPickerScreen({
+    super.key,
+    required this.circleId,
+    required this.currentUserId,
+    required this.members,
+    required this.onMemberTap,
+  });
+
+  final String circleId;
+  final String currentUserId;
+  final List<CircleMember> members;
+  final ValueChanged<CircleMember> onMemberTap;
+
+  @override
+  ConsumerState<DestinationPickerScreen> createState() =>
+      _DestinationPickerScreenState();
+}
+
+class _DestinationPickerScreenState
+    extends ConsumerState<DestinationPickerScreen> {
+  late final GeoPoint _initialCenter;
+  late final ViewportState _viewport;
+
+  MapboxMap? _map;
+  MapboxLiveAnnotations? _annotations;
+  PointAnnotationManager? _venueHighlights;
+  FeaturesetFeature? _selectedBuilding;
+  VenueHit? _selectedVenue;
+  bool _styleReady = false;
+  bool _moving = false;
+  bool _seeded = false;
+  bool _saving = false;
+  bool _querying = false;
+  bool _venueFlight = false;
+  String? _error;
+  double _zoom = 15.2;
+  int _idleRun = 0;
+  int _styleGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _initialCenter = _resolveInitialCenter();
+    _viewport = CameraViewportState(
+      center: Point(
+        coordinates: Position(
+          _initialCenter.longitude,
+          _initialCenter.latitude,
+        ),
+      ),
+      zoom: _zoom,
+      pitch: MapboxStandardStyle.pickerPitch,
+    );
+  }
+
+  GeoPoint _resolveInitialCenter() {
+    final destination =
+        ref.read(navigationControllerProvider(widget.circleId)).destination;
+    if (destination != null) return destination.point;
+
+    final reading = ref
+        .read(telemetryControllerProvider(widget.currentUserId))
+        .lastReading;
+    return reading?.point ?? _fallbackCenter;
+  }
+
+  @override
+  void dispose() {
+    _annotations?.dispose();
+    super.dispose();
+  }
+
+  void _seedDraft(NavigationDestination? destination) {
+    if (!mounted) return;
+    final provider = destinationDraftControllerProvider(widget.circleId);
+    if (ref.read(provider).hasPoint) return;
+
+    final controller = ref.read(provider.notifier);
+    if (destination != null) {
+      controller.seed(destination);
+      return;
+    }
+
+    final reading = ref
+        .read(telemetryControllerProvider(widget.currentUserId))
+        .lastReading;
+    if (reading != null) {
+      controller.select(reading.point.latitude, reading.point.longitude);
+    }
+  }
+
+  void _onMapCreated(MapboxMap map) {
+    _map = map;
+    map.addInteraction(
+      TapInteraction.onMap(_handleMapTap),
+      interactionID: 'picker-tap',
+    );
+    if (!kIsWeb) {
+      map.addInteraction(
+        LongTapInteraction.onMap(_handleMapTap),
+        interactionID: 'picker-long-tap',
+      );
+    }
+  }
+
+  Future<void> _handleMapTap(MapContentGestureContext context) async {
+    if (_querying) return;
+
+    final longitude = context.point.coordinates.lng.toDouble();
+    final latitude = context.point.coordinates.lat.toDouble();
+    final map = _map;
+
+    if (map == null || kIsWeb) {
+      _selectFallback(longitude, latitude);
+      return;
+    }
+
+    _querying = true;
+    try {
+      final venue = await venueAt(map, context.touchPosition, context.point);
+      if (!mounted) return;
+      if (venue != null) {
+        _selectVenue(venue);
+      } else {
+        _selectFallback(longitude, latitude);
+      }
+    } finally {
+      _querying = false;
+    }
+  }
+
+  void _selectFallback(double longitude, double latitude) {
+    _clearVenueSelection();
+    _select(longitude, latitude);
+    unawaited(_easeTo(longitude, latitude));
+  }
+
+  void _selectVenue(VenueHit venue) {
+    _selectedVenue = venue;
+    ref
+        .read(destinationDraftControllerProvider(widget.circleId).notifier)
+        .selectVenue(
+          latitude: venue.point.latitude,
+          longitude: venue.point.longitude,
+          name: venue.name,
+          category: venue.categoryLabel,
+          maki: venue.maki,
+        );
+    unawaited(_highlightBuilding(venue));
+    unawaited(_drawVenueHighlight(venue));
+    unawaited(_flyToVenue(venue.point));
+  }
+
+  void _clearVenueSelection() {
+    if (_selectedVenue == null && _selectedBuilding == null) return;
+    _selectedVenue = null;
+    unawaited(_highlightBuilding(null));
+    unawaited(_drawVenueHighlight(null));
+  }
+
+  Future<void> _highlightBuilding(VenueHit? venue) async {
+    final map = _map;
+    if (map == null) return;
+
+    final next = venue?.isBuilding == true ? venue!.feature : null;
+    final previous = _selectedBuilding;
+    if (previous == next) return;
+    _selectedBuilding = next;
+
+    try {
+      if (previous != null) {
+        await map.setFeatureStateForFeaturesetFeature(
+          previous,
+          StandardBuildingsState(select: false),
+        );
+      }
+      if (next != null) {
+        await map.setFeatureStateForFeaturesetFeature(
+          next,
+          StandardBuildingsState(select: true),
+        );
+      }
+    } catch (_) {
+      // Feature state needs a feature id and a settled Standard style.
+    }
+  }
+
+  Future<void> _drawVenueHighlight(VenueHit? venue) async {
+    final manager = _venueHighlights;
+    if (manager == null) return;
+
+    try {
+      await manager.deleteAll();
+      if (venue == null || !mounted) return;
+      final image = await MapMarkerImages.venueHighlight(
+        color: Theme.of(context).colorScheme.tertiary,
+      );
+      if (!mounted) return;
+      await manager.create(
+        PointAnnotationOptions(
+          geometry: Point(
+            coordinates: Position(venue.point.longitude, venue.point.latitude),
+          ),
+          image: image,
+          iconSize: 0.48,
+          iconAnchor: IconAnchor.CENTER,
+        ),
+      );
+    } catch (_) {
+      // Annotation managers are unimplemented on web.
+    }
+  }
+
+  Future<void> _flyToVenue(GeoPoint point) async {
+    final map = _map;
+    if (map == null) return;
+
+    _venueFlight = true;
+    _setMoving(true);
+    try {
+      await map.flyTo(
+        CameraOptions(
+          center: Point(
+            coordinates: Position(point.longitude, point.latitude),
+          ),
+          zoom: _zoom < 16.2 ? 16.2 : _zoom,
+          pitch: MapboxStandardStyle.venuePitch,
+        ),
+        MapAnimationOptions(duration: 1100),
+      );
+    } catch (_) {
+      // Camera animations are best effort.
+    }
+    _setMoving(false);
+  }
+
+  void _select(double longitude, double latitude, {String? label}) {
+    ref
+        .read(destinationDraftControllerProvider(widget.circleId).notifier)
+        .select(latitude, longitude, label: label);
+  }
+
+  void _onStyleLoaded(StyleLoadedEventData event) {
+    _styleReady = true;
+    _annotations?.dispose();
+    final map = _map;
+    if (map == null) return;
+
+    unawaited(
+      MapboxStandardStyle.apply(
+        map,
+        dark: Theme.of(context).brightness == Brightness.dark,
+      ),
+    );
+
+    final annotations = MapboxLiveAnnotations(map, iconScale: 0.5);
+    annotations.onMemberTapped = (memberId) {
+      for (final member in widget.members) {
+        if (member.profile.id == memberId) {
+          widget.onMemberTap(member);
+          return;
+        }
+      }
+    };
+    _annotations = annotations;
+    unawaited(annotations.initialize());
+    _syncAnnotations();
+
+    _selectedBuilding = null;
+    unawaited(_restoreVenueHighlight(map));
+  }
+
+  Future<void> _restoreVenueHighlight(MapboxMap map) async {
+    final generation = ++_styleGeneration;
+    try {
+      final manager = await map.annotations.createPointAnnotationManager(
+        id: 'venue-highlight-$generation',
+      );
+      await manager.setIconAllowOverlap(true);
+      if (!mounted) return;
+      _venueHighlights = manager;
+
+      final venue = _selectedVenue;
+      if (venue != null) {
+        await _highlightBuilding(venue);
+        await _drawVenueHighlight(venue);
+      }
+    } catch (_) {
+      // Web has no annotation managers; the venue card still drives selection.
+    }
+  }
+
+  void _syncAnnotations() {
+    final annotations = _annotations;
+    if (!_styleReady || annotations == null || !mounted) return;
+
+    final navigation =
+        ref.read(navigationControllerProvider(widget.circleId));
+    final destination = navigation.destination;
+    final view = MapCircleView.from(
+      members: widget.members,
+      currentUserId: widget.currentUserId,
+      navigation: navigation,
+      scheme: Theme.of(context).colorScheme,
+    );
+
+    unawaited(
+      annotations.sync(
+        members: view.pins,
+        routes: view.lines,
+        destination: destination?.point,
+        destinationColor: Theme.of(context).colorScheme.tertiary,
+      ),
+    );
+  }
+
+  void _setMoving(bool moving) {
+    if (!mounted || _moving == moving) return;
+    setState(() => _moving = moving);
+  }
+
+  Future<void> _easeTo(double longitude, double latitude) async {
+    final map = _map;
+    if (map == null) return;
+    _setMoving(true);
+
+    try {
+      await map.easeTo(
+        CameraOptions(
+          center: Point(coordinates: Position(longitude, latitude)),
+          zoom: _zoom,
+          pitch: 0,
+        ),
+        MapAnimationOptions(duration: 450),
+      );
+    } catch (_) {
+      // A style swap can reject the camera mid-flight.
+    }
+    _setMoving(false);
+  }
+
+  Future<void> _handleIdle() async {
+    final map = _map;
+    if (map == null || !mounted) return;
+
+    final run = ++_idleRun;
+    try {
+      final camera = await map.getCameraState();
+      if (!mounted || run != _idleRun) return;
+
+      _zoom = camera.zoom;
+      _setMoving(false);
+
+      // The first idle after a venue flight is the camera arriving at a point
+      // the draft already holds, so it must not be treated as a pan.
+      if (_venueFlight) {
+        _venueFlight = false;
+        return;
+      }
+
+      final latitude = camera.center.coordinates.lat.toDouble();
+      final longitude = camera.center.coordinates.lng.toDouble();
+      final draft =
+          ref.read(destinationDraftControllerProvider(widget.circleId));
+      final drifted = !draft.hasPoint ||
+          distanceMeters(
+                GeoPoint(
+                  latitude: draft.latitude!,
+                  longitude: draft.longitude!,
+                ),
+                GeoPoint(latitude: latitude, longitude: longitude),
+              ) >
+              4;
+
+      if (drifted) {
+        _clearVenueSelection();
+        _select(longitude, latitude);
+      }
+    } catch (_) {
+      // Ignore a camera read that raced a style reload.
+    }
+  }
+
+  Future<void> _goToMyLocation() async {
+    final messenger = ScaffoldMessenger.of(context);
+    var reading = ref
+        .read(telemetryControllerProvider(widget.currentUserId))
+        .lastReading;
+
+    if (reading == null) {
+      await ref
+          .read(telemetryControllerProvider(widget.currentUserId).notifier)
+          .requestAccess();
+      if (!mounted) return;
+      reading = ref
+          .read(telemetryControllerProvider(widget.currentUserId))
+          .lastReading;
+    }
+
+    if (reading == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Waiting for a location fix…')),
+      );
+      return;
+    }
+
+    final map = _map;
+    if (map == null) return;
+    _setMoving(true);
+    try {
+      await map.flyTo(
+        CameraOptions(
+          center: Point(
+            coordinates: Position(
+              reading.point.longitude,
+              reading.point.latitude,
+            ),
+          ),
+          zoom: 16.2,
+          pitch: 0,
+        ),
+        MapAnimationOptions(duration: 900),
+      );
+    } catch (_) {
+      // Camera animations are best effort.
+    }
+    _setMoving(false);
+  }
+
+  Future<void> _confirm() async {
+    final draft = ref.read(destinationDraftControllerProvider(widget.circleId));
+    final point = draft.point;
+    if (point == null || _saving) return;
+
+    final label = draft.label?.trim().isNotEmpty == true
+        ? draft.label!.trim()
+        : draft.coordinates;
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      await ref
+          .read(navigationRepositoryProvider(widget.circleId))
+          .setDestination(
+            label: label,
+            latitude: point.latitude,
+            longitude: point.longitude,
+            setBy: widget.currentUserId,
+          );
+      if (!mounted) return;
+      navigator.pop(true);
+      messenger.showSnackBar(
+        SnackBar(content: Text('Everyone is heading to $label.')),
+      );
+    } on NavigationFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = failure.message;
+      });
+    }
+  }
+
+  Future<void> _endNavigation() async {
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      await ref
+          .read(navigationRepositoryProvider(widget.circleId))
+          .clearDestination();
+      if (!mounted) return;
+      navigator.pop(true);
+      messenger.showSnackBar(const SnackBar(content: Text('Navigation ended.')));
+    } on NavigationFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = failure.message;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final navigation = ref.watch(navigationControllerProvider(widget.circleId));
+    final draft = ref.watch(destinationDraftControllerProvider(widget.circleId));
+
+    if (!_seeded) {
+      _seeded = true;
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _seedDraft(navigation.destination),
+      );
+    }
+
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    final configured = MapboxConfig.isConfigured;
+
+    return Scaffold(
+      backgroundColor: scheme.surface,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: configured
+                ? MapWidget(
+                    styleUri: MapboxStandardStyle.uri,
+                    viewport: _viewport,
+                    onMapCreated: _onMapCreated,
+                    onStyleLoadedListener: _onStyleLoaded,
+                    onCameraChangeListener: (_) => _setMoving(true),
+                    onMapIdleListener: (_) => unawaited(_handleIdle()),
+                  )
+                : const _MissingMapToken(),
+          ),
+          if (configured && draft.hasPoint && !draft.isVenue)
+            Positioned.fill(
+              child: _CenterPin(moving: _moving, color: scheme.tertiary),
+            ),
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 8,
+            left: 12,
+            right: 12,
+            child: _PickerHeader(onClose: () => Navigator.of(context).pop()),
+          ),
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: safeBottom + 12,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (configured)
+                  _LocateButton(onTap: () => unawaited(_goToMyLocation())),
+                const SizedBox(height: AppSpacing.sm),
+                _SelectionSheet(
+                  draft: draft,
+                  configured: configured,
+                  saving: _saving,
+                  error: _error,
+                  hasActiveDestination: navigation.destination != null,
+                  onConfirm: _confirm,
+                  onEnd: _endNavigation,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PickerHeader extends StatelessWidget {
+  const _PickerHeader({required this.onClose});
+
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Row(
+      children: [
+        _MapRoundButton(
+          icon: Icons.close_rounded,
+          tooltip: 'Close map',
+          onTap: onClose,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerLowest.withValues(alpha: 0.94),
+              borderRadius: BorderRadius.circular(AppRadius.tile),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Pick a destination', style: theme.textTheme.titleSmall),
+                const SizedBox(height: 1),
+                Text(
+                  'Tap a cafe, cinema or building · drag to fine-tune',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SelectionSheet extends StatelessWidget {
+  const _SelectionSheet({
+    required this.draft,
+    required this.configured,
+    required this.saving,
+    required this.error,
+    required this.hasActiveDestination,
+    required this.onConfirm,
+    required this.onEnd,
+  });
+
+  final DestinationDraft draft;
+  final bool configured;
+  final bool saving;
+  final String? error;
+  final bool hasActiveDestination;
+  final VoidCallback onConfirm;
+  final VoidCallback onEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final canConfirm = configured && draft.hasPoint && !saving;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest.withValues(alpha: 0.97),
+        borderRadius: BorderRadius.circular(AppRadius.sheet),
+        border: Border.all(color: scheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.14),
+            blurRadius: 26,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: scheme.tertiaryContainer,
+                ),
+                child: Icon(
+                  draft.isVenue
+                      ? venueIcon(category: draft.category, maki: draft.maki)
+                      : Icons.flag_rounded,
+                  size: 20,
+                  color: scheme.onTertiaryContainer,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      draft.displayLabel,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    if (draft.isVenue && draft.category != null) ...[
+                      const SizedBox(height: 1),
+                      Text(
+                        draft.category!,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: scheme.tertiary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 2),
+                    Text(
+                      draft.resolvingAddress
+                          ? 'Looking up the address…'
+                          : draft.hasPoint
+                              ? (draft.isVenue
+                                  ? draft.detail
+                                  : draft.coordinates)
+                              : 'Tap a place or the map to choose a point',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (draft.resolvingAddress)
+                const Padding(
+                  padding: EdgeInsets.only(left: 8, top: 3),
+                  child: SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 1.8),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: canConfirm ? onConfirm : null,
+              icon: saving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.flag_rounded, size: 18),
+              label: Text(
+                saving ? 'Setting destination…' : 'Set as Group Destination',
+              ),
+            ),
+          ),
+          if (!configured) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Add your Mapbox public token to mapbox.env.json and restart the '
+              'app to use the map.',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          if (hasActiveDestination) ...[
+            const SizedBox(height: 2),
+            Align(
+              alignment: Alignment.center,
+              child: TextButton(
+                onPressed: saving ? null : onEnd,
+                child: Text(
+                  'End current navigation',
+                  style: TextStyle(color: scheme.error),
+                ),
+              ),
+            ),
+          ],
+          if (error != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              error!,
+              style: theme.textTheme.bodySmall?.copyWith(color: scheme.error),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CenterPin extends StatelessWidget {
+  const _CenterPin({required this.moving, required this.color});
+
+  final bool moving;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Align(
+        alignment: Alignment.center,
+        child: Transform.translate(
+          offset: const Offset(0, -26),
+          child: AnimatedScale(
+            scale: moving ? 1.14 : 1,
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOut,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: color,
+                    border: Border.all(color: Colors.white, width: 3),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: moving ? 0.34 : 0.22,
+                        ),
+                        blurRadius: moving ? 16 : 8,
+                        offset: Offset(0, moving ? 8 : 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.flag_rounded,
+                    size: 20,
+                    color: Colors.white,
+                  ),
+                ),
+                CustomPaint(
+                  size: const Size(14, 10),
+                  painter: _PinTailPainter(color),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PinTailPainter extends CustomPainter {
+  const _PinTailPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(_PinTailPainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
+class _LocateButton extends StatelessWidget {
+  const _LocateButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _MapRoundButton(
+      icon: Icons.my_location_rounded,
+      tooltip: 'My location',
+      onTap: onTap,
+    );
+  }
+}
+
+class _MapRoundButton extends StatelessWidget {
+  const _MapRoundButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: scheme.surfaceContainerLowest.withValues(alpha: 0.96),
+        shape: const CircleBorder(),
+        elevation: 2,
+        shadowColor: Colors.black.withValues(alpha: 0.2),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Icon(icon, size: 20, color: scheme.onSurface),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MissingMapToken extends StatelessWidget {
+  const _MissingMapToken();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            scheme.surfaceContainerHigh,
+            scheme.surfaceContainerHighest,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      padding: const EdgeInsets.all(32),
+      alignment: Alignment.center,
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLowest.withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(AppRadius.tile),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.key_rounded, size: 22, color: scheme.onSurfaceVariant),
+            const SizedBox(height: AppSpacing.sm),
+            Text('Mapbox token needed', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              'Start the app with '
+              '--dart-define-from-file=mapbox.env.json so the map can load.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

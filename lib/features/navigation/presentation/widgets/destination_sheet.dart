@@ -6,15 +6,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_tokens.dart';
 import '../../../../core/config/mapbox_config.dart';
 import '../../../../core/utils/time_format.dart';
+import '../../../circle/domain/circle_member.dart';
 import '../../../location/application/telemetry_providers.dart';
 import '../../application/navigation_providers.dart';
 import '../../domain/navigation_failure.dart';
 import '../../domain/place_suggestion.dart';
+import '../destination_picker_screen.dart';
 
 Future<void> showDestinationSheet(
   BuildContext context, {
   required String circleId,
   required String currentUserId,
+  required List<CircleMember> members,
+  required ValueChanged<CircleMember> onMemberTap,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -23,6 +27,8 @@ Future<void> showDestinationSheet(
     builder: (_) => DestinationSheet(
       circleId: circleId,
       currentUserId: currentUserId,
+      members: members,
+      onMemberTap: onMemberTap,
     ),
   );
 }
@@ -33,10 +39,14 @@ class DestinationSheet extends ConsumerStatefulWidget {
     super.key,
     required this.circleId,
     required this.currentUserId,
+    required this.members,
+    required this.onMemberTap,
   });
 
   final String circleId;
   final String currentUserId;
+  final List<CircleMember> members;
+  final ValueChanged<CircleMember> onMemberTap;
 
   @override
   ConsumerState<DestinationSheet> createState() => _DestinationSheetState();
@@ -137,6 +147,21 @@ class _DestinationSheetState extends ConsumerState<DestinationSheet> {
     }
   }
 
+  Future<void> _chooseOnMap() async {
+    final picked = await Navigator.of(context, rootNavigator: true).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => DestinationPickerScreen(
+          circleId: widget.circleId,
+          currentUserId: widget.currentUserId,
+          members: widget.members,
+          onMemberTap: widget.onMemberTap,
+        ),
+      ),
+    );
+    if (!mounted || picked != true) return;
+    Navigator.of(context).pop();
+  }
+
   Future<void> _endNavigation() async {
     setState(() {
       _saving = true;
@@ -226,6 +251,15 @@ class _DestinationSheetState extends ConsumerState<DestinationSheet> {
                           ),
                         )
                       : null,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _saving ? null : _chooseOnMap,
+                  icon: const Icon(Icons.map_outlined, size: 18),
+                  label: const Text('Choose on map'),
                 ),
               ),
               if (_results.isNotEmpty) ...[

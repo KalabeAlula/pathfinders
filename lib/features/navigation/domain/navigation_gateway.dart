@@ -11,4 +11,8 @@ abstract interface class NavigationGateway {
     String query, {
     GeoPoint? proximity,
   });
+
+  /// The closest known address or place name, or null for open water and
+  /// other spots Mapbox has no name for.
+  Future<String?> reverseGeocode(GeoPoint point);
 }

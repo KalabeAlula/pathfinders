@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- OSM map tiles and realtime sync need network access in release. -->
+    <!-- Mapbox map tiles and realtime sync need network access in release. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Live circle sharing runs while the app is open; see the sharing sheet. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>

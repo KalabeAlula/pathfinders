@@ -98,6 +98,32 @@ class MapboxNavigationGateway implements NavigationGateway {
     ];
   }
 
+  @override
+  Future<String?> reverseGeocode(GeoPoint point) async {
+    _ensureConfigured();
+
+    final uri = Uri.https(
+      _host,
+      '/geocoding/v5/mapbox.places/'
+          '${point.longitude},${point.latitude}.json',
+      {
+        'limit': '1',
+        'types': 'address,poi,place,locality,neighborhood',
+        'access_token': _token,
+      },
+    );
+
+    final body = await _getJson(uri);
+    final features = body['features'];
+    if (features is! List || features.isEmpty) return null;
+
+    final first = features.first;
+    if (first is! Map<String, dynamic>) return null;
+    final name = first['place_name'];
+    if (name is! String || name.trim().isEmpty) return null;
+    return name.trim();
+  }
+
   Future<Map<String, dynamic>> _getJson(Uri uri) async {
     try {
       final response = await _client.get(uri).timeout(

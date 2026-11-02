@@ -16,6 +16,13 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 subprojects {
+    // mapbox_maps_flutter only applies KGP for AGP < 9 because it expects AGP 9's
+    // built-in Kotlin, which this project turns off via android.builtInKotlin.
+    if (name == "mapbox_maps_flutter_mobile") {
+        pluginManager.apply("org.jetbrains.kotlin.android")
+    }
+}
+subprojects {
     project.evaluationDependsOn(":app")
 }
 

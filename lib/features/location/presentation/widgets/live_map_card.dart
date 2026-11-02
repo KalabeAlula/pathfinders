@@ -1,20 +1,26 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import '../../../../app/theme/app_tokens.dart';
 import '../../../../app/widgets/bento_card.dart';
-import '../../../../app/widgets/member_avatar.dart';
+import '../../../../core/config/mapbox_config.dart';
 import '../../../../core/utils/time_format.dart';
 import '../../../circle/domain/circle_member.dart';
 import '../../../navigation/application/navigation_providers.dart';
 import '../../../navigation/application/navigation_state.dart';
+import '../../../navigation/presentation/destination_picker_screen.dart';
 import '../../../navigation/presentation/widgets/destination_sheet.dart';
+import '../../domain/geo_point.dart';
+import 'map_circle_view.dart';
+import 'mapbox_live_annotations.dart';
+import 'mapbox_standard_style.dart';
 
-class LiveMapCard extends ConsumerStatefulWidget {
+const _fallbackCenter = GeoPoint(latitude: 8.999, longitude: 38.775);
+
+class LiveMapCard extends ConsumerWidget {
   const LiveMapCard({
     super.key,
     required this.circleId,
@@ -28,218 +34,50 @@ class LiveMapCard extends ConsumerStatefulWidget {
   final String currentUserId;
   final ValueChanged<CircleMember> onMemberTap;
 
-  @override
-  ConsumerState<LiveMapCard> createState() => _LiveMapCardState();
-}
-
-class _LiveMapCardState extends ConsumerState<LiveMapCard> {
-  final MapController _mapController = MapController();
-
-  static const _fitInterval = Duration(seconds: 2);
-  static const _peerRouteColors = <Color>[
-    Color(0xFF3F6FA8),
-    Color(0xFF6F9E62),
-    Color(0xFF8C5BA8),
-    Color(0xFFC7974C),
-    Color(0xFF4A9A9A),
-  ];
-
-  bool _mapReady = false;
-  DateTime? _lastFitAt;
-  Timer? _fitTimer;
-  List<LatLng> _pendingFit = const [];
-  String? _pendingFitSignature;
-
-  @override
-  void dispose() {
-    _fitTimer?.cancel();
-    _mapController.dispose();
-    super.dispose();
-  }
-
-  void _openDestinationSheet() {
+  void _openDestinationSheet(BuildContext context) {
     showDestinationSheet(
       context,
-      circleId: widget.circleId,
-      currentUserId: widget.currentUserId,
+      circleId: circleId,
+      currentUserId: currentUserId,
+      members: members,
+      onMemberTap: onMemberTap,
     );
   }
 
-  /// Keeps every located member and the shared destination in frame. Fits are
-  /// throttled so new GPS fixes do not yank the camera around constantly.
-  void _scheduleFit(List<LatLng> points) {
-    if (points.isEmpty || !_mapReady) return;
-
-    final signature = [
-      for (final point in points)
-        '${point.latitude.toStringAsFixed(3)},'
-            '${point.longitude.toStringAsFixed(3)}',
-    ].join('|');
-    if (signature == _pendingFitSignature) return;
-
-    _pendingFitSignature = signature;
-    _pendingFit = List.unmodifiable(points);
-
-    final now = DateTime.now();
-    final last = _lastFitAt;
-    final elapsed = last == null ? null : now.difference(last);
-    final remaining = elapsed == null || elapsed >= _fitInterval
-        ? Duration.zero
-        : _fitInterval - elapsed;
-
-    _fitTimer?.cancel();
-    if (remaining == Duration.zero) {
-      _fitNow();
-    } else {
-      _fitTimer = Timer(remaining, _fitNow);
-    }
-  }
-
-  void _fitNow() {
-    if (!mounted || !_mapReady || _pendingFit.isEmpty) return;
-    _lastFitAt = DateTime.now();
-    final fit = CameraFit.coordinates(
-      coordinates: _pendingFit,
-      padding: const EdgeInsets.fromLTRB(46, 52, 46, 60),
-      maxZoom: 15,
+  void _openPicker(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DestinationPickerScreen(
+          circleId: circleId,
+          currentUserId: currentUserId,
+          members: members,
+          onMemberTap: onMemberTap,
+        ),
+      ),
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_mapReady) return;
-      _mapController.fitCamera(fit);
-    });
   }
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final navigation = ref.watch(navigationControllerProvider(widget.circleId));
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final navigation = ref.watch(navigationControllerProvider(circleId));
     final destination = navigation.destination;
+    final view = MapCircleView.from(
+      members: members,
+      currentUserId: currentUserId,
+      navigation: navigation,
+      scheme: scheme,
+    );
 
-    final located = widget.members
-        .where((member) => member.status?.location != null)
-        .toList(growable: false);
-    final points = [
-      for (final member in located)
-        LatLng(
-          member.status!.location!.latitude,
-          member.status!.location!.longitude,
-        ),
-    ];
     final destinationPoint = destination == null
         ? null
-        : LatLng(destination.latitude, destination.longitude);
-    final fitPoints = [
-      ...points,
-      ?destinationPoint,
-    ];
-
-    final pausedCount = widget.members
-        .where((member) => member.status?.isPaused ?? false)
-        .length;
-
-    final peerIds = [
-      for (final member in widget.members)
-        if (member.profile.id != widget.currentUserId) member.profile.id,
-    ]..sort();
-    final routeColors = <String, Color>{
-      for (final member in widget.members)
-        member.profile.id: member.profile.id == widget.currentUserId
-            ? scheme.primary
-            : _peerRouteColors[
-                peerIds.indexOf(member.profile.id) % _peerRouteColors.length],
-    };
-
-    final routes = [
-      for (final member in widget.members)
-        if (navigation.routeFor(member.profile.id) case final route?)
-          (member: member, route: route),
-    ]..sort(
-        (a, b) => a.member.profile.id == widget.currentUserId
-            ? 1
-            : b.member.profile.id == widget.currentUserId
-                ? -1
-                : 0,
-      );
-
-    _scheduleFit(fitPoints);
-
-    final map = FlutterMap(
-      mapController: _mapController,
-      options: MapOptions(
-        initialCenter: destinationPoint ??
-            (points.isEmpty ? const LatLng(8.999, 38.775) : points.first),
-        initialZoom: 14.5,
-        backgroundColor: scheme.surfaceContainerHigh,
-        interactionOptions:
-            const InteractionOptions(flags: InteractiveFlag.none),
-        onMapReady: () {
-          _mapReady = true;
-          _lastFitAt = null;
-          _pendingFitSignature = null;
-          _scheduleFit(fitPoints);
-        },
-      ),
-      children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.pathfinders.pathfinders',
-        ),
-        PolylineLayer(
-          polylines: [
-            for (final entry in routes)
-              Polyline(
-                points: [
-                  for (final point in entry.route.plan.geometry)
-                    LatLng(point.latitude, point.longitude),
-                ],
-                strokeWidth:
-                    entry.member.profile.id == widget.currentUserId ? 5.5 : 4,
-                color: routeColors[entry.member.profile.id]!,
-                borderStrokeWidth: 1.5,
-                borderColor: Colors.white.withValues(alpha: 0.9),
-              ),
-          ],
-        ),
-        if (destinationPoint != null)
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: destinationPoint,
-                width: 44,
-                height: 50,
-                child: _DestinationMarker(color: scheme.tertiary),
-              ),
-            ],
-          ),
-        MarkerLayer(
-          markers: [
-            for (final member in located.reversed)
-              Marker(
-                point: LatLng(
-                  member.status!.location!.latitude,
-                  member.status!.location!.longitude,
-                ),
-                width: 58,
-                height: 62,
-                child: _MemberMarker(
-                  member: member,
-                  isCurrentUser: member.profile.id == widget.currentUserId,
-                  accent: routeColors[member.profile.id],
-                  hasRoute: navigation.routeFor(member.profile.id) != null,
-                  onTap: () => widget.onMemberTap(member),
-                ),
-              ),
-          ],
-        ),
-        SimpleAttributionWidget(
-          source: Text(
-            'OpenStreetMap',
-            style: TextStyle(fontSize: 9, color: scheme.onSurfaceVariant),
-          ),
-          backgroundColor: scheme.surfaceContainerLowest.withValues(alpha: 0.85),
-        ),
-      ],
-    );
+        : GeoPoint(
+            latitude: destination.latitude,
+            longitude: destination.longitude,
+          );
+    final initialCenter = destinationPoint ??
+        (view.pins.isEmpty ? null : _pinPoint(view.pins.first));
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppRadius.card),
@@ -247,7 +85,30 @@ class _LiveMapCardState extends ConsumerState<LiveMapCard> {
         padding: EdgeInsets.zero,
         child: Stack(
           children: [
-            Positioned.fill(child: map),
+            Positioned.fill(
+              child: _MapPreview(
+                pins: view.pins,
+                routes: view.lines,
+                destination: destinationPoint,
+                destinationColor: scheme.tertiary,
+                initialCenter: initialCenter ?? _fallbackCenter,
+                darkMode: theme.brightness == Brightness.dark,
+                onMemberTapped: (memberId) {
+                  for (final member in members) {
+                    if (member.profile.id == memberId) {
+                      onMemberTap(member);
+                      return;
+                    }
+                  }
+                },
+              ),
+            ),
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _openPicker(context),
+              ),
+            ),
             Positioned(
               top: 12,
               left: 12,
@@ -258,7 +119,7 @@ class _LiveMapCardState extends ConsumerState<LiveMapCard> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (located.isEmpty)
+                        if (view.locatedCount == 0)
                           Icon(
                             Icons.schedule_rounded,
                             size: 11,
@@ -275,10 +136,10 @@ class _LiveMapCardState extends ConsumerState<LiveMapCard> {
                           ),
                         const SizedBox(width: 5),
                         Text(
-                          located.isEmpty
+                          view.locatedCount == 0
                               ? 'Waiting for locations'
-                              : 'Live · ${located.length}/${widget.members.length}',
-                          style: Theme.of(context).textTheme.labelSmall,
+                              : 'Live · ${view.locatedCount}/${members.length}',
+                          style: theme.textTheme.labelSmall,
                         ),
                       ],
                     ),
@@ -290,29 +151,31 @@ class _LiveMapCardState extends ConsumerState<LiveMapCard> {
                         : Icons.flag_rounded,
                     label: destination?.label ?? 'Meet up',
                     accent: destination == null ? null : scheme.tertiary,
-                    onTap: _openDestinationSheet,
+                    onTap: () => _openDestinationSheet(context),
                   ),
                 ],
               ),
             ),
-            if (located.isEmpty)
+            if (view.locatedCount == 0)
               Positioned.fill(
-                child: Center(
-                  child: _MapPill(
-                    child: Text(
-                      'No live locations yet',
-                      style: Theme.of(context).textTheme.labelSmall,
+                child: IgnorePointer(
+                  child: Center(
+                    child: _MapPill(
+                      child: Text(
+                        'No live locations yet',
+                        style: theme.textTheme.labelSmall,
+                      ),
                     ),
                   ),
                 ),
               ),
             Positioned(
               left: 12,
-              right: 78,
+              right: 68,
               bottom: 10,
               child: Row(
                 children: [
-                  if (pausedCount > 0) ...[
+                  if (view.pausedCount > 0) ...[
                     _MapPill(
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -324,8 +187,8 @@ class _LiveMapCardState extends ConsumerState<LiveMapCard> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '$pausedCount paused',
-                            style: Theme.of(context).textTheme.labelSmall,
+                            '${view.pausedCount} paused',
+                            style: theme.textTheme.labelSmall,
                           ),
                         ],
                       ),
@@ -336,18 +199,318 @@ class _LiveMapCardState extends ConsumerState<LiveMapCard> {
                     child: _NavigationStatus(
                       destinationSet: destination != null,
                       isConfigured: navigation.isConfigured,
-                      hasRoutes: routes.isNotEmpty,
+                      hasRoutes: view.routes.isNotEmpty,
                       error: navigation.error,
-                      routes: routes,
-                      routeColors: routeColors,
-                      currentUserId: widget.currentUserId,
-                      onTap: _openDestinationSheet,
+                      routes: view.routes,
+                      routeColors: view.colors,
+                      currentUserId: currentUserId,
+                      onTap: () => _openDestinationSheet(context),
                     ),
                   ),
                 ],
               ),
             ),
+            Positioned(
+              right: 12,
+              bottom: 10,
+              child: _PickOnMapButton(onTap: () => _openPicker(context)),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  static GeoPoint _pinPoint(MapMemberPin pin) =>
+      GeoPoint(latitude: pin.latitude, longitude: pin.longitude);
+}
+
+/// The live preview. It never takes gestures itself; the card opens the
+/// interactive picker instead, which keeps the dashboard scrollable.
+class _MapPreview extends StatefulWidget {
+  const _MapPreview({
+    required this.pins,
+    required this.routes,
+    required this.destination,
+    required this.destinationColor,
+    required this.initialCenter,
+    required this.darkMode,
+    required this.onMemberTapped,
+  });
+
+  final List<MapMemberPin> pins;
+  final List<MapRouteLine> routes;
+  final GeoPoint? destination;
+  final Color destinationColor;
+  final GeoPoint initialCenter;
+  final bool darkMode;
+  final ValueChanged<String> onMemberTapped;
+
+  @override
+  State<_MapPreview> createState() => _MapPreviewState();
+}
+
+class _MapPreviewState extends State<_MapPreview> {
+  static const _fitInterval = Duration(seconds: 2);
+
+  late final ViewportState _viewport = CameraViewportState(
+    center: Point(
+      coordinates: Position(
+        widget.initialCenter.longitude,
+        widget.initialCenter.latitude,
+      ),
+    ),
+    zoom: 14.5,
+    pitch: MapboxStandardStyle.previewPitch,
+  );
+
+  MapboxMap? _map;
+  MapboxLiveAnnotations? _annotations;
+  bool _styleReady = false;
+  bool _revealed = false;
+
+  Timer? _syncTimer;
+  String _syncSignature = '';
+
+  Timer? _fitTimer;
+  DateTime? _lastFitAt;
+  List<Point> _pendingFit = const [];
+  String? _fitSignature;
+
+  @override
+  void didUpdateWidget(covariant _MapPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _scheduleAnnotations();
+    _scheduleFit();
+  }
+
+  @override
+  void dispose() {
+    _syncTimer?.cancel();
+    _fitTimer?.cancel();
+    _annotations?.dispose();
+    super.dispose();
+  }
+
+  List<Point> get _fitPoints => [
+        for (final pin in widget.pins)
+          Point(coordinates: Position(pin.longitude, pin.latitude)),
+        if (widget.destination case final point?)
+          Point(coordinates: Position(point.longitude, point.latitude)),
+      ];
+
+  void _onMapCreated(MapboxMap map) {
+    _map = map;
+  }
+
+  void _onStyleLoaded(StyleLoadedEventData event) {
+    _styleReady = true;
+    _annotations?.dispose();
+    final map = _map;
+    if (map == null) return;
+
+    unawaited(MapboxStandardStyle.apply(map, dark: widget.darkMode));
+
+    final annotations = MapboxLiveAnnotations(map);
+    annotations.onMemberTapped = widget.onMemberTapped;
+    _annotations = annotations;
+    unawaited(annotations.initialize());
+    _syncSignature = '';
+    _scheduleAnnotations(force: true, immediate: true);
+    _scheduleFit(force: true);
+
+    if (_fitPoints.isEmpty) {
+      setState(() => _revealed = true);
+    }
+  }
+
+  String _annotationSignature() => [
+        for (final pin in widget.pins) pin.signature,
+        for (final route in widget.routes) route.signature,
+        'dest:${widget.destination?.latitude},${widget.destination?.longitude}',
+        'color:${widget.destinationColor.toARGB32()}',
+      ].join('|');
+
+  void _scheduleAnnotations({bool force = false, bool immediate = false}) {
+    if (!_styleReady) return;
+    final signature = _annotationSignature();
+    if (!force && signature == _syncSignature) return;
+    _syncSignature = signature;
+
+    _syncTimer?.cancel();
+    if (immediate) {
+      _applyAnnotations();
+      return;
+    }
+    _syncTimer = Timer(const Duration(milliseconds: 400), _applyAnnotations);
+  }
+
+  void _applyAnnotations() {
+    final annotations = _annotations;
+    if (!mounted || annotations == null) return;
+    unawaited(
+      annotations.sync(
+        members: widget.pins,
+        routes: widget.routes,
+        destination: widget.destination,
+        destinationColor: widget.destinationColor,
+      ),
+    );
+  }
+
+  /// Keeps every located member and the shared destination in frame. Fits are
+  /// throttled so new GPS fixes do not yank the camera around constantly.
+  void _scheduleFit({bool force = false}) {
+    if (!_styleReady || _map == null) return;
+
+    final points = _fitPoints;
+    if (points.isEmpty) return;
+
+    final signature = points
+        .map(
+          (point) => '${point.coordinates.lat.toStringAsFixed(3)},'
+              '${point.coordinates.lng.toStringAsFixed(3)}',
+        )
+        .join('|');
+    if (!force && signature == _fitSignature) return;
+
+    _fitSignature = signature;
+    _pendingFit = List.unmodifiable(points);
+
+    final now = DateTime.now();
+    final last = _lastFitAt;
+    final elapsed = last == null ? null : now.difference(last);
+    final remaining = elapsed == null || elapsed >= _fitInterval
+        ? Duration.zero
+        : _fitInterval - elapsed;
+
+    _fitTimer?.cancel();
+    if (remaining == Duration.zero) {
+      unawaited(_fitNow());
+    } else {
+      _fitTimer = Timer(remaining, () => unawaited(_fitNow()));
+    }
+  }
+
+  Future<void> _fitNow() async {
+    final map = _map;
+    if (!mounted || !_styleReady || map == null || _pendingFit.isEmpty) return;
+    _lastFitAt = DateTime.now();
+
+    try {
+      final camera = await map.cameraForCoordinatesPadding(
+        _pendingFit,
+        CameraOptions(),
+        MbxEdgeInsets(top: 54, left: 48, bottom: 64, right: 48),
+        15,
+        null,
+      );
+      if (!mounted) return;
+      camera.pitch = MapboxStandardStyle.previewPitch;
+      await map.easeTo(camera, MapAnimationOptions(duration: 650));
+    } catch (_) {
+      // The camera helper rejects while a style swap is in flight.
+    }
+
+    if (mounted && !_revealed) {
+      setState(() => _revealed = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    if (!MapboxConfig.isConfigured) {
+      return const _MissingTokenSurface();
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        IgnorePointer(
+          child: MapWidget(
+            key: ValueKey(widget.darkMode),
+            styleUri: MapboxStandardStyle.uri,
+            viewport: _viewport,
+            onMapCreated: _onMapCreated,
+            onStyleLoadedListener: _onStyleLoaded,
+          ),
+        ),
+        IgnorePointer(
+          child: AnimatedOpacity(
+            opacity: _revealed ? 0 : 1,
+            duration: const Duration(milliseconds: 350),
+            child: ColoredBox(color: scheme.surfaceContainerHigh),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MissingTokenSurface extends StatelessWidget {
+  const _MissingTokenSurface();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            scheme.surfaceContainerHigh,
+            scheme.surfaceContainerHighest,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.map_outlined, size: 18, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              'Add a Mapbox token to show the map',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PickOnMapButton extends StatelessWidget {
+  const _PickOnMapButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: 'Pick a destination on the map',
+      child: Material(
+        color: scheme.surfaceContainerLowest.withValues(alpha: 0.94),
+        shape: CircleBorder(side: BorderSide(color: scheme.outlineVariant)),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(7),
+            child: Icon(
+              Icons.add_location_alt_outlined,
+              size: 15,
+              color: scheme.primary,
+            ),
+          ),
         ),
       ),
     );
@@ -486,152 +649,6 @@ class _RouteChip extends StatelessWidget {
               color: scheme.onSurface,
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DestinationMarker extends StatelessWidget {
-  const _DestinationMarker({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color,
-              border: Border.all(color: Colors.white, width: 2.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.22),
-                  blurRadius: 7,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.flag_rounded,
-              size: 17,
-              color: Colors.white,
-            ),
-          ),
-          Container(
-            width: 3,
-            height: 7,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(2),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MemberMarker extends StatelessWidget {
-  const _MemberMarker({
-    required this.member,
-    required this.isCurrentUser,
-    required this.accent,
-    required this.hasRoute,
-    required this.onTap,
-  });
-
-  final CircleMember member;
-  final bool isCurrentUser;
-  final Color? accent;
-  final bool hasRoute;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final status = member.status;
-    if (status == null) return const SizedBox.shrink();
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(2.5),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: status.isApproximate
-                  ? scheme.tertiaryContainer.withValues(alpha: 0.75)
-                  : Colors.white.withValues(alpha: 0.9),
-              border: Border.all(
-                color: accent ??
-                    (isCurrentUser
-                        ? scheme.primary
-                        : scheme.surfaceContainerLowest),
-                width: hasRoute ? 2.5 : 2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.18),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: MemberAvatar(
-              profile: member.profile,
-              size: 30,
-              isOnline: status.isOnline,
-              showStatusBadge: false,
-            ),
-          ),
-          if (status.batteryPercent != null) ...[
-            const SizedBox(height: 2),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerLowest.withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    status.isCharging
-                        ? Icons.bolt_rounded
-                        : Icons.battery_3_bar_rounded,
-                    size: 9,
-                    color: status.isLowBattery
-                        ? scheme.error
-                        : scheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${status.batteryPercent}%',
-                    style: TextStyle(
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.w700,
-                      color: status.isLowBattery
-                          ? scheme.error
-                          : scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );
