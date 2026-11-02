@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_tokens.dart';
+import '../../../chat/presentation/widgets/chat_badge_button.dart';
 
 class DashboardHeader extends StatelessWidget {
   const DashboardHeader({
@@ -11,6 +12,8 @@ class DashboardHeader extends StatelessWidget {
     required this.dateLine,
     required this.inviteCode,
     required this.onCopyInvite,
+    required this.unreadCount,
+    required this.onChat,
   });
 
   final String greeting;
@@ -19,6 +22,8 @@ class DashboardHeader extends StatelessWidget {
   final String dateLine;
   final String inviteCode;
   final VoidCallback onCopyInvite;
+  final int unreadCount;
+  final VoidCallback onChat;
 
   @override
   Widget build(BuildContext context) {
@@ -32,23 +37,18 @@ class DashboardHeader extends StatelessWidget {
             children: [
               Text(
                 greeting,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
+                style: Theme.of(context).textTheme.bodyMedium
+                    ?.copyWith(color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: 1),
-              Text(
-                firstName,
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
+              Text(firstName, style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 3),
               Text(
                 '$circleName · $dateLine',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: scheme.onSurfaceVariant),
               ),
             ],
           ),
@@ -62,7 +62,10 @@ class DashboardHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppSpacing.lg),
               onTap: onCopyInvite,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: scheme.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(AppSpacing.lg),
@@ -74,10 +77,10 @@ class DashboardHeader extends StatelessWidget {
                     Text(
                       'INVITE',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                            fontSize: 8,
-                            letterSpacing: 1.2,
-                          ),
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 8,
+                        letterSpacing: 1.2,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Row(
@@ -85,9 +88,8 @@ class DashboardHeader extends StatelessWidget {
                       children: [
                         Text(
                           inviteCode,
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                letterSpacing: 1.2,
-                              ),
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(letterSpacing: 1.2),
                         ),
                         const SizedBox(width: 4),
                         Icon(
@@ -101,6 +103,18 @@ class DashboardHeader extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: scheme.surfaceContainerLow,
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(3),
+            child: ChatBadgeButton(unreadCount: unreadCount, onTap: onChat),
           ),
         ),
       ],

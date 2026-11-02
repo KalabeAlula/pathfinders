@@ -9,6 +9,125 @@ part of 'memories_providers.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
+@ProviderFor(memoriesCache)
+final memoriesCacheProvider = MemoriesCacheFamily._();
+
+final class MemoriesCacheProvider
+    extends $FunctionalProvider<MemoriesCache, MemoriesCache, MemoriesCache>
+    with $Provider<MemoriesCache> {
+  MemoriesCacheProvider._({
+    required MemoriesCacheFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'memoriesCacheProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$memoriesCacheHash();
+
+  @override
+  String toString() {
+    return r'memoriesCacheProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<MemoriesCache> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  MemoriesCache create(Ref ref) {
+    final argument = this.argument as String;
+    return memoriesCache(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(MemoriesCache value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<MemoriesCache>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MemoriesCacheProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$memoriesCacheHash() => r'0fea203ba783c46a46c6e41c8c2194c3328b50d4';
+
+final class MemoriesCacheFamily extends $Family
+    with $FunctionalFamilyOverride<MemoriesCache, String> {
+  MemoriesCacheFamily._()
+    : super(
+        retry: null,
+        name: r'memoriesCacheProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  MemoriesCacheProvider call(String circleId) =>
+      MemoriesCacheProvider._(argument: circleId, from: this);
+
+  @override
+  String toString() => r'memoriesCacheProvider';
+}
+
+@ProviderFor(memoryPhotoUrls)
+final memoryPhotoUrlsProvider = MemoryPhotoUrlsProvider._();
+
+final class MemoryPhotoUrlsProvider
+    extends
+        $FunctionalProvider<MemoryPhotoUrls, MemoryPhotoUrls, MemoryPhotoUrls>
+    with $Provider<MemoryPhotoUrls> {
+  MemoryPhotoUrlsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'memoryPhotoUrlsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$memoryPhotoUrlsHash();
+
+  @$internal
+  @override
+  $ProviderElement<MemoryPhotoUrls> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  MemoryPhotoUrls create(Ref ref) {
+    return memoryPhotoUrls(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(MemoryPhotoUrls value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<MemoryPhotoUrls>(value),
+    );
+  }
+}
+
+String _$memoryPhotoUrlsHash() => r'3f9f2da1a5a60c4af3e265a6427a6e77ce554bde';
+
 @ProviderFor(memoriesRepository)
 final memoriesRepositoryProvider = MemoriesRepositoryFamily._();
 
@@ -73,7 +192,7 @@ final class MemoriesRepositoryProvider
 }
 
 String _$memoriesRepositoryHash() =>
-    r'f264191c577769880cfad4651b05877a9a2c5f2c';
+    r'3fe46ba117a5a0936a68d541b14a81b51c6fc006';
 
 final class MemoriesRepositoryFamily extends $Family
     with $FunctionalFamilyOverride<MemoriesRepository, String> {

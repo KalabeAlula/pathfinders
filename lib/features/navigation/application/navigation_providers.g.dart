@@ -134,6 +134,47 @@ final class NavigationRepositoryFamily extends $Family
   String toString() => r'navigationRepositoryProvider';
 }
 
+@ProviderFor(arrivalStore)
+final arrivalStoreProvider = ArrivalStoreProvider._();
+
+final class ArrivalStoreProvider
+    extends $FunctionalProvider<ArrivalStore, ArrivalStore, ArrivalStore>
+    with $Provider<ArrivalStore> {
+  ArrivalStoreProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'arrivalStoreProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$arrivalStoreHash();
+
+  @$internal
+  @override
+  $ProviderElement<ArrivalStore> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  ArrivalStore create(Ref ref) {
+    return arrivalStore(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ArrivalStore value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ArrivalStore>(value),
+    );
+  }
+}
+
+String _$arrivalStoreHash() => r'35adcfe6f76c770fbc2710a2e7632060c67710ab';
+
 @ProviderFor(circleDestination)
 final circleDestinationProvider = CircleDestinationFamily._();
 
@@ -315,7 +356,7 @@ final class NavigationControllerProvider
 }
 
 String _$navigationControllerHash() =>
-    r'f91730ed003c6db62104796982b831fe593a1866';
+    r'3c0105616c9d93c1e5eb29b100c28a112f66d764';
 
 /// Keeps one route per member up to date between the live fixes and the
 /// shared destination.

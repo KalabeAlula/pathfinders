@@ -4,12 +4,14 @@ import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/config/mapbox_config.dart';
+import '../../../core/storage/storage_providers.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../circle/application/circle_providers.dart';
 import '../../circle/domain/circle_member.dart';
 import '../../location/application/telemetry_providers.dart';
 import '../../location/domain/device_telemetry.dart';
 import '../../location/domain/geo_point.dart';
+import '../data/arrival_store.dart';
 import '../data/mapbox_navigation_gateway.dart';
 import '../data/supabase_navigation_repository.dart';
 import '../domain/navigation_destination.dart';
@@ -34,6 +36,10 @@ NavigationRepository navigationRepository(Ref ref, String circleId) =>
       ref.watch(supabaseClientProvider),
       circleId: circleId,
     );
+
+@Riverpod(keepAlive: true)
+ArrivalStore arrivalStore(Ref ref) =>
+    ArrivalStore(ref.watch(sharedPreferencesProvider));
 
 @riverpod
 Stream<NavigationDestination?> circleDestination(Ref ref, String circleId) =>

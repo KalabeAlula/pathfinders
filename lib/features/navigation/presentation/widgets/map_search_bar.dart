@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -56,13 +58,24 @@ class _MapSearchBarState extends ConsumerState<MapSearchBar> {
   }
 
   void _choose(PlaceSuggestion place) {
+    final provider = mapSearchControllerProvider(widget.userId);
+    final query = ref.read(provider).query;
+    final controller = ref.read(provider.notifier);
     _focus.unfocus();
-    ref.read(mapSearchControllerProvider(widget.userId).notifier).dismiss();
+    controller.dismiss();
+    if (query.trim().isNotEmpty) unawaited(controller.remember(query));
     _controller.text = place.displayName;
     _controller.selection = TextSelection.collapsed(
       offset: _controller.text.length,
     );
     widget.onPlaceSelected(place);
+  }
+
+  void _useHistory(String query) {
+    _controller.text = query;
+    _controller.selection = TextSelection.collapsed(offset: query.length);
+    ref.read(mapSearchControllerProvider(widget.userId).notifier).search(query);
+    _focus.requestFocus();
   }
 
   void _clear() {
@@ -86,6 +99,8 @@ class _MapSearchBarState extends ConsumerState<MapSearchBar> {
     final scheme = theme.colorScheme;
     final search = ref.watch(mapSearchControllerProvider(widget.userId));
     final showList = _focus.hasFocus && search.isActive;
+    final showHistory =
+        _focus.hasFocus && search.hasHistory && search.query.trim().length < 2;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -150,8 +165,77 @@ class _MapSearchBarState extends ConsumerState<MapSearchBar> {
         if (showList) ...[
           const SizedBox(height: AppSpacing.sm),
           _SuggestionsCard(state: search, onSelected: _choose),
+        ] else if (showHistory) ...[
+          const SizedBox(height: AppSpacing.sm),
+          _HistoryCard(entries: search.history, onSelected: _useHistory),
         ],
       ],
+    );
+  }
+}
+
+class _HistoryCard extends StatelessWidget {
+  const _HistoryCard({required this.entries, required this.onSelected});
+
+  final List<String> entries;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Material(
+      color: scheme.surfaceContainerLowest.withValues(alpha: 0.98),
+      elevation: 5,
+      shadowColor: Colors.black.withValues(alpha: 0.24),
+      borderRadius: BorderRadius.circular(AppRadius.tile),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 2),
+            child: Text(
+              'Recent searches',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          for (final entry in entries)
+            InkWell(
+              onTap: () => onSelected(entry),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.history_rounded,
+                      size: 18,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        entry,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ),
+                    Icon(
+                      Icons.north_west_rounded,
+                      size: 15,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

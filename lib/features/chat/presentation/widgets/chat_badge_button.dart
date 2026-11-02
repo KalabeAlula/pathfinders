@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Round chat entry point with a live unread badge, sized to sit inside the
-/// map's search pill.
+/// Round chat entry point with a live unread badge, used by the dashboard
+/// header and the map's search pill.
 class ChatBadgeButton extends StatelessWidget {
   const ChatBadgeButton({
     super.key,

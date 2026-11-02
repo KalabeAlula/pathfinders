@@ -9,6 +9,84 @@ part of 'milestones_providers.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
+@ProviderFor(milestonesCache)
+final milestonesCacheProvider = MilestonesCacheFamily._();
+
+final class MilestonesCacheProvider
+    extends
+        $FunctionalProvider<MilestonesCache, MilestonesCache, MilestonesCache>
+    with $Provider<MilestonesCache> {
+  MilestonesCacheProvider._({
+    required MilestonesCacheFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'milestonesCacheProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$milestonesCacheHash();
+
+  @override
+  String toString() {
+    return r'milestonesCacheProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<MilestonesCache> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  MilestonesCache create(Ref ref) {
+    final argument = this.argument as String;
+    return milestonesCache(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(MilestonesCache value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<MilestonesCache>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MilestonesCacheProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$milestonesCacheHash() => r'11c7a627f3da2aa74b411544524950f90bddec63';
+
+final class MilestonesCacheFamily extends $Family
+    with $FunctionalFamilyOverride<MilestonesCache, String> {
+  MilestonesCacheFamily._()
+    : super(
+        retry: null,
+        name: r'milestonesCacheProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  MilestonesCacheProvider call(String circleId) =>
+      MilestonesCacheProvider._(argument: circleId, from: this);
+
+  @override
+  String toString() => r'milestonesCacheProvider';
+}
+
 @ProviderFor(milestonesRepository)
 final milestonesRepositoryProvider = MilestonesRepositoryFamily._();
 
@@ -73,7 +151,7 @@ final class MilestonesRepositoryProvider
 }
 
 String _$milestonesRepositoryHash() =>
-    r'd2b0b1369f3924b7f2decb67fd1682b20712efef';
+    r'012830f934b5842561410480451af7b0c64c6680';
 
 final class MilestonesRepositoryFamily extends $Family
     with $FunctionalFamilyOverride<MilestonesRepository, String> {

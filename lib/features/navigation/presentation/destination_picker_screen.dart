@@ -25,6 +25,7 @@ import '../domain/navigation_failure.dart';
 import '../domain/place_suggestion.dart';
 import '../domain/route_geometry.dart';
 import 'venue_selection.dart';
+import 'widgets/arrival_card.dart';
 import 'widgets/map_search_bar.dart';
 import 'widgets/route_eta_card.dart';
 
@@ -43,12 +44,19 @@ class DestinationPickerScreen extends ConsumerStatefulWidget {
     required this.currentUserId,
     required this.members,
     required this.onMemberTap,
+    this.initialSharedLocation,
+    this.initialSharedLabel,
   });
 
   final String circleId;
   final String currentUserId;
   final List<CircleMember> members;
   final ValueChanged<CircleMember> onMemberTap;
+
+  /// A place tapped in the chat before this screen opened. The camera lands on
+  /// it and its venue card is ready to set as the destination.
+  final GeoPoint? initialSharedLocation;
+  final String? initialSharedLabel;
 
   @override
   ConsumerState<DestinationPickerScreen> createState() =>
@@ -74,6 +82,7 @@ class _DestinationPickerScreenState
   bool _querying = false;
   bool _venueFlight = false;
   bool _searchSelection = false;
+  bool _sharedLocationApplied = false;
   String? _error;
   double _zoom = 15.2;
   int _idleRun = 0;
@@ -96,6 +105,9 @@ class _DestinationPickerScreenState
   }
 
   GeoPoint _resolveInitialCenter() {
+    final shared = widget.initialSharedLocation;
+    if (shared != null) return shared;
+
     final destination = ref
         .read(navigationControllerProvider(widget.circleId))
         .destination;
@@ -383,6 +395,12 @@ class _DestinationPickerScreenState
 
     _selectedBuilding = null;
     unawaited(_restoreVenueHighlight(map));
+
+    final shared = widget.initialSharedLocation;
+    if (shared != null && !_sharedLocationApplied) {
+      _sharedLocationApplied = true;
+      _showSharedLocation(shared, widget.initialSharedLabel);
+    }
   }
 
   Future<void> _restoreVenueHighlight(MapboxMap map) async {
@@ -719,6 +737,11 @@ class _DestinationPickerScreenState
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 if (navigation.destination != null) ...[
+                  ArrivalCard(
+                    circleId: widget.circleId,
+                    currentUserId: widget.currentUserId,
+                    compact: true,
+                  ),
                   RouteEtaCard(
                     circleId: widget.circleId,
                     currentUserId: widget.currentUserId,

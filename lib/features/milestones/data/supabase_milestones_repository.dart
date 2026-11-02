@@ -6,16 +6,21 @@ import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../domain/milestones_failure.dart';
 import '../domain/milestones_repository.dart';
 import '../domain/shared_milestone.dart';
+import 'milestones_cache.dart';
 
 /// Reads and writes the shared countdown for one circle.
 class SupabaseMilestonesRepository implements MilestonesRepository {
-  SupabaseMilestonesRepository(this._client, {required this.circleId});
+  SupabaseMilestonesRepository(
+    this._client, {
+    required this.circleId,
+    this.cache,
+  });
 
   final sb.SupabaseClient _client;
+  final MilestonesCache? cache;
   final String circleId;
 
-  static const _columns =
-      'id, title, subtitle, due_on, kind, created_at';
+  static const _columns = 'id, title, subtitle, due_on, kind, created_at';
 
   @override
   Stream<List<SharedMilestone>> watchMilestones() async* {
@@ -29,21 +34,36 @@ class SupabaseMilestonesRepository implements MilestonesRepository {
       });
     }
 
-    final channel = _client
-        .channel('milestones-changes-$circleId')
-        .onPostgresChanges(
-          event: sb.PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'milestones',
-          callback: (_) => scheduleRefresh(),
-        )
-      ..subscribe();
+    final channel =
+        _client
+            .channel('milestones-changes-$circleId')
+            .onPostgresChanges(
+              event: sb.PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'milestones',
+              callback: (_) => scheduleRefresh(),
+            )
+          ..subscribe();
 
     try {
-      yield await _fetch();
+      final cached = cache?.read();
+      if (cached != null) yield cached;
+
+      try {
+        yield await _fetchAndCache();
+      } catch (error) {
+        if (cached == null) rethrow;
+        // The cached list is still worth showing; realtime may recover.
+        developer.log(
+          'Could not refresh milestones',
+          name: 'pathfinders.milestones',
+          error: error,
+        );
+      }
+
       await for (final _ in changes.stream) {
         try {
-          yield await _fetch();
+          yield await _fetchAndCache();
         } catch (error) {
           // Keep showing the last good list; the next event retries.
           developer.log(
@@ -81,7 +101,8 @@ class SupabaseMilestonesRepository implements MilestonesRepository {
     } on sb.PostgrestException catch (error) {
       throw _mapFailure(
         error,
-        fallback: 'Could not save that countdown. Check your connection and '
+        fallback:
+            'Could not save that countdown. Check your connection and '
             'try again.',
       );
     } on Exception {
@@ -89,6 +110,16 @@ class SupabaseMilestonesRepository implements MilestonesRepository {
         'Could not save that countdown. Check your connection and try again.',
       );
     }
+  }
+
+  Future<List<SharedMilestone>> _fetchAndCache() async {
+    final milestones = await _fetch();
+    try {
+      await cache?.write(milestones);
+    } on Exception {
+      // A failed cache write must not hide a fresh list.
+    }
+    return milestones;
   }
 
   Future<List<SharedMilestone>> _fetch() async {
@@ -112,16 +143,17 @@ class SupabaseMilestonesRepository implements MilestonesRepository {
     } on sb.PostgrestException catch (error) {
       throw _mapFailure(
         error,
-        fallback: 'Could not reach your milestones. Check your connection and '
+        fallback:
+            'Could not reach your milestones. Check your connection and '
             'try again.',
       );
     }
   }
 
   static MilestoneKind _kind(Object? value) => MilestoneKind.values.firstWhere(
-        (kind) => kind.name == value,
-        orElse: () => MilestoneKind.goal,
-      );
+    (kind) => kind.name == value,
+    orElse: () => MilestoneKind.goal,
+  );
 
   static String? _optionalLabel(Object? value) {
     if (value is! String) return null;

@@ -8,6 +8,91 @@ part of 'map_search_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+
+@ProviderFor(searchHistoryStore)
+final searchHistoryStoreProvider = SearchHistoryStoreFamily._();
+
+final class SearchHistoryStoreProvider
+    extends
+        $FunctionalProvider<
+          SearchHistoryStore,
+          SearchHistoryStore,
+          SearchHistoryStore
+        >
+    with $Provider<SearchHistoryStore> {
+  SearchHistoryStoreProvider._({
+    required SearchHistoryStoreFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'searchHistoryStoreProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$searchHistoryStoreHash();
+
+  @override
+  String toString() {
+    return r'searchHistoryStoreProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<SearchHistoryStore> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SearchHistoryStore create(Ref ref) {
+    final argument = this.argument as String;
+    return searchHistoryStore(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SearchHistoryStore value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SearchHistoryStore>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is SearchHistoryStoreProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$searchHistoryStoreHash() =>
+    r'a89bf003e9b4f94c5358f595a907b232ba6659f1';
+
+final class SearchHistoryStoreFamily extends $Family
+    with $FunctionalFamilyOverride<SearchHistoryStore, String> {
+  SearchHistoryStoreFamily._()
+    : super(
+        retry: null,
+        name: r'searchHistoryStoreProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  SearchHistoryStoreProvider call(String userId) =>
+      SearchHistoryStoreProvider._(argument: userId, from: this);
+
+  @override
+  String toString() => r'searchHistoryStoreProvider';
+}
+
 /// Debounced Mapbox autocomplete for the map's search bar.
 ///
 /// Results are biased around the member's last GPS fix so nearby cafes and
@@ -71,7 +156,7 @@ final class MapSearchControllerProvider
 }
 
 String _$mapSearchControllerHash() =>
-    r'3904cd9895490ee6463944c9f192fd39cb286a89';
+    r'5a4d7a2456ab8902c8996a01baa60516fa499d04';
 
 /// Debounced Mapbox autocomplete for the map's search bar.
 ///

@@ -8,6 +8,8 @@
 	<string>Pathfinders shares your live location with the people in your circle.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Pathfinders keeps sharing your location with your circle while the app is closed, until you pause sharing.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Pathfinders lets you attach a photo to a memory for your circle.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

@@ -20,16 +20,22 @@ class MemoryPost {
     required this.createdAt,
     this.placeLabel,
     this.voiceNoteSeconds,
+    this.photoPath,
     this.reactions = const {},
   });
 
   final String id;
   final String authorId;
+
+  /// Empty when the memory is a photo with no caption.
   final String text;
   final MemoryMood mood;
   final DateTime createdAt;
   final String? placeLabel;
   final int? voiceNoteSeconds;
+
+  /// Object path in the private `memories` bucket, signed on demand.
+  final String? photoPath;
 
   /// Emoji to count, e.g. `{'🧡': 3}`.
   final Map<String, int> reactions;

@@ -9,6 +9,47 @@ part of 'chat_providers.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
+@ProviderFor(chatSeenStore)
+final chatSeenStoreProvider = ChatSeenStoreProvider._();
+
+final class ChatSeenStoreProvider
+    extends $FunctionalProvider<ChatSeenStore, ChatSeenStore, ChatSeenStore>
+    with $Provider<ChatSeenStore> {
+  ChatSeenStoreProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'chatSeenStoreProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatSeenStoreHash();
+
+  @$internal
+  @override
+  $ProviderElement<ChatSeenStore> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  ChatSeenStore create(Ref ref) {
+    return chatSeenStore(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ChatSeenStore value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ChatSeenStore>(value),
+    );
+  }
+}
+
+String _$chatSeenStoreHash() => r'c83df972218dda7e09350e96bec4fa885f3307ac';
+
 @ProviderFor(chatRepository)
 final chatRepositoryProvider = ChatRepositoryFamily._();
 
@@ -163,18 +204,18 @@ final class CircleMessagesFamily extends $Family
   String toString() => r'circleMessagesProvider';
 }
 
-/// The moment this device last looked at the thread, kept in memory so the
-/// map's badge only counts messages that arrived while the chat was closed.
+/// The moment this device last looked at the thread, restored after restarts
+/// so the map's badge only counts messages the member has not opened yet.
 
 @ProviderFor(ChatSeenController)
 final chatSeenControllerProvider = ChatSeenControllerFamily._();
 
-/// The moment this device last looked at the thread, kept in memory so the
-/// map's badge only counts messages that arrived while the chat was closed.
+/// The moment this device last looked at the thread, restored after restarts
+/// so the map's badge only counts messages the member has not opened yet.
 final class ChatSeenControllerProvider
     extends $NotifierProvider<ChatSeenController, DateTime> {
-  /// The moment this device last looked at the thread, kept in memory so the
-  /// map's badge only counts messages that arrived while the chat was closed.
+  /// The moment this device last looked at the thread, restored after restarts
+  /// so the map's badge only counts messages the member has not opened yet.
   ChatSeenControllerProvider._({
     required ChatSeenControllerFamily super.from,
     required String super.argument,
@@ -220,10 +261,10 @@ final class ChatSeenControllerProvider
 }
 
 String _$chatSeenControllerHash() =>
-    r'3d26d9772c40547136ef9e8f416f3e212c9202af';
+    r'45e3c48ce3d1622a8d9f35d1906a9628d8fbc62d';
 
-/// The moment this device last looked at the thread, kept in memory so the
-/// map's badge only counts messages that arrived while the chat was closed.
+/// The moment this device last looked at the thread, restored after restarts
+/// so the map's badge only counts messages the member has not opened yet.
 
 final class ChatSeenControllerFamily extends $Family
     with
@@ -243,8 +284,8 @@ final class ChatSeenControllerFamily extends $Family
         isAutoDispose: false,
       );
 
-  /// The moment this device last looked at the thread, kept in memory so the
-  /// map's badge only counts messages that arrived while the chat was closed.
+  /// The moment this device last looked at the thread, restored after restarts
+  /// so the map's badge only counts messages the member has not opened yet.
 
   ChatSeenControllerProvider call(String circleId) =>
       ChatSeenControllerProvider._(argument: circleId, from: this);
@@ -253,8 +294,8 @@ final class ChatSeenControllerFamily extends $Family
   String toString() => r'chatSeenControllerProvider';
 }
 
-/// The moment this device last looked at the thread, kept in memory so the
-/// map's badge only counts messages that arrived while the chat was closed.
+/// The moment this device last looked at the thread, restored after restarts
+/// so the map's badge only counts messages the member has not opened yet.
 
 abstract class _$ChatSeenController extends $Notifier<DateTime> {
   late final _$args = ref.$arg as String;
@@ -333,7 +374,7 @@ final class ChatUnreadCountProvider extends $FunctionalProvider<int, int, int>
   }
 }
 
-String _$chatUnreadCountHash() => r'6a075f894330d470f611dd2b5a44d277f920353f';
+String _$chatUnreadCountHash() => r'82ed24f4bd10a6e39ad13cf8e27d1900473a29a3';
 
 final class ChatUnreadCountFamily extends $Family
     with $FunctionalFamilyOverride<int, ChatUnreadQuery> {

@@ -5,6 +5,8 @@ import '../../../../app/widgets/bento_card.dart';
 import '../../../../core/utils/time_format.dart';
 import '../../../circle/domain/user_profile.dart';
 import '../../domain/memory_post.dart';
+import '../memory_mood_colors.dart';
+import 'memory_photo_view.dart';
 
 class MemorySnippetCard extends StatelessWidget {
   const MemorySnippetCard({
@@ -13,12 +15,14 @@ class MemorySnippetCard extends StatelessWidget {
     required this.author,
     required this.now,
     this.onTap,
+    this.onAdd,
   });
 
   final MemoryPost memory;
   final UserProfile? author;
   final DateTime now;
   final VoidCallback? onTap;
+  final VoidCallback? onAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -26,27 +30,30 @@ class MemorySnippetCard extends StatelessWidget {
     return BentoCard(
       padding: const EdgeInsets.all(14),
       onTap: onTap,
-      semanticLabel: 'Latest memory. Add another.',
+      semanticLabel: 'Latest memory. Open it.',
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 58,
-            height: 58,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
-                colors: memory.mood.colors,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          if (memory.photoPath != null)
+            MemoryPhotoView(path: memory.photoPath!, width: 58, height: 58)
+          else
+            Container(
+              width: 58,
+              height: 58,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  colors: memory.mood.colors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Text(
+                memory.mood.emoji,
+                style: const TextStyle(fontSize: 24),
               ),
             ),
-            child: Text(
-              memory.mood.emoji,
-              style: const TextStyle(fontSize: 24),
-            ),
-          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -83,21 +90,21 @@ class MemorySnippetCard extends StatelessWidget {
                     Text(
                       timeAgo(memory.createdAt, now: now),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                            fontSize: 10,
-                          ),
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 10,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 3),
-                Text(
-                  memory.text,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
-                ),
+                if (memory.text.isNotEmpty)
+                  Text(
+                    memory.text,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w500),
+                  ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 6,
@@ -116,7 +123,8 @@ class MemorySnippetCard extends StatelessWidget {
                           const SizedBox(width: 2),
                           Text(
                             memory.placeLabel!,
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
                                   color: scheme.onSurfaceVariant,
                                   fontSize: 10,
                                 ),
@@ -146,7 +154,8 @@ class MemorySnippetCard extends StatelessWidget {
                             const SizedBox(width: 3),
                             Text(
                               formatVoiceNote(memory.voiceNoteSeconds!),
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
                                     fontSize: 10,
                                     color: scheme.onSecondaryContainer,
                                   ),
@@ -156,9 +165,25 @@ class MemorySnippetCard extends StatelessWidget {
                       ),
                     if (onTap != null)
                       Icon(
-                        Icons.add_circle_outline_rounded,
-                        size: 13,
+                        Icons.chevron_right_rounded,
+                        size: 14,
                         color: scheme.onSurfaceVariant,
+                      ),
+                    if (onAdd != null)
+                      IconButton(
+                        onPressed: onAdd,
+                        tooltip: 'New memory',
+                        icon: const Icon(
+                          Icons.add_circle_outline_rounded,
+                          size: 16,
+                        ),
+                        color: scheme.primary,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 32,
+                          height: 32,
+                        ),
                       ),
                   ],
                 ),
@@ -192,14 +217,4 @@ class _ReactionChip extends StatelessWidget {
       ),
     );
   }
-}
-
-extension on MemoryMood {
-  List<Color> get colors => switch (this) {
-        MemoryMood.cozy => const [Color(0xFFC7974C), Color(0xFF8A5A3B)],
-        MemoryMood.joyful => const [Color(0xFFE0A487), Color(0xFFB86B4F)],
-        MemoryMood.calm => const [Color(0xFF9DB4B7), Color(0xFF687F7C)],
-        MemoryMood.silly => const [Color(0xFFD0A75F), Color(0xFF7C8C6B)],
-        MemoryMood.proud => const [Color(0xFF7C8C6B), Color(0xFFB86B4F)],
-      };
 }

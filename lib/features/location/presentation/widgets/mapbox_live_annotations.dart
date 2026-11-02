@@ -48,8 +48,8 @@ class MapRouteLine {
   final Color color;
   final double width;
 
-  /// The light casing that keeps the line readable over dense map labels.
-  /// The local route asks for a heavier one so it stays the primary line.
+  /// Mapbox draws the border as a narrower stroke on top of the line, so this
+  /// stays thin enough that the member color still dominates.
   final double borderWidth;
 
   String get signature {

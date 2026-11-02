@@ -1,11 +1,19 @@
+import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/storage/storage_providers.dart';
 import '../../auth/application/auth_providers.dart';
+import '../data/chat_seen_store.dart';
 import '../data/supabase_chat_repository.dart';
 import '../domain/chat_message.dart';
 import '../domain/chat_repository.dart';
 
 part 'chat_providers.g.dart';
+
+@riverpod
+ChatSeenStore chatSeenStore(Ref ref) =>
+    ChatSeenStore(ref.watch(sharedPreferencesProvider));
 
 @Riverpod(keepAlive: true)
 ChatRepository chatRepository(Ref ref, String circleId) =>
@@ -18,15 +26,18 @@ ChatRepository chatRepository(Ref ref, String circleId) =>
 Stream<List<ChatMessage>> circleMessages(Ref ref, String circleId) =>
     ref.watch(chatRepositoryProvider(circleId)).watchMessages();
 
-/// The moment this device last looked at the thread, kept in memory so the
-/// map's badge only counts messages that arrived while the chat was closed.
+/// The moment this device last looked at the thread, restored after restarts
+/// so the map's badge only counts messages the member has not opened yet.
 @Riverpod(keepAlive: true)
 class ChatSeenController extends _$ChatSeenController {
   @override
-  DateTime build(String circleId) => DateTime.now();
+  DateTime build(String circleId) =>
+      ref.watch(chatSeenStoreProvider).read(circleId) ?? DateTime.now();
 
   void markSeen() {
-    state = DateTime.now();
+    final seenAt = DateTime.now();
+    state = seenAt;
+    unawaited(ref.read(chatSeenStoreProvider).write(circleId, seenAt));
   }
 }
 

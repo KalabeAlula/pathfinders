@@ -7,6 +7,7 @@ import '../../../app/widgets/bento_card.dart';
 import '../../../core/application/clock_provider.dart';
 import '../../../core/utils/time_format.dart';
 import '../../chat/application/chat_providers.dart';
+import '../../chat/presentation/widgets/group_chat_sheet.dart';
 import '../../circle/domain/circle_member.dart';
 import '../../circle/domain/circle_snapshot.dart';
 import '../../circle/presentation/widgets/member_detail_sheet.dart';
@@ -17,6 +18,8 @@ import '../../location/domain/privacy_mode.dart';
 import '../../location/presentation/widgets/live_map_card.dart';
 import '../../memories/application/memories_providers.dart';
 import '../../memories/domain/memory_post.dart';
+import '../../memories/presentation/memories_gallery_screen.dart';
+import '../../memories/presentation/memory_detail_screen.dart';
 import '../../memories/presentation/widgets/memory_composer_sheet.dart';
 import '../../memories/presentation/widgets/memory_snippet_card.dart';
 import '../../milestones/application/milestones_providers.dart';
@@ -25,6 +28,8 @@ import '../../milestones/presentation/widgets/countdown_card.dart';
 import '../../milestones/presentation/widgets/milestone_composer_sheet.dart';
 import '../../nudges/application/nudge_providers.dart';
 import '../../nudges/domain/nudge.dart';
+import '../../navigation/presentation/destination_picker_screen.dart';
+import '../../navigation/presentation/widgets/arrival_card.dart';
 import '../../nudges/presentation/widgets/nudge_overlay.dart';
 import '../../nudges/presentation/widgets/nudge_tile.dart';
 import '../../pet/application/pet_providers.dart';
@@ -51,9 +56,9 @@ class DashboardScreen extends ConsumerWidget {
     final now = ref.watch(appClockProvider).value ?? DateTime.now();
 
     final circleId = snapshot.circle.id;
-    // Keeps the unread baseline and the realtime stream warm while the crew is
-    // on the dashboard, so the map badge counts messages that arrive meanwhile.
-    ref.watch(
+    // Keeps the thread stream warm on Home so the unread badge and chat update
+    // without opening the map first.
+    final unreadChats = ref.watch(
       chatUnreadCountProvider((circleId: circleId, userId: currentUserId)),
     );
     final memories =
@@ -81,6 +86,28 @@ class DashboardScreen extends ConsumerWidget {
       );
     }
 
+    void openChat() {
+      showGroupChat(
+        context,
+        circleId: circleId,
+        currentUserId: currentUserId,
+        onShowLocation: (point, label) {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => DestinationPickerScreen(
+                circleId: circleId,
+                currentUserId: currentUserId,
+                members: snapshot.members,
+                onMemberTap: openMember,
+                initialSharedLocation: point,
+                initialSharedLabel: label,
+              ),
+            ),
+          );
+        },
+      );
+    }
+
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -94,6 +121,7 @@ class DashboardScreen extends ConsumerWidget {
                 memories: memories,
                 milestone: milestone,
                 now: now,
+                unreadChats: unreadChats,
                 sharingNotice: _sharingNotice(telemetry),
                 onMemberTap: openMember,
                 onSharingTap: () {
@@ -115,6 +143,7 @@ class DashboardScreen extends ConsumerWidget {
                   circleId: circleId,
                   authorId: currentUserId,
                 ),
+                onChat: openChat,
                 onAddMilestone: () => showMilestoneComposer(
                   context,
                   circleId: circleId,
@@ -166,6 +195,7 @@ class _DashboardBody extends StatelessWidget {
     required this.memories,
     required this.milestone,
     required this.now,
+    required this.unreadChats,
     required this.sharingNotice,
     required this.onMemberTap,
     required this.onSharingTap,
@@ -174,6 +204,7 @@ class _DashboardBody extends StatelessWidget {
     required this.onCopyInvite,
     required this.onAddMemory,
     required this.onAddMilestone,
+    required this.onChat,
   });
 
   final CircleSnapshot snapshot;
@@ -182,6 +213,7 @@ class _DashboardBody extends StatelessWidget {
   final List<MemoryPost> memories;
   final SharedMilestone? milestone;
   final DateTime now;
+  final int unreadChats;
   final _SharingNotice? sharingNotice;
   final ValueChanged<CircleMember> onMemberTap;
   final VoidCallback onSharingTap;
@@ -190,9 +222,11 @@ class _DashboardBody extends StatelessWidget {
   final VoidCallback onCopyInvite;
   final VoidCallback onAddMemory;
   final VoidCallback onAddMilestone;
+  final VoidCallback onChat;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final currentMember = snapshot.memberById(currentUserId);
     final firstName = currentMember?.profile.firstName ?? 'friend';
     final latestMemory = memories.isEmpty ? null : memories.first;
@@ -212,6 +246,8 @@ class _DashboardBody extends StatelessWidget {
             dateLine: formatDateLine(now),
             inviteCode: snapshot.circle.inviteCode,
             onCopyInvite: onCopyInvite,
+            unreadCount: unreadChats,
+            onChat: onChat,
           ),
         ),
         const SizedBox(height: 18),
@@ -234,6 +270,10 @@ class _DashboardBody extends StatelessWidget {
                 _SharingBanner(notice: sharingNotice!, onTap: onSharingTap),
                 const SizedBox(height: AppSpacing.md),
               ],
+              ArrivalCard(
+                circleId: snapshot.circle.id,
+                currentUserId: currentUserId,
+              ),
               SizedBox(
                 height: 196,
                 child: LiveMapCard(
@@ -253,14 +293,59 @@ class _DashboardBody extends StatelessWidget {
                 error: (error, stack) => const _SkeletonBox(height: 164),
               ),
               const SizedBox(height: AppSpacing.md),
-              if (latestMemory != null)
+              if (latestMemory != null) ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Memories',
+                        style: Theme.of(context).textTheme.labelLarge
+                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => MemoriesGalleryScreen(
+                              circleId: snapshot.circle.id,
+                              currentUserId: currentUserId,
+                              authors: {
+                                for (final member in snapshot.members)
+                                  member.profile.id: member.profile,
+                              },
+                              now: now,
+                            ),
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        child: const Text('See all'),
+                      ),
+                    ],
+                  ),
+                ),
                 MemorySnippetCard(
                   memory: latestMemory,
                   author: snapshot.memberById(latestMemory.authorId)?.profile,
                   now: now,
-                  onTap: onAddMemory,
-                )
-              else
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => MemoryDetailScreen(
+                        circleId: snapshot.circle.id,
+                        currentUserId: currentUserId,
+                        memory: latestMemory,
+                        author: snapshot
+                            .memberById(latestMemory.authorId)
+                            ?.profile,
+                        now: now,
+                      ),
+                    ),
+                  ),
+                  onAdd: onAddMemory,
+                ),
+              ] else
                 _EmptyMemoryCard(onTap: onAddMemory),
               const SizedBox(height: AppSpacing.md),
               SizedBox(
