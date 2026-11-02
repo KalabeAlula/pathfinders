@@ -9,6 +9,7 @@ import '../../../app/theme/app_tokens.dart';
 import '../../../core/config/mapbox_config.dart';
 import '../../chat/application/chat_providers.dart';
 import '../../chat/presentation/widgets/group_chat_sheet.dart';
+import '../../circle/application/circle_providers.dart';
 import '../../circle/domain/circle_member.dart';
 import '../../location/application/telemetry_providers.dart';
 import '../../location/domain/geo_point.dart';
@@ -25,6 +26,7 @@ import '../domain/place_suggestion.dart';
 import '../domain/route_geometry.dart';
 import 'venue_selection.dart';
 import 'widgets/map_search_bar.dart';
+import 'widgets/route_eta_card.dart';
 
 const _fallbackCenter = GeoPoint(latitude: 8.999, longitude: 38.775);
 
@@ -63,6 +65,8 @@ class _DestinationPickerScreenState
   PointAnnotationManager? _venueHighlights;
   FeaturesetFeature? _selectedBuilding;
   VenueHit? _selectedVenue;
+  List<CircleMember>? _mapMembers;
+  Timer? _annotationTimer;
   bool _styleReady = false;
   bool _moving = false;
   bool _seeded = false;
@@ -105,6 +109,7 @@ class _DestinationPickerScreenState
 
   @override
   void dispose() {
+    _annotationTimer?.cancel();
     _annotations?.dispose();
     super.dispose();
   }
@@ -365,7 +370,7 @@ class _DestinationPickerScreenState
 
     final annotations = MapboxLiveAnnotations(map, iconScale: 0.5);
     annotations.onMemberTapped = (memberId) {
-      for (final member in widget.members) {
+      for (final member in _currentMembers) {
         if (member.profile.id == memberId) {
           widget.onMemberTap(member);
           return;
@@ -407,7 +412,7 @@ class _DestinationPickerScreenState
     final navigation = ref.read(navigationControllerProvider(widget.circleId));
     final destination = navigation.destination;
     final view = MapCircleView.from(
-      members: widget.members,
+      members: _currentMembers,
       currentUserId: widget.currentUserId,
       navigation: navigation,
       scheme: Theme.of(context).colorScheme,
@@ -420,6 +425,19 @@ class _DestinationPickerScreenState
         destination: destination?.point,
         destinationColor: Theme.of(context).colorScheme.tertiary,
       ),
+    );
+  }
+
+  List<CircleMember> get _currentMembers => _mapMembers ?? widget.members;
+
+  /// Routes and peer fixes arrive while the picker is open, so redraw the
+  /// annotations rather than only painting them once per style load.
+  void _scheduleSync() {
+    if (!_styleReady) return;
+    _annotationTimer?.cancel();
+    _annotationTimer = Timer(
+      const Duration(milliseconds: 350),
+      _syncAnnotations,
     );
   }
 
@@ -609,6 +627,22 @@ class _DestinationPickerScreenState
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final navigation = ref.watch(navigationControllerProvider(widget.circleId));
+    final snapshotMembers = ref
+        .watch(circleSnapshotProvider(widget.currentUserId))
+        .value
+        ?.members;
+    final members = snapshotMembers ?? widget.members;
+    _mapMembers = members;
+
+    ref.listen(
+      navigationControllerProvider(widget.circleId),
+      (_, _) => _scheduleSync(),
+    );
+    ref.listen(
+      circleSnapshotProvider(widget.currentUserId),
+      (_, _) => _scheduleSync(),
+    );
+
     final draft = ref.watch(
       destinationDraftControllerProvider(widget.circleId),
     );
@@ -684,6 +718,14 @@ class _DestinationPickerScreenState
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                if (navigation.destination != null) ...[
+                  RouteEtaCard(
+                    circleId: widget.circleId,
+                    currentUserId: widget.currentUserId,
+                    members: members,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
                 if (configured)
                   _LocateButton(onTap: () => unawaited(_goToMyLocation())),
                 const SizedBox(height: AppSpacing.sm),

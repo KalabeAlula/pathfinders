@@ -12,6 +12,29 @@ const _peerRouteColors = <Color>[
   Color(0xFF4A9A9A),
 ];
 
+/// The accent each member's route and pin uses.
+///
+/// The local user always takes [ColorScheme.primary]; peers cycle through a
+/// fixed palette in a stable order so colors do not shuffle between rebuilds.
+Map<String, Color> routeAccentColors({
+  required List<CircleMember> members,
+  required String currentUserId,
+  required ColorScheme scheme,
+}) {
+  final peerIds = [
+    for (final member in members)
+      if (member.profile.id != currentUserId) member.profile.id,
+  ]..sort();
+
+  return {
+    for (final member in members)
+      member.profile.id: member.profile.id == currentUserId
+          ? scheme.primary
+          : _peerRouteColors[peerIds.indexOf(member.profile.id) %
+                _peerRouteColors.length],
+  };
+}
+
 /// Maps the circle snapshot and navigation state onto everything the map
 /// draws, so the dashboard preview and the full picker stay identical.
 class MapCircleView {
@@ -41,29 +64,24 @@ class MapCircleView {
         .where((member) => member.status?.location != null)
         .toList(growable: false);
 
-    final peerIds = [
-      for (final member in members)
-        if (member.profile.id != currentUserId) member.profile.id,
-    ]..sort();
-    final colors = <String, Color>{
-      for (final member in members)
-        member.profile.id: member.profile.id == currentUserId
-            ? scheme.primary
-            : _peerRouteColors[
-                peerIds.indexOf(member.profile.id) % _peerRouteColors.length],
-    };
+    final colors = routeAccentColors(
+      members: members,
+      currentUserId: currentUserId,
+      scheme: scheme,
+    );
 
-    final routes = [
-      for (final member in members)
-        if (navigation.routeFor(member.profile.id) case final route?)
-          (member: member, route: route),
-    ]..sort(
-        (a, b) => a.member.profile.id == currentUserId
-            ? 1
-            : b.member.profile.id == currentUserId
-                ? -1
-                : 0,
-      );
+    final routes =
+        [
+          for (final member in members)
+            if (navigation.routeFor(member.profile.id) case final route?)
+              (member: member, route: route),
+        ]..sort(
+          (a, b) => a.member.profile.id == currentUserId
+              ? 1
+              : b.member.profile.id == currentUserId
+              ? -1
+              : 0,
+        );
 
     return MapCircleView(
       pins: [
@@ -85,13 +103,15 @@ class MapCircleView {
             points: entry.route.plan.geometry,
             color: colors[entry.member.profile.id]!,
             width: entry.member.profile.id == currentUserId ? 5.5 : 4,
+            borderWidth: entry.member.profile.id == currentUserId ? 3 : 1.2,
           ),
       ],
       routes: routes,
       colors: colors,
       locatedCount: located.length,
-      pausedCount:
-          members.where((member) => member.status?.isPaused ?? false).length,
+      pausedCount: members
+          .where((member) => member.status?.isPaused ?? false)
+          .length,
     );
   }
 }

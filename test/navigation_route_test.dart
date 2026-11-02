@@ -4,13 +4,12 @@ import 'package:pathfinders/features/location/domain/geo_point.dart';
 import 'package:pathfinders/features/navigation/data/polyline_decoder.dart';
 import 'package:pathfinders/features/navigation/domain/route_geometry.dart';
 import 'package:pathfinders/features/navigation/domain/route_plan.dart';
+import 'package:pathfinders/features/navigation/domain/route_progress.dart';
 
 void main() {
   group('decodePolyline', () {
     test('matches the reference precision-5 example', () {
-      final points = decodePolyline(
-        r'_p~iF~ps|U_ulLnnqC_mqNvxq`@',
-      );
+      final points = decodePolyline(r'_p~iF~ps|U_ulLnnqC_mqNvxq`@');
 
       expect(points, hasLength(3));
       expect(points[0].latitude, closeTo(38.5, 1e-5));
@@ -81,6 +80,56 @@ void main() {
 
       expect(plan.eta, DateTime(2026, 11, 1, 18, 12));
       expect(plan.hasArrived, isTrue);
+    });
+  });
+
+  group('route progress', () {
+    const start = GeoPoint(latitude: 0, longitude: 0);
+    const middle = GeoPoint(latitude: 0, longitude: 0.005);
+    const finish = GeoPoint(latitude: 0, longitude: 0.01);
+    const geometry = [start, finish];
+    final plan = RoutePlan(
+      geometry: geometry,
+      distanceMeters: 1112,
+      duration: const Duration(minutes: 10),
+      fetchedAt: DateTime(2026, 11, 2, 9),
+    );
+
+    test('measures how far along the polyline a fix sits', () {
+      final location = progressAlongLine(middle, geometry);
+      expect(location.total, closeTo(1112, 3));
+      expect(location.travelled, closeTo(556, 3));
+      expect(progressAlongLine(middle, const []), (travelled: 0.0, total: 0.0));
+    });
+
+    test('shrinks remaining distance and time as the member advances', () {
+      final progress = RouteProgress.from(
+        plan,
+        middle,
+        now: DateTime(2026, 11, 2, 9, 5),
+      );
+
+      expect(progress.remainingMeters, closeTo(556, 3));
+      expect(progress.remaining, const Duration(minutes: 5));
+      expect(progress.arrival, DateTime(2026, 11, 2, 9, 10));
+      expect(progress.arrived, isFalse);
+    });
+
+    test('clamps fixes behind the start or past the end', () {
+      final behind = RouteProgress.from(
+        plan,
+        const GeoPoint(latitude: 0, longitude: -0.005),
+        now: DateTime(2026, 11, 2, 9),
+      );
+      expect(behind.remainingMeters, closeTo(plan.distanceMeters, 1));
+
+      final past = RouteProgress.from(
+        plan,
+        const GeoPoint(latitude: 0, longitude: 0.02),
+        now: DateTime(2026, 11, 2, 9),
+      );
+      expect(past.remainingMeters, 0);
+      expect(past.arrived, isTrue);
     });
   });
 

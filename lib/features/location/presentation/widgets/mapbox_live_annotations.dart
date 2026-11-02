@@ -40,6 +40,7 @@ class MapRouteLine {
     required this.points,
     required this.color,
     required this.width,
+    this.borderWidth = 1.5,
   });
 
   final String memberId;
@@ -47,11 +48,15 @@ class MapRouteLine {
   final Color color;
   final double width;
 
+  /// The light casing that keeps the line readable over dense map labels.
+  /// The local route asks for a heavier one so it stays the primary line.
+  final double borderWidth;
+
   String get signature {
     if (points.isEmpty) return '$memberId:empty:${color.toARGB32()}';
     final first = points.first;
     final last = points.last;
-    return '$memberId:${points.length}:${color.toARGB32()}:'
+    return '$memberId:${points.length}:${color.toARGB32()}:$borderWidth:'
         '${first.latitude.toStringAsFixed(4)},'
         '${first.longitude.toStringAsFixed(4)}:'
         '${last.latitude.toStringAsFixed(4)},'
@@ -189,7 +194,7 @@ class MapboxLiveAnnotations {
               lineColor: route.color.toARGB32(),
               lineWidth: route.width,
               lineBorderColor: Colors.white.withValues(alpha: 0.9).toARGB32(),
-              lineBorderWidth: 1.5,
+              lineBorderWidth: route.borderWidth,
               lineJoin: LineJoin.ROUND,
             ),
       ];

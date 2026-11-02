@@ -11,8 +11,10 @@ import '../../../../core/utils/time_format.dart';
 import '../../../circle/domain/circle_member.dart';
 import '../../../navigation/application/navigation_providers.dart';
 import '../../../navigation/application/navigation_state.dart';
+import '../../../navigation/domain/route_progress.dart';
 import '../../../navigation/presentation/destination_picker_screen.dart';
 import '../../../navigation/presentation/widgets/destination_sheet.dart';
+import '../../application/telemetry_providers.dart';
 import '../../domain/geo_point.dart';
 import 'map_circle_view.dart';
 import 'mapbox_live_annotations.dart';
@@ -63,6 +65,10 @@ class LiveMapCard extends ConsumerWidget {
     final scheme = theme.colorScheme;
     final navigation = ref.watch(navigationControllerProvider(circleId));
     final destination = navigation.destination;
+    final livePoint = ref
+        .watch(telemetryControllerProvider(currentUserId))
+        .lastReading
+        ?.point;
     final view = MapCircleView.from(
       members: members,
       currentUserId: currentUserId,
@@ -76,7 +82,8 @@ class LiveMapCard extends ConsumerWidget {
             latitude: destination.latitude,
             longitude: destination.longitude,
           );
-    final initialCenter = destinationPoint ??
+    final initialCenter =
+        destinationPoint ??
         (view.pins.isEmpty ? null : _pinPoint(view.pins.first));
 
     return ClipRRect(
@@ -204,6 +211,7 @@ class LiveMapCard extends ConsumerWidget {
                       routes: view.routes,
                       routeColors: view.colors,
                       currentUserId: currentUserId,
+                      livePoint: livePoint,
                       onTap: () => _openDestinationSheet(context),
                     ),
                   ),
@@ -293,11 +301,11 @@ class _MapPreviewState extends State<_MapPreview> {
   }
 
   List<Point> get _fitPoints => [
-        for (final pin in widget.pins)
-          Point(coordinates: Position(pin.longitude, pin.latitude)),
-        if (widget.destination case final point?)
-          Point(coordinates: Position(point.longitude, point.latitude)),
-      ];
+    for (final pin in widget.pins)
+      Point(coordinates: Position(pin.longitude, pin.latitude)),
+    if (widget.destination case final point?)
+      Point(coordinates: Position(point.longitude, point.latitude)),
+  ];
 
   void _onMapCreated(MapboxMap map) {
     _map = map;
@@ -325,11 +333,11 @@ class _MapPreviewState extends State<_MapPreview> {
   }
 
   String _annotationSignature() => [
-        for (final pin in widget.pins) pin.signature,
-        for (final route in widget.routes) route.signature,
-        'dest:${widget.destination?.latitude},${widget.destination?.longitude}',
-        'color:${widget.destinationColor.toARGB32()}',
-      ].join('|');
+    for (final pin in widget.pins) pin.signature,
+    for (final route in widget.routes) route.signature,
+    'dest:${widget.destination?.latitude},${widget.destination?.longitude}',
+    'color:${widget.destinationColor.toARGB32()}',
+  ].join('|');
 
   void _scheduleAnnotations({bool force = false, bool immediate = false}) {
     if (!_styleReady) return;
@@ -368,7 +376,8 @@ class _MapPreviewState extends State<_MapPreview> {
 
     final signature = points
         .map(
-          (point) => '${point.coordinates.lat.toStringAsFixed(3)},'
+          (point) =>
+              '${point.coordinates.lat.toStringAsFixed(3)},'
               '${point.coordinates.lng.toStringAsFixed(3)}',
         )
         .join('|');
@@ -458,10 +467,7 @@ class _MissingTokenSurface extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            scheme.surfaceContainerHigh,
-            scheme.surfaceContainerHighest,
-          ],
+          colors: [scheme.surfaceContainerHigh, scheme.surfaceContainerHighest],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -476,9 +482,8 @@ class _MissingTokenSurface extends StatelessWidget {
           Flexible(
             child: Text(
               'Add a Mapbox token to show the map',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
+              style: Theme.of(context).textTheme.labelSmall
+                  ?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ),
         ],
@@ -526,6 +531,7 @@ class _NavigationStatus extends StatelessWidget {
     required this.routes,
     required this.routeColors,
     required this.currentUserId,
+    required this.livePoint,
     required this.onTap,
   });
 
@@ -536,6 +542,7 @@ class _NavigationStatus extends StatelessWidget {
   final List<({CircleMember member, MemberRoute route})> routes;
   final Map<String, Color> routeColors;
   final String currentUserId;
+  final GeoPoint? livePoint;
   final VoidCallback onTap;
 
   @override
@@ -546,13 +553,13 @@ class _NavigationStatus extends StatelessWidget {
       final label = !isConfigured
           ? 'Add Mapbox token to route'
           : error != null
-              ? 'Routes unavailable'
-              : 'Calculating routes…';
+          ? 'Routes unavailable'
+          : 'Calculating routes…';
       final icon = !isConfigured
           ? Icons.key_rounded
           : error != null
-              ? Icons.warning_amber_rounded
-              : null;
+          ? Icons.warning_amber_rounded
+          : null;
 
       return Align(
         alignment: Alignment.centerLeft,
@@ -592,6 +599,19 @@ class _NavigationStatus extends StatelessWidget {
       );
     }
 
+    final now = DateTime.now();
+
+    String detailFor(CircleMember member, MemberRoute route) {
+      final isMe = member.profile.id == currentUserId;
+      final current = isMe
+          ? (livePoint ?? member.status?.location ?? route.origin)
+          : (member.status?.location ?? route.origin);
+      final progress = RouteProgress.from(route.plan, current, now: now);
+      if (progress.arrived) return 'Arrived';
+      return '${formatRouteDistance(progress.remainingMeters)} · '
+          '${formatRouteEta(progress.remaining)}';
+    }
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -601,7 +621,7 @@ class _NavigationStatus extends StatelessWidget {
               name: entry.member.profile.id == currentUserId
                   ? 'You'
                   : entry.member.profile.firstName,
-              eta: formatRouteEta(entry.route.plan.duration),
+              detail: detailFor(entry.member, entry.route),
               color: routeColors[entry.member.profile.id]!,
             ),
         ],
@@ -613,12 +633,12 @@ class _NavigationStatus extends StatelessWidget {
 class _RouteChip extends StatelessWidget {
   const _RouteChip({
     required this.name,
-    required this.eta,
+    required this.detail,
     required this.color,
   });
 
   final String name;
-  final String eta;
+  final String detail;
   final Color color;
 
   @override
@@ -642,7 +662,7 @@ class _RouteChip extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           Text(
-            '$name $eta',
+            '$name $detail',
             style: TextStyle(
               fontSize: 9.5,
               fontWeight: FontWeight.w700,
@@ -713,9 +733,8 @@ class _MapAction extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurface,
-                      ),
+                  style: Theme.of(context).textTheme.labelSmall
+                      ?.copyWith(color: scheme.onSurface),
                 ),
               ),
             ],

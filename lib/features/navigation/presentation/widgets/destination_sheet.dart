@@ -11,6 +11,7 @@ import '../../../location/application/telemetry_providers.dart';
 import '../../application/navigation_providers.dart';
 import '../../domain/navigation_failure.dart';
 import '../../domain/place_suggestion.dart';
+import '../../domain/route_progress.dart';
 import '../destination_picker_screen.dart';
 
 Future<void> showDestinationSheet(
@@ -85,17 +86,15 @@ class _DestinationSheetState extends ConsumerState<DestinationSheet> {
       _searching = true;
       _error = null;
     });
-    _debounce = Timer(
-      const Duration(milliseconds: 350),
-      () => _search(clean),
-    );
+    _debounce = Timer(const Duration(milliseconds: 350), () => _search(clean));
   }
 
   Future<void> _search(String query) async {
     final run = ++_searchRun;
     final gateway = ref.read(navigationGatewayProvider);
-    final reading =
-        ref.read(telemetryControllerProvider(widget.currentUserId)).lastReading;
+    final reading = ref
+        .read(telemetryControllerProvider(widget.currentUserId))
+        .lastReading;
 
     try {
       final results = await gateway.searchPlaces(
@@ -127,7 +126,9 @@ class _DestinationSheetState extends ConsumerState<DestinationSheet> {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     try {
-      await ref.read(navigationRepositoryProvider(widget.circleId)).setDestination(
+      await ref
+          .read(navigationRepositoryProvider(widget.circleId))
+          .setDestination(
             label: place.label,
             latitude: place.latitude,
             longitude: place.longitude,
@@ -176,7 +177,9 @@ class _DestinationSheetState extends ConsumerState<DestinationSheet> {
           .clearDestination();
       if (!mounted) return;
       navigator.pop();
-      messenger.showSnackBar(const SnackBar(content: Text('Navigation ended.')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Navigation ended.')),
+      );
     } on NavigationFailure catch (failure) {
       if (!mounted) return;
       setState(() {
@@ -193,6 +196,20 @@ class _DestinationSheetState extends ConsumerState<DestinationSheet> {
     final navigation = ref.watch(navigationControllerProvider(widget.circleId));
     final destination = navigation.destination;
     final myRoute = navigation.routeFor(widget.currentUserId);
+    final live = ref
+        .watch(telemetryControllerProvider(widget.currentUserId))
+        .lastReading
+        ?.point;
+
+    String? etaLabel;
+    if (myRoute != null) {
+      final progress = RouteProgress.from(myRoute.plan, live ?? myRoute.origin);
+      etaLabel = progress.arrived
+          ? 'You have arrived'
+          : '${formatRouteDistance(progress.remainingMeters)} · '
+                '${formatRouteEta(progress.remaining)} · '
+                'arrives ${formatArrivalClock(progress.arrival)}';
+    }
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
@@ -218,10 +235,7 @@ class _DestinationSheetState extends ConsumerState<DestinationSheet> {
                 label: destination.label,
                 latitude: destination.latitude,
                 longitude: destination.longitude,
-                etaLabel: myRoute == null
-                    ? null
-                    : '${formatRouteEta(myRoute.plan.duration)} · '
-                        '${formatRouteDistance(myRoute.plan.distanceMeters)}',
+                etaLabel: etaLabel,
                 onEnd: _saving ? null : _endNavigation,
               ),
             ],
@@ -361,10 +375,7 @@ class _ActiveDestination extends StatelessWidget {
           const SizedBox(width: 6),
           TextButton(
             onPressed: onEnd,
-            child: Text(
-              'End',
-              style: TextStyle(color: scheme.error),
-            ),
+            child: Text('End', style: TextStyle(color: scheme.error)),
           ),
         ],
       ),
@@ -392,13 +403,12 @@ class _MapboxSetupHint extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.key_rounded,
-                size: 18,
-                color: scheme.onSurfaceVariant,
-              ),
+              Icon(Icons.key_rounded, size: 18, color: scheme.onSurfaceVariant),
               const SizedBox(width: 8),
-              Text('Routing needs a Mapbox token', style: theme.textTheme.titleSmall),
+              Text(
+                'Routing needs a Mapbox token',
+                style: theme.textTheme.titleSmall,
+              ),
             ],
           ),
           const SizedBox(height: 8),
