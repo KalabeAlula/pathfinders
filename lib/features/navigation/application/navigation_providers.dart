@@ -41,9 +41,9 @@ Stream<NavigationDestination?> circleDestination(Ref ref, String circleId) =>
 
 @Riverpod(keepAlive: true)
 NavigationGateway navigationGateway(Ref ref) => MapboxNavigationGateway(
-      ref.watch(httpClientProvider),
-      accessToken: MapboxConfig.accessToken,
-    );
+  ref.watch(httpClientProvider),
+  accessToken: MapboxConfig.accessToken,
+);
 
 /// Keeps one route per member up to date between the live fixes and the
 /// shared destination.
@@ -155,10 +155,8 @@ class NavigationController extends _$NavigationController {
 
       final moved = distanceMeters(cached.origin, entry.value);
       final age = now.difference(cached.computedAt);
-      final offRoute = distanceToLineMeters(
-            entry.value,
-            cached.plan.geometry,
-          ) >
+      final offRoute =
+          distanceToLineMeters(entry.value, cached.plan.geometry) >
           _offRouteThresholdMeters;
 
       if (moved > _moveThresholdMeters || age > _staleAfter || offRoute) {
@@ -232,13 +230,17 @@ class NavigationController extends _$NavigationController {
     if (member.profile.id == userId) {
       return liveReading?.point ?? member.status?.location;
     }
-    return member.status?.location;
+
+    // Peers only get a route while they are actually reporting; a stale last
+    // fix would otherwise keep drawing a route for someone who has gone dark.
+    final status = member.status;
+    if (status == null || status.location == null || !status.isOnline) {
+      return null;
+    }
+    return status.location;
   }
 
-  NavigationState _state(
-    bool isConfigured,
-    NavigationDestination destination,
-  ) {
+  NavigationState _state(bool isConfigured, NavigationDestination destination) {
     return NavigationState(
       destination: destination,
       routes: Map.unmodifiable(_cache),
@@ -258,8 +260,8 @@ class NavigationController extends _$NavigationController {
 
 class _RouteOutcome {
   _RouteOutcome.success(MemberRoute this.route)
-      : memberId = route.memberId,
-        error = null;
+    : memberId = route.memberId,
+      error = null;
 
   const _RouteOutcome.failure(this.memberId, this.error) : route = null;
 
