@@ -16,6 +16,14 @@ import '../../application/circle_providers.dart';
 import '../../domain/circle_member.dart';
 import '../member_status_label.dart';
 
+typedef _SharingConfig = ({
+  TelemetryPermission? permission,
+  PrivacyMode mode,
+  String? error,
+  bool backgroundGranted,
+  bool? notificationsGranted,
+});
+
 Future<void> showMemberDetailSheet(
   BuildContext context, {
   required String memberId,
@@ -55,8 +63,21 @@ class MemberDetailSheet extends ConsumerWidget {
     final snapshot = ref.watch(circleSnapshotProvider(currentUserId)).value;
     final member = snapshot?.memberById(memberId) ?? initialMember;
     final status = member.status;
-    final telemetry = ref.watch(telemetryControllerProvider(currentUserId));
+    // The sharing controls depend on permission and mode, not on the fix
+    // itself, so GPS ticks must not rebuild the sheet.
+    final sharing = ref.watch(
+      telemetryControllerProvider(currentUserId).select(
+        (state) => (
+          permission: state.permission,
+          mode: state.mode,
+          error: state.error,
+          backgroundGranted: state.backgroundGranted,
+          notificationsGranted: state.notificationsGranted,
+        ),
+      ),
+    );
     final now = DateTime.now();
+    final online = status?.isOnlineAt(now) ?? false;
     final scheme = Theme.of(context).colorScheme;
     final battery = status?.batteryPercent;
 
@@ -75,7 +96,7 @@ class MemberDetailSheet extends ConsumerWidget {
                 MemberAvatar(
                   profile: member.profile,
                   size: 58,
-                  isOnline: status?.isOnline ?? false,
+                  isOnline: online,
                   isPaused: status?.isPaused ?? false,
                   isApproximate: status?.isApproximate ?? false,
                   showStatusBadge: status != null,
@@ -108,9 +129,8 @@ class MemberDetailSheet extends ConsumerWidget {
                           member.profile.statusLine!,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: scheme.onSurfaceVariant),
                         ),
                       ],
                     ],
@@ -153,9 +173,9 @@ class MemberDetailSheet extends ConsumerWidget {
                     label: 'Update',
                     value: status == null
                         ? '—'
-                        : status.isOnline
-                            ? 'Live · ${timeAgo(status.updatedAt)}'
-                            : 'Offline · ${timeAgo(status.updatedAt)}',
+                        : online
+                        ? 'Live · ${timeAgo(status.updatedAt)}'
+                        : 'Offline · ${timeAgo(status.updatedAt)}',
                   ),
                 ],
               ),
@@ -163,25 +183,30 @@ class MemberDetailSheet extends ConsumerWidget {
             const SizedBox(height: 24),
             if (isCurrentUser) ...[
               _SharingSection(
-                state: telemetry,
+                state: sharing,
                 onModeChanged: (mode) => unawaited(
-                  ref.read(telemetryControllerProvider(currentUserId).notifier)
+                  ref
+                      .read(telemetryControllerProvider(currentUserId).notifier)
                       .setMode(mode),
                 ),
                 onRequestAccess: () => unawaited(
-                  ref.read(telemetryControllerProvider(currentUserId).notifier)
+                  ref
+                      .read(telemetryControllerProvider(currentUserId).notifier)
                       .requestAccess(),
                 ),
                 onAppSettings: () => unawaited(
-                  ref.read(telemetryControllerProvider(currentUserId).notifier)
+                  ref
+                      .read(telemetryControllerProvider(currentUserId).notifier)
                       .openAppSettings(),
                 ),
                 onLocationSettings: () => unawaited(
-                  ref.read(telemetryControllerProvider(currentUserId).notifier)
+                  ref
+                      .read(telemetryControllerProvider(currentUserId).notifier)
                       .openLocationSettings(),
                 ),
                 onEnableBackground: () => unawaited(
-                  ref.read(telemetryControllerProvider(currentUserId).notifier)
+                  ref
+                      .read(telemetryControllerProvider(currentUserId).notifier)
                       .requestBackgroundAccess(),
                 ),
               ),
@@ -216,7 +241,9 @@ class MemberDetailSheet extends ConsumerWidget {
                     minimumSize: const Size.fromHeight(52),
                   ),
                   onPressed: () async {
-                    final controller = ref.read(nudgeControllerProvider.notifier);
+                    final controller = ref.read(
+                      nudgeControllerProvider.notifier,
+                    );
                     Navigator.of(context).pop();
                     await controller.sendNudge(
                       fromUserId: currentUserId,
@@ -235,11 +262,11 @@ class MemberDetailSheet extends ConsumerWidget {
   }
 
   static String _privacyLabel(PrivacyMode? mode) => switch (mode) {
-        PrivacyMode.exact => 'Exact location',
-        PrivacyMode.approximate => 'Approximate area',
-        PrivacyMode.paused => 'Paused',
-        null => '—',
-      };
+    PrivacyMode.exact => 'Exact location',
+    PrivacyMode.approximate => 'Approximate area',
+    PrivacyMode.paused => 'Paused',
+    null => '—',
+  };
 }
 
 class _InfoRow extends StatelessWidget {
@@ -267,17 +294,15 @@ class _InfoRow extends StatelessWidget {
           width: 58,
           child: Text(
             label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
+            style: Theme.of(context).textTheme.labelMedium
+                ?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ),
         Expanded(
           child: Text(
             value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: valueColor ?? scheme.onSurface,
-                ),
+            style: Theme.of(context).textTheme.bodyMedium
+                ?.copyWith(color: valueColor ?? scheme.onSurface),
           ),
         ),
       ],
@@ -295,7 +320,7 @@ class _SharingSection extends StatelessWidget {
     required this.onEnableBackground,
   });
 
-  final TelemetryState state;
+  final _SharingConfig state;
   final ValueChanged<PrivacyMode> onModeChanged;
   final VoidCallback onRequestAccess;
   final VoidCallback onAppSettings;
@@ -317,9 +342,8 @@ class _SharingSection extends StatelessWidget {
         const SizedBox(height: 3),
         Text(
           'You decide how much the crew sees. Battery stays visible for safety.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: scheme.onSurfaceVariant),
         ),
         if (permission != null &&
             permission != TelemetryPermission.granted) ...[
@@ -335,9 +359,8 @@ class _SharingSection extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             state.error!,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.error,
-                ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: scheme.error),
           ),
         ],
         const SizedBox(height: 12),
@@ -351,10 +374,7 @@ class _SharingSection extends StatelessWidget {
         ],
         if (permission == TelemetryPermission.granted && !kIsWeb) ...[
           const SizedBox(height: 12),
-          _BackgroundSharingTile(
-            state: state,
-            onEnable: onEnableBackground,
-          ),
+          _BackgroundSharingTile(state: state, onEnable: onEnableBackground),
         ],
       ],
     );
@@ -364,7 +384,7 @@ class _SharingSection extends StatelessWidget {
 class _BackgroundSharingTile extends StatelessWidget {
   const _BackgroundSharingTile({required this.state, required this.onEnable});
 
-  final TelemetryState state;
+  final _SharingConfig state;
   final VoidCallback onEnable;
 
   @override
@@ -392,9 +412,7 @@ class _BackgroundSharingTile extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Icon(
-              granted
-                  ? Icons.smartphone_rounded
-                  : Icons.phone_iphone_rounded,
+              granted ? Icons.smartphone_rounded : Icons.phone_iphone_rounded,
               size: 20,
               color: granted ? scheme.primary : scheme.onSurfaceVariant,
             ),
@@ -433,9 +451,7 @@ class _BackgroundSharingTile extends StatelessWidget {
           if (!granted)
             TextButton(
               onPressed: onEnable,
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-              ),
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
               child: const Text('Turn on'),
             ),
         ],
@@ -462,30 +478,30 @@ class _PermissionNotice extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final (icon, message, action, onAction) = switch (permission) {
       TelemetryPermission.denied => (
-          Icons.location_off_rounded,
-          'Location is off for Pathfinders. Allow it so your crew can see '
-              'where you are.',
-          'Turn on',
-          onRequestAccess,
-        ),
+        Icons.location_off_rounded,
+        'Location is off for Pathfinders. Allow it so your crew can see '
+            'where you are.',
+        'Turn on',
+        onRequestAccess,
+      ),
       TelemetryPermission.deniedForever => (
-          Icons.lock_outline_rounded,
-          'Location is blocked. Enable it for Pathfinders in system settings.',
-          'Open settings',
-          onAppSettings,
-        ),
+        Icons.lock_outline_rounded,
+        'Location is blocked. Enable it for Pathfinders in system settings.',
+        'Open settings',
+        onAppSettings,
+      ),
       TelemetryPermission.servicesDisabled => (
-          Icons.location_disabled_rounded,
-          'Location services are off. Turn them on to share where you are.',
-          'Open settings',
-          onLocationSettings,
-        ),
+        Icons.location_disabled_rounded,
+        'Location services are off. Turn them on to share where you are.',
+        'Open settings',
+        onLocationSettings,
+      ),
       _ => (
-          Icons.info_outline_rounded,
-          'Live location is not available on this device.',
-          null,
-          null,
-        ),
+        Icons.info_outline_rounded,
+        'Live location is not available on this device.',
+        null,
+        null,
+      ),
     };
 
     return Container(
@@ -505,9 +521,8 @@ class _PermissionNotice extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onTertiaryContainer,
-                  ),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: scheme.onTertiaryContainer),
             ),
           ),
           if (action != null)
@@ -574,28 +589,27 @@ class _PrivacyOption extends StatelessWidget {
                       Text(
                         mode.label,
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: selected
-                                  ? scheme.onPrimaryContainer
-                                  : scheme.onSurface,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          color: selected
+                              ? scheme.onPrimaryContainer
+                              : scheme.onSurface,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       Text(
                         mode.description,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: selected
-                                  ? scheme.onPrimaryContainer
-                                      .withValues(alpha: 0.75)
-                                  : scheme.onSurfaceVariant,
-                            ),
+                          color: selected
+                              ? scheme.onPrimaryContainer.withValues(
+                                  alpha: 0.75,
+                                )
+                              : scheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 Icon(
-                  selected
-                      ? Icons.check_circle_rounded
-                      : Icons.circle_outlined,
+                  selected ? Icons.check_circle_rounded : Icons.circle_outlined,
                   size: 20,
                   color: selected ? scheme.primary : scheme.outline,
                 ),
@@ -624,9 +638,9 @@ class _YouPill extends StatelessWidget {
       child: Text(
         'you',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSecondaryContainer,
-              fontSize: 10,
-            ),
+          color: Theme.of(context).colorScheme.onSecondaryContainer,
+          fontSize: 10,
+        ),
       ),
     );
   }
@@ -634,22 +648,22 @@ class _YouPill extends StatelessWidget {
 
 extension on PrivacyMode {
   String get label => switch (this) {
-        PrivacyMode.exact => 'Exact pin',
-        PrivacyMode.approximate => 'Approximate area',
-        PrivacyMode.paused => 'Paused',
-      };
+    PrivacyMode.exact => 'Exact pin',
+    PrivacyMode.approximate => 'Approximate area',
+    PrivacyMode.paused => 'Paused',
+  };
 
   String get description => switch (this) {
-        PrivacyMode.exact => 'Show your live position on the map.',
-        PrivacyMode.approximate =>
-          'Share a soft area; your exact street stays private.',
-        PrivacyMode.paused =>
-          'Share no location until you turn it back on. Battery stays visible.',
-      };
+    PrivacyMode.exact => 'Show your live position on the map.',
+    PrivacyMode.approximate =>
+      'Share a soft area; your exact street stays private.',
+    PrivacyMode.paused =>
+      'Share no location until you turn it back on. Battery stays visible.',
+  };
 
   IconData get icon => switch (this) {
-        PrivacyMode.exact => Icons.my_location_rounded,
-        PrivacyMode.approximate => Icons.blur_on_rounded,
-        PrivacyMode.paused => Icons.pause_circle_outline_rounded,
-      };
+    PrivacyMode.exact => Icons.my_location_rounded,
+    PrivacyMode.approximate => Icons.blur_on_rounded,
+    PrivacyMode.paused => Icons.pause_circle_outline_rounded,
+  };
 }

@@ -59,8 +59,7 @@ class TelemetryState {
   /// True when this device is allowed to send a fix and the member wants one
   /// to be visible.
   bool get isSharing =>
-      permission == TelemetryPermission.granted &&
-      mode != PrivacyMode.paused;
+      permission == TelemetryPermission.granted && mode != PrivacyMode.paused;
 
   /// True when sharing keeps running after the member leaves the app.
   bool get isSharingInBackground => isSharing && backgroundGranted;
@@ -106,15 +105,14 @@ class TelemetryController extends _$TelemetryController {
   TelemetryCadence? _cadence;
   DeviceReading? _lastReading;
   bool _sending = false;
+  bool _sendQueued = false;
   bool _askedForNotifications = false;
   String _userId = '';
 
   @override
   TelemetryState build(String userId) {
     _userId = userId;
-    _lifecycle = AppLifecycleListener(
-      onResume: () => unawaited(_refreshPermission()),
-    );
+    _lifecycle = AppLifecycleListener(onResume: () => unawaited(_onResume()));
     ref.onDispose(() {
       _keepAlive?.cancel();
       _keepAlive = null;
@@ -133,8 +131,9 @@ class TelemetryController extends _$TelemetryController {
   /// Raises sharing to "always", which is what lets fixes keep arriving after
   /// the app leaves the screen.
   Future<void> requestBackgroundAccess() async {
-    final granted =
-        await ref.read(deviceTelemetrySourceProvider).requestBackgroundAccess();
+    final granted = await ref
+        .read(deviceTelemetrySourceProvider)
+        .requestBackgroundAccess();
     if (!ref.mounted) return;
     _emit(state.copyWith(backgroundGranted: granted));
   }
@@ -146,9 +145,7 @@ class TelemetryController extends _$TelemetryController {
     _emit(state.copyWith(mode: mode, clearError: true));
 
     try {
-      await ref
-          .read(telemetryRepositoryProvider(_userId))
-          .setPrivacyMode(mode);
+      await ref.read(telemetryRepositoryProvider(_userId)).setPrivacyMode(mode);
       if (!ref.mounted) return;
       await _syncTracking();
     } on TelemetryFailure catch (error) {
@@ -163,23 +160,65 @@ class TelemetryController extends _$TelemetryController {
       ref.read(deviceTelemetrySourceProvider).openLocationSettings();
 
   Future<void> _bootstrap() async {
+    // Mark this member online before the privacy round trip. A point-free
+    // heartbeat is safe in every mode: the server keeps any existing fix but
+    // refreshes `updated_at`.
+    unawaited(_sendPresence());
     try {
-      final mode =
-          await ref.read(telemetryRepositoryProvider(_userId)).loadPrivacyMode();
+      final mode = await ref
+          .read(telemetryRepositoryProvider(_userId))
+          .loadPrivacyMode();
       _emit(state.copyWith(mode: mode, ready: true));
     } on TelemetryFailure catch (error) {
       _emit(state.copyWith(ready: true, error: error.message));
+    } catch (_) {
+      // A single failed read must not leave the circle without a heartbeat.
+      _emit(state.copyWith(ready: true));
     }
     await _refreshPermission();
   }
 
+  /// Back from the background: mark this member online before anything else,
+  /// then re-check access in case it changed while we were away.
+  Future<void> _onResume() async {
+    if (!ref.mounted) return;
+    // The OS may have suspended the periodic timer, so start a fresh one.
+    _resyncKeepAlive();
+    await _send();
+    await _refreshPermission();
+  }
+
+  Future<void> _sendPresence() async {
+    try {
+      await ref.read(telemetryRepositoryProvider(_userId)).report();
+    } catch (_) {
+      // The full send after bootstrap retries with battery and position.
+    }
+  }
+
   Future<void> _refreshPermission({bool request = false}) async {
     final source = ref.read(deviceTelemetrySourceProvider);
-    final permission = request
-        ? await source.requestPermission()
-        : await source.checkPermission();
-    final background = permission == TelemetryPermission.granted &&
-        await source.hasBackgroundAccess();
+    final previousPermission = state.permission;
+    final previousBackground = state.backgroundGranted;
+
+    TelemetryPermission permission;
+    try {
+      permission = request
+          ? await source.requestPermission()
+          : await source.checkPermission();
+    } catch (_) {
+      permission = TelemetryPermission.denied;
+    }
+    if (!ref.mounted) return;
+
+    var background = false;
+    if (permission == TelemetryPermission.granted) {
+      try {
+        background = await source.hasBackgroundAccess();
+      } catch (_) {
+        background = false;
+      }
+    }
     if (!ref.mounted) return;
 
     _emit(
@@ -189,11 +228,17 @@ class TelemetryController extends _$TelemetryController {
         clearError: true,
       ),
     );
-    await _syncTracking();
+
+    // A resume that changed nothing already sent its heartbeat above, so this
+    // avoids a duplicate report on every return to the app.
+    final changed =
+        permission != previousPermission || background != previousBackground;
+    if (changed || !state.isSharing) await _syncTracking();
   }
 
   Future<void> _syncTracking() async {
-    final canShare = state.permission == TelemetryPermission.granted &&
+    final canShare =
+        state.permission == TelemetryPermission.granted &&
         state.mode != PrivacyMode.paused;
 
     if (!canShare) {
@@ -221,7 +266,13 @@ class TelemetryController extends _$TelemetryController {
   }
 
   Future<void> _send() async {
-    if (_sending || !ref.mounted) return;
+    if (!ref.mounted) return;
+    if (_sending) {
+      // A heartbeat or fix that lands mid-flight still has to reach the
+      // server; dropping it is how an active member looks offline.
+      _sendQueued = true;
+      return;
+    }
     _sending = true;
 
     try {
@@ -249,7 +300,9 @@ class TelemetryController extends _$TelemetryController {
       }
 
       final reading = canShare ? _lastReading : null;
-      await ref.read(telemetryRepositoryProvider(_userId)).report(
+      await ref
+          .read(telemetryRepositoryProvider(_userId))
+          .report(
             point: reading?.point,
             accuracyMeters: reading?.accuracyMeters ?? 0,
             speedKph: reading?.speedKph ?? 0,
@@ -258,7 +311,9 @@ class TelemetryController extends _$TelemetryController {
           );
 
       if (!ref.mounted) return;
-      _emit(state.copyWith(lastSentAt: DateTime.now(), clearError: true));
+      _emit(
+        state.copyWith(lastSentAt: DateTime.now().toUtc(), clearError: true),
+      );
     } on TelemetryFailure catch (error) {
       _emit(state.copyWith(error: error.message));
     } catch (_) {
@@ -269,6 +324,10 @@ class TelemetryController extends _$TelemetryController {
       );
     } finally {
       _sending = false;
+      if (_sendQueued && ref.mounted) {
+        _sendQueued = false;
+        unawaited(_send());
+      }
     }
   }
 
@@ -328,8 +387,17 @@ class TelemetryController extends _$TelemetryController {
 
   void _restartKeepAlive(Duration period) {
     if (_keepAlivePeriod == period && _keepAlive != null) return;
-    _keepAlive?.cancel();
     _keepAlivePeriod = period;
+    _resyncKeepAlive();
+  }
+
+  /// Re-arms the heartbeat without changing its period. The OS can suspend
+  /// timers while the app is backgrounded, so resume calls this even when the
+  /// period is unchanged.
+  void _resyncKeepAlive() {
+    final period = _keepAlivePeriod;
+    if (period == null) return;
+    _keepAlive?.cancel();
     _keepAlive = Timer.periodic(period, (_) => unawaited(_send()));
   }
 

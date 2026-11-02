@@ -6,11 +6,18 @@ class DeviceReading {
     required this.point,
     required this.accuracyMeters,
     required this.speedKph,
+    this.speedAccuracyKph = 0,
   });
 
   final GeoPoint point;
   final double accuracyMeters;
+
+  /// Already filtered for stationary drift; exactly 0 means the device is
+  /// still. Raw GPS speed must never reach this field unfiltered.
   final double speedKph;
+
+  /// How wrong the platform thinks [speedKph] is; 0 when it did not say.
+  final double speedAccuracyKph;
 }
 
 /// What the device can tell us about its battery right now.

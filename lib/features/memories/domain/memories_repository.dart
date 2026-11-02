@@ -16,4 +16,10 @@ abstract interface class MemoriesRepository {
 
   /// Deletes one of the caller's memories and, when given, its photo object.
   Future<void> deleteMemory(String memoryId, {String? photoPath});
+
+  /// Leaves [emoji] on a memory, replacing the caller's previous reaction.
+  Future<void> setReaction({required String memoryId, required String emoji});
+
+  /// Removes the caller's reaction to a memory.
+  Future<void> clearReaction(String memoryId);
 }

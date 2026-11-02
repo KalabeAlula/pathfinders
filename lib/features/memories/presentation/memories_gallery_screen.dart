@@ -12,7 +12,7 @@ import 'widgets/memory_composer_sheet.dart';
 import 'widgets/memory_photo_view.dart';
 
 /// Every memory in the circle, newest first, as a photo-first grid.
-class MemoriesGalleryScreen extends ConsumerWidget {
+class MemoriesGalleryScreen extends ConsumerStatefulWidget {
   const MemoriesGalleryScreen({
     super.key,
     required this.circleId,
@@ -31,9 +31,28 @@ class MemoriesGalleryScreen extends ConsumerWidget {
   final DateTime? now;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final memories = ref.watch(recentMemoriesProvider(circleId));
-    final clock = now ?? DateTime.now();
+  ConsumerState<MemoriesGalleryScreen> createState() =>
+      _MemoriesGalleryScreenState();
+}
+
+class _MemoriesGalleryScreenState extends ConsumerState<MemoriesGalleryScreen> {
+  /// Null means everyone; otherwise only this author is shown.
+  String? _authorFilter;
+
+  /// Tapping the selected author again clears the filter.
+  void _selectAuthor(String? authorId) {
+    setState(() {
+      _authorFilter = _authorFilter == authorId ? null : authorId;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final memories = ref.watch(recentMemoriesProvider(widget.circleId));
+    final clock = widget.now ?? DateTime.now();
+    final authors = widget.authors;
+    final circleId = widget.circleId;
+    final currentUserId = widget.currentUserId;
 
     return Scaffold(
       appBar: AppBar(
@@ -51,30 +70,54 @@ class MemoriesGalleryScreen extends ConsumerWidget {
         ],
       ),
       body: memories.when(
-        data: (items) => items.isEmpty
-            ? _EmptyGallery(
-                onAdd: () => showMemoryComposer(
-                  context,
+        data: (items) {
+          if (items.isEmpty) {
+            return _EmptyGallery(
+              onAdd: () => showMemoryComposer(
+                context,
+                circleId: circleId,
+                authorId: currentUserId,
+              ),
+            );
+          }
+
+          final authorIds = <String>[];
+          for (final memory in items) {
+            if (!authorIds.contains(memory.authorId)) {
+              authorIds.add(memory.authorId);
+            }
+          }
+          final selected =
+              _authorFilter != null && authorIds.contains(_authorFilter)
+              ? _authorFilter
+              : null;
+          final visible = selected == null
+              ? items
+              : [
+                  for (final memory in items)
+                    if (memory.authorId == selected) memory,
+                ];
+
+          return _MemoryGrid(
+            memories: visible,
+            authorIds: authorIds,
+            selectedAuthorId: selected,
+            onSelectAuthor: _selectAuthor,
+            authors: authors,
+            now: clock,
+            onOpen: (memory) => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => MemoryDetailScreen(
                   circleId: circleId,
-                  authorId: currentUserId,
-                ),
-              )
-            : _MemoryGrid(
-                memories: items,
-                authors: authors,
-                now: clock,
-                onOpen: (memory) => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => MemoryDetailScreen(
-                      circleId: circleId,
-                      currentUserId: currentUserId,
-                      memory: memory,
-                      author: authors[memory.authorId],
-                      now: clock,
-                    ),
-                  ),
+                  currentUserId: currentUserId,
+                  memory: memory,
+                  author: authors[memory.authorId],
+                  now: clock,
                 ),
               ),
+            ),
+          );
+        },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => _GalleryError(
           onRetry: () => ref.invalidate(recentMemoriesProvider(circleId)),
@@ -87,12 +130,18 @@ class MemoriesGalleryScreen extends ConsumerWidget {
 class _MemoryGrid extends StatelessWidget {
   const _MemoryGrid({
     required this.memories,
+    required this.authorIds,
+    required this.selectedAuthorId,
+    required this.onSelectAuthor,
     required this.authors,
     required this.now,
     required this.onOpen,
   });
 
   final List<MemoryPost> memories;
+  final List<String> authorIds;
+  final String? selectedAuthorId;
+  final ValueChanged<String?> onSelectAuthor;
   final Map<String, UserProfile> authors;
   final DateTime now;
   final ValueChanged<MemoryPost> onOpen;
@@ -109,9 +158,21 @@ class _MemoryGrid extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
+              padding: const EdgeInsets.only(
+                top: AppSpacing.xs,
+                bottom: AppSpacing.xs,
+              ),
+              child: _AuthorFilter(
+                authorIds: authorIds,
+                authors: authors,
+                selectedAuthorId: selectedAuthorId,
+                onSelect: onSelectAuthor,
+              ),
+            ),
+            Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.xl,
-                AppSpacing.sm,
+                AppSpacing.xs,
                 AppSpacing.xl,
                 AppSpacing.md,
               ),
@@ -163,6 +224,129 @@ class _MemoryGrid extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _AuthorFilter extends StatelessWidget {
+  const _AuthorFilter({
+    required this.authorIds,
+    required this.authors,
+    required this.selectedAuthorId,
+    required this.onSelect,
+  });
+
+  final List<String> authorIds;
+  final Map<String, UserProfile> authors;
+  final String? selectedAuthorId;
+  final ValueChanged<String?> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+      child: Row(
+        children: [
+          _AuthorFilterChip(
+            label: 'Everyone',
+            selected: selectedAuthorId == null,
+            onTap: () => onSelect(null),
+          ),
+          for (final id in authorIds) ...[
+            const SizedBox(width: AppSpacing.sm),
+            _AuthorFilterChip(
+              label: authors[id]?.firstName ?? 'Someone',
+              profile: authors[id],
+              selected: selectedAuthorId == id,
+              onTap: () => onSelect(id),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AuthorFilterChip extends StatelessWidget {
+  const _AuthorFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.profile,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final UserProfile? profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final radius = BorderRadius.circular(AppRadius.pill);
+    final avatar = profile;
+    final avatarColor = avatar == null ? null : Color(avatar.avatarColor);
+    final onAvatar = avatarColor == null
+        ? null
+        : ThemeData.estimateBrightnessForColor(avatarColor) == Brightness.dark
+        ? Colors.white
+        : Colors.black87;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: profile == null
+          ? 'Show all memories'
+          : 'Show memories from $label',
+      child: Material(
+        color: selected
+            ? scheme.secondaryContainer
+            : scheme.surfaceContainerHighest,
+        borderRadius: radius,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: radius,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (avatar != null) ...[
+                  Container(
+                    width: 18,
+                    height: 18,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: avatarColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      avatar.initials,
+                      style: TextStyle(
+                        fontSize: 8,
+                        fontWeight: FontWeight.w700,
+                        color: onAvatar,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  label,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: selected
+                        ? scheme.onSecondaryContainer
+                        : scheme.onSurface,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
+import 'package:flutter_riverpod/flutter_riverpod.dart'
+    show ProviderListenableSelect;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../auth/application/auth_providers.dart';
@@ -51,7 +53,9 @@ class ArrivalController extends _$ArrivalController {
     }
 
     final snapshot = ref.watch(circleSnapshotProvider(userId)).value;
-    final reading = ref.watch(telemetryControllerProvider(userId)).lastReading;
+    final reading = ref.watch(
+      telemetryControllerProvider(userId).select((state) => state.lastReading),
+    );
     final localPoint = reading?.point;
     final arrived =
         localPoint != null &&

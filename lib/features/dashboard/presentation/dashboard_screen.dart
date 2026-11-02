@@ -52,7 +52,11 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final pet = ref.watch(petControllerProvider);
     final activeNudge = ref.watch(nudgeControllerProvider);
-    final telemetry = ref.watch(telemetryControllerProvider(currentUserId));
+    // Only permission and privacy mode change the banner; watching the whole
+    // telemetry state would rebuild the dashboard on every GPS fix.
+    final sharingNotice = ref.watch(
+      telemetryControllerProvider(currentUserId).select(_sharingNotice),
+    );
     final now = ref.watch(appClockProvider).value ?? DateTime.now();
 
     final circleId = snapshot.circle.id;
@@ -122,7 +126,7 @@ class DashboardScreen extends ConsumerWidget {
                 milestone: milestone,
                 now: now,
                 unreadChats: unreadChats,
-                sharingNotice: _sharingNotice(telemetry),
+                sharingNotice: sharingNotice,
                 onMemberTap: openMember,
                 onSharingTap: () {
                   final me = snapshot.memberById(currentUserId);

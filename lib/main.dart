@@ -11,6 +11,11 @@ import 'core/storage/storage_providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Thumbnails decode at display size, so a lean cache is enough and keeps
+  // low-end devices away from the 100 MB default budget.
+  PaintingBinding.instance.imageCache
+    ..maximumSize = 200
+    ..maximumSizeBytes = 64 * 1024 * 1024;
   await Supabase.initialize(
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.publishableKey,

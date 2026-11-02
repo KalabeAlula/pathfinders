@@ -66,8 +66,10 @@ class LiveMapCard extends ConsumerWidget {
     final navigation = ref.watch(navigationControllerProvider(circleId));
     final destination = navigation.destination;
     final livePoint = ref
-        .watch(telemetryControllerProvider(currentUserId))
-        .lastReading
+        .watch(
+          telemetryControllerProvider(currentUserId)
+              .select((state) => state.lastReading),
+        )
         ?.point;
     final view = MapCircleView.from(
       members: members,

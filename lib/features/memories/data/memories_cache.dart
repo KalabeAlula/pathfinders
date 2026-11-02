@@ -59,6 +59,8 @@ class MemoriesCache {
     'placeLabel': memory.placeLabel,
     'voiceNoteSeconds': memory.voiceNoteSeconds,
     'photoPath': memory.photoPath,
+    'reactions': memory.reactions,
+    'myReaction': memory.myReaction,
   };
 
   static MemoryPost _decode(Map<String, dynamic> json) => MemoryPost(
@@ -73,5 +75,20 @@ class MemoriesCache {
     placeLabel: json['placeLabel'] as String?,
     voiceNoteSeconds: (json['voiceNoteSeconds'] as num?)?.toInt(),
     photoPath: json['photoPath'] as String?,
+    reactions: _decodeReactions(json['reactions']),
+    myReaction: json['myReaction'] as String?,
   );
+
+  static Map<String, int> _decodeReactions(Object? raw) {
+    if (raw is! Map) return const {};
+    final reactions = <String, int>{};
+    for (final entry in raw.entries) {
+      final emoji = entry.key;
+      final count = entry.value;
+      if (emoji is String && count is num && count > 0) {
+        reactions[emoji] = count.toInt();
+      }
+    }
+    return reactions;
+  }
 }

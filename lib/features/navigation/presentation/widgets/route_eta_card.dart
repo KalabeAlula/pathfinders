@@ -35,8 +35,10 @@ class RouteEtaCard extends ConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final live = ref
-        .watch(telemetryControllerProvider(currentUserId))
-        .lastReading
+        .watch(
+          telemetryControllerProvider(currentUserId)
+              .select((state) => state.lastReading),
+        )
         ?.point;
     final colors = routeAccentColors(
       members: members,
@@ -71,59 +73,61 @@ class RouteEtaCard extends ConsumerWidget {
       return a.isMe ? -1 : 1;
     });
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLowest.withValues(alpha: 0.97),
-        borderRadius: BorderRadius.circular(AppRadius.tile),
-        border: Border.all(color: scheme.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.flag_rounded, size: 14, color: scheme.tertiary),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Heading to ${destination.label}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              if (navigation.loadingMemberIds.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(left: 6),
-                  child: SizedBox(
-                    width: 11,
-                    height: 11,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.5,
-                      color: scheme.onSurfaceVariant,
+    return RepaintBoundary(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLowest.withValues(alpha: 0.97),
+          borderRadius: BorderRadius.circular(AppRadius.tile),
+          border: Border.all(color: scheme.outlineVariant),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.flag_rounded, size: 14, color: scheme.tertiary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Heading to ${destination.label}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
+                if (navigation.loadingMemberIds.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: SizedBox(
+                      width: 11,
+                      height: 11,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            for (var index = 0; index < rows.length; index++) ...[
+              if (index > 0) const SizedBox(height: 4),
+              _EtaRow(row: rows[index]),
             ],
-          ),
-          const SizedBox(height: 7),
-          for (var index = 0; index < rows.length; index++) ...[
-            if (index > 0) const SizedBox(height: 4),
-            _EtaRow(row: rows[index]),
           ],
-        ],
+        ),
       ),
     );
   }

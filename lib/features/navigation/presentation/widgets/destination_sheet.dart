@@ -197,8 +197,10 @@ class _DestinationSheetState extends ConsumerState<DestinationSheet> {
     final destination = navigation.destination;
     final myRoute = navigation.routeFor(widget.currentUserId);
     final live = ref
-        .watch(telemetryControllerProvider(widget.currentUserId))
-        .lastReading
+        .watch(
+          telemetryControllerProvider(widget.currentUserId)
+              .select((state) => state.lastReading),
+        )
         ?.point;
 
     String? etaLabel;

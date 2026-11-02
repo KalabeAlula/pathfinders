@@ -28,7 +28,7 @@ void main() {
       speedKph: speedKph,
       isOnline: isOnline,
       privacyMode: privacyMode,
-      updatedAt: now.subtract(const Duration(minutes: 4)),
+      updatedAt: now.subtract(Duration(minutes: isOnline ? 4 : 6)),
       arrivedAt: arrivedAt,
     );
   }
@@ -38,7 +38,23 @@ void main() {
       arrivedAt: now.subtract(const Duration(hours: 2, minutes: 15)),
     );
 
-    expect(describeMemberLocation(resting, now), 'Stopped for 2h 15m');
+    expect(describeMemberLocation(resting, now), 'Stationary for 2h 15m');
+  });
+
+  test('a still member reads as stationary, never as moving', () {
+    final still = status();
+    final member = CircleMember(profile: profile, status: still);
+
+    expect(describeMemberLocation(still, now), 'Stationary');
+    expect(describeMemberStatus(member, now), 'Stationary');
+  });
+
+  test('a ghost speed below the deadband is not movement', () {
+    final ghost = status(speedKph: 2.1);
+    final member = CircleMember(profile: profile, status: ghost);
+
+    expect(describeMemberStatus(member, now), 'Stationary');
+    expect(describeMemberLocation(ghost, now), 'Stationary');
   });
 
   test('sheet copy avoids reading "for just arrived"', () {
@@ -77,7 +93,7 @@ void main() {
   test('offline copy falls back to last seen', () {
     expect(
       describeMemberLocation(status(isOnline: false), now),
-      'Last seen 4m ago',
+      'Last seen 6m ago',
     );
   });
 

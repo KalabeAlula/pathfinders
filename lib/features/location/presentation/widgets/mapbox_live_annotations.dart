@@ -85,6 +85,8 @@ class MapboxLiveAnnotations {
   bool _busy = false;
   bool _queued = false;
   int _generation = 0;
+  String? _appliedSignature;
+  String? _inFlightSignature;
 
   _Snapshot _last = const _Snapshot(
     members: [],
@@ -125,6 +127,7 @@ class MapboxLiveAnnotations {
       _ready = false;
       return;
     }
+    _appliedSignature = null;
     await _apply();
   }
 
@@ -146,14 +149,20 @@ class MapboxLiveAnnotations {
 
   Future<void> _apply() async {
     if (!_ready || _disposed) return;
+
+    final snapshot = _last;
+    final signature = _signatureOf(snapshot);
     if (_busy) {
-      _queued = true;
+      if (signature != _inFlightSignature) _queued = true;
       return;
     }
+    if (signature == _appliedSignature) return;
+
     _busy = true;
+    _inFlightSignature = signature;
 
     try {
-      final members = _last.members;
+      final members = snapshot.members;
       final memberOptions = await Future.wait([
         for (final pin in members)
           MapMarkerImages.member(
@@ -182,7 +191,7 @@ class MapboxLiveAnnotations {
 
       await _routes?.deleteAll();
       final lines = [
-        for (final route in _last.routes)
+        for (final route in snapshot.routes)
           if (route.points.length > 1)
             PolylineAnnotationOptions(
               geometry: LineString(
@@ -203,10 +212,10 @@ class MapboxLiveAnnotations {
       }
 
       await _destination?.deleteAll();
-      final destination = _last.destination;
+      final destination = snapshot.destination;
       if (destination != null) {
         final image = await MapMarkerImages.destination(
-          color: _last.destinationColor,
+          color: snapshot.destinationColor,
         );
         if (_disposed) return;
         await _destination?.create(
@@ -223,17 +232,51 @@ class MapboxLiveAnnotations {
           ),
         );
       }
+
+      _appliedSignature = signature;
     } catch (_) {
       // Losing the style invalidates the managers; the owner re-initializes
       // when the new style reports ready.
       _ready = false;
     } finally {
       _busy = false;
+      _inFlightSignature = null;
       if (_queued && _ready) {
         _queued = false;
         await _apply();
       }
     }
+  }
+
+  /// Everything that changes what the native layer draws. Identical syncs are
+  /// skipped so GPS ticks do not delete and recreate every annotation.
+  static String _signatureOf(_Snapshot snapshot) {
+    final buffer = StringBuffer();
+    for (final pin in snapshot.members) {
+      buffer
+        ..write('m|${pin.id}|${pin.initials}|')
+        ..write('${pin.latitude.toStringAsFixed(5)},')
+        ..write('${pin.longitude.toStringAsFixed(5)}|')
+        ..write('${pin.accent.toARGB32()}|${pin.background.toARGB32()}|')
+        ..write('${pin.approximate};');
+    }
+    for (final route in snapshot.routes) {
+      buffer
+        ..write('r|${route.memberId}|${route.color.toARGB32()}|')
+        ..write('${route.width}|${route.borderWidth}|');
+      for (final point in route.points) {
+        buffer
+          ..write(point.latitude.toStringAsFixed(5))
+          ..write(',')
+          ..write(point.longitude.toStringAsFixed(5))
+          ..write(';');
+      }
+    }
+    final destination = snapshot.destination;
+    buffer
+      ..write('d|${destination?.latitude},${destination?.longitude}|')
+      ..write(snapshot.destinationColor.toARGB32());
+    return buffer.toString();
   }
 
   void dispose() {

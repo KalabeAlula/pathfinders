@@ -22,6 +22,15 @@ class MemberStatus {
   final String userId;
   final GeoPoint? location;
 
+  /// How stale a row may be before this member reads as offline.
+  ///
+  /// The slowest keepalive heartbeat is 2.5 minutes, so this leaves a full
+  /// minute of slack for a slow request or a timer the OS suspended.
+  static const Duration onlineWindow = Duration(minutes: 5);
+
+  /// Matches the device-side speed deadband: anything slower is jitter.
+  static const double movingThresholdKph = 3.6;
+
   /// Null when the device has not reported a level yet.
   final int? batteryPercent;
   final bool isCharging;
@@ -41,7 +50,14 @@ class MemberStatus {
 
   bool get isLowBattery => batteryPercent != null && batteryPercent! <= 20;
 
-  bool get isMoving => speedKph >= 2;
+  bool get isMoving => speedKph >= movingThresholdKph;
+
+  /// Whether the row is still fresh as of [now].
+  ///
+  /// [isOnline] is frozen at decode time, so screens that tick a clock should
+  /// use this instead.
+  bool isOnlineAt(DateTime now) =>
+      now.toUtc().difference(updatedAt.toUtc()) <= onlineWindow;
 
   Duration? dwellTime(DateTime now) {
     final arrived = arrivedAt;

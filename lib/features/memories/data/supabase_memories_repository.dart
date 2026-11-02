@@ -29,7 +29,7 @@ class SupabaseMemoriesRepository implements MemoriesRepository {
 
   static const _columns =
       'id, author_id, body, mood, place_label, voice_note_seconds, photo_path, '
-      'created_at';
+      'created_at, memory_reactions ( user_id, emoji )';
 
   @override
   Stream<List<MemoryPost>> watchMemories() async* {
@@ -50,6 +50,12 @@ class SupabaseMemoriesRepository implements MemoriesRepository {
               event: sb.PostgresChangeEvent.all,
               schema: 'public',
               table: 'memories',
+              callback: (_) => scheduleRefresh(),
+            )
+            .onPostgresChanges(
+              event: sb.PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'memory_reactions',
               callback: (_) => scheduleRefresh(),
             )
           ..subscribe();
@@ -164,6 +170,53 @@ class SupabaseMemoriesRepository implements MemoriesRepository {
     }
   }
 
+  @override
+  Future<void> setReaction({
+    required String memoryId,
+    required String emoji,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      throw const MemoriesFailure('Sign in again to react.');
+    }
+
+    try {
+      await _client.from('memory_reactions').upsert({
+        'memory_id': memoryId,
+        'user_id': userId,
+        'emoji': emoji,
+      }, onConflict: 'memory_id,user_id');
+    } on sb.PostgrestException catch (error) {
+      throw _mapReactionFailure(error);
+    } on Exception {
+      throw const MemoriesFailure(
+        'Could not save your reaction. Check your connection and try again.',
+      );
+    }
+  }
+
+  @override
+  Future<void> clearReaction(String memoryId) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      throw const MemoriesFailure('Sign in again to react.');
+    }
+
+    try {
+      await _client
+          .from('memory_reactions')
+          .delete()
+          .eq('memory_id', memoryId)
+          .eq('user_id', userId);
+    } on sb.PostgrestException catch (error) {
+      throw _mapReactionFailure(error);
+    } on Exception {
+      throw const MemoriesFailure(
+        'Could not save your reaction. Check your connection and try again.',
+      );
+    }
+  }
+
   Future<String> _uploadPhoto({
     required String authorId,
     required MemoryPhotoDraft photo,
@@ -234,8 +287,11 @@ class SupabaseMemoriesRepository implements MemoriesRepository {
           .order('created_at', ascending: false)
           .limit(40);
 
-      return [
-        for (final row in rows)
+      final userId = _client.auth.currentUser?.id;
+      final memories = <MemoryPost>[];
+      for (final row in rows) {
+        final tally = _reactionTally(row['memory_reactions'], userId);
+        memories.add(
           MemoryPost(
             id: row['id'] as String,
             authorId: row['author_id'] as String,
@@ -245,8 +301,12 @@ class SupabaseMemoriesRepository implements MemoriesRepository {
             placeLabel: _optionalText(row['place_label']),
             voiceNoteSeconds: (row['voice_note_seconds'] as num?)?.toInt(),
             photoPath: _optionalText(row['photo_path']),
+            reactions: tally.counts,
+            myReaction: tally.mine,
           ),
-      ];
+        );
+      }
+      return memories;
     } on sb.PostgrestException catch (error) {
       throw _mapFailure(
         error,
@@ -255,6 +315,24 @@ class SupabaseMemoriesRepository implements MemoriesRepository {
             'try again.',
       );
     }
+  }
+
+  static ({Map<String, int> counts, String? mine}) _reactionTally(
+    Object? raw,
+    String? userId,
+  ) {
+    final counts = <String, int>{};
+    String? mine;
+    if (raw is List) {
+      for (final entry in raw) {
+        if (entry is! Map) continue;
+        final emoji = entry['emoji'];
+        if (emoji is! String) continue;
+        counts.update(emoji, (count) => count + 1, ifAbsent: () => 1);
+        if (userId != null && entry['user_id'] == userId) mine = emoji;
+      }
+    }
+    return (counts: counts, mine: mine);
   }
 
   static MemoryMood _mood(Object? value) => MemoryMood.values.firstWhere(
@@ -279,6 +357,20 @@ class SupabaseMemoriesRepository implements MemoriesRepository {
       message ??
           'Could not upload that photo. Check your connection and try again.',
       code: error.statusCode,
+    );
+  }
+
+  static MemoriesFailure _mapReactionFailure(sb.PostgrestException error) {
+    final message = switch (error.code) {
+      '42501' || 'PGRST301' => 'Sign in again to react.',
+      '23503' => 'That memory is no longer here.',
+      '23514' => 'That reaction is not available.',
+      _ => null,
+    };
+    return MemoriesFailure(
+      message ??
+          'Could not save your reaction. Check your connection and try again.',
+      code: error.code,
     );
   }
 

@@ -78,11 +78,35 @@ void main() {
     expect(stale.isOnline, isFalse);
   });
 
-  test('a missing battery reading is not treated as low battery', () {
+  test('a slow heartbeat gap stays inside the online window', () {
     final status = MemberStatusMapper.fromRow(
-      row(battery: null),
+      row(updatedAt: '2026-11-01T17:56:00.000Z'),
       now: now,
     );
+
+    expect(status.isOnline, isTrue);
+    expect(status.isOnlineAt(now), isTrue);
+  });
+
+  test('online expires once the clock passes the window', () {
+    final status = MemberStatusMapper.fromRow(row(), now: now);
+
+    expect(status.isOnlineAt(now.add(const Duration(minutes: 4))), isTrue);
+    expect(status.isOnlineAt(now.add(const Duration(minutes: 6))), isFalse);
+  });
+
+  test('timestamps without an offset are read as UTC, not local', () {
+    final status = MemberStatusMapper.fromRow(
+      row(updatedAt: '2026-11-01T17:59:30.000'),
+      now: now,
+    );
+
+    expect(status.updatedAt.toUtc(), DateTime.utc(2026, 11, 1, 17, 59, 30));
+    expect(status.isOnline, isTrue);
+  });
+
+  test('a missing battery reading is not treated as low battery', () {
+    final status = MemberStatusMapper.fromRow(row(battery: null), now: now);
 
     expect(status.batteryPercent, isNull);
     expect(status.isLowBattery, isFalse);
@@ -92,5 +116,12 @@ void main() {
     final status = MemberStatusMapper.fromRow(row(mode: 'nonsense'), now: now);
 
     expect(status.privacyMode, PrivacyMode.exact);
+  });
+
+  test('stored jitter is clamped before it reaches the UI', () {
+    final status = MemberStatusMapper.fromRow(row(speedKph: 1.8), now: now);
+
+    expect(status.speedKph, 0);
+    expect(status.isMoving, isFalse);
   });
 }

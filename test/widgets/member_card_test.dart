@@ -65,7 +65,7 @@ void main() {
     expect(find.text('Kaleab'), findsOneWidget);
     expect(find.text('you'), findsOneWidget);
     expect(find.text('68%'), findsOneWidget);
-    expect(find.text('Stopped · 2h 15m'), findsOneWidget);
+    expect(find.text('Stationary · 2h 15m'), findsOneWidget);
   });
 
   testWidgets('paused members show no location copy', (tester) async {

@@ -939,47 +939,49 @@ class _CenterPin extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Align(
-        alignment: Alignment.center,
-        child: Transform.translate(
-          offset: const Offset(0, -26),
-          child: AnimatedScale(
-            scale: moving ? 1.14 : 1,
-            duration: const Duration(milliseconds: 160),
-            curve: Curves.easeOut,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: color,
-                    border: Border.all(color: Colors.white, width: 3),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(
-                          alpha: moving ? 0.34 : 0.22,
+    return RepaintBoundary(
+      child: IgnorePointer(
+        child: Align(
+          alignment: Alignment.center,
+          child: Transform.translate(
+            offset: const Offset(0, -26),
+            child: AnimatedScale(
+              scale: moving ? 1.14 : 1,
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: color,
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(
+                            alpha: moving ? 0.34 : 0.22,
+                          ),
+                          blurRadius: moving ? 16 : 8,
+                          offset: Offset(0, moving ? 8 : 4),
                         ),
-                        blurRadius: moving ? 16 : 8,
-                        offset: Offset(0, moving ? 8 : 4),
-                      ),
-                    ],
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.flag_rounded,
+                      size: 20,
+                      color: Colors.white,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.flag_rounded,
-                    size: 20,
-                    color: Colors.white,
+                  CustomPaint(
+                    size: const Size(14, 10),
+                    painter: _PinTailPainter(color),
                   ),
-                ),
-                CustomPaint(
-                  size: const Size(14, 10),
-                  painter: _PinTailPainter(color),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

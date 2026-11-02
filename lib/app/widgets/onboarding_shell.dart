@@ -111,16 +111,12 @@ class BrandMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(size * 0.34);
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(size * 0.34),
-        gradient: const LinearGradient(
-          colors: [AppColors.clay, AppColors.honey],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        borderRadius: radius,
         boxShadow: [
           BoxShadow(
             color: AppColors.clay.withValues(alpha: 0.35),
@@ -129,10 +125,16 @@ class BrandMark extends StatelessWidget {
           ),
         ],
       ),
-      child: Icon(
-        Icons.explore_rounded,
-        size: size * 0.55,
-        color: Colors.white,
+      child: ClipRRect(
+        borderRadius: radius,
+        child: Image.asset(
+          'assets/branding/app_icon.png',
+          width: size,
+          height: size,
+          cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+          fit: BoxFit.cover,
+          semanticLabel: 'Pathfinders',
+        ),
       ),
     );
   }

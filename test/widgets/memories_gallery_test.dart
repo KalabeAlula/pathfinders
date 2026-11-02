@@ -21,6 +21,12 @@ const _sam = UserProfile(
   avatarColor: 0xFF7C8C6B,
 );
 
+const _nadia = UserProfile(
+  id: 'nadia',
+  displayName: 'Nadia Haile',
+  avatarColor: 0xFFC7974C,
+);
+
 List<MemoryPost> _memories() => [
   MemoryPost(
     id: 'm1',
@@ -63,6 +69,15 @@ class _FakeMemoriesRepository implements MemoriesRepository {
 
   @override
   Future<void> deleteMemory(String memoryId, {String? photoPath}) async {}
+
+  @override
+  Future<void> setReaction({
+    required String memoryId,
+    required String emoji,
+  }) async {}
+
+  @override
+  Future<void> clearReaction(String memoryId) async {}
 }
 
 Widget _host(_FakeMemoriesRepository repository) {
@@ -72,7 +87,7 @@ Widget _host(_FakeMemoriesRepository repository) {
       home: MemoriesGalleryScreen(
         circleId: 'c1',
         currentUserId: 'alex',
-        authors: const {'alex': _alex, 'sam': _sam},
+        authors: const {'alex': _alex, 'sam': _sam, 'nadia': _nadia},
         now: DateTime(2026, 11, 2, 10),
       ),
     ),
@@ -100,6 +115,54 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('1 moment'), findsOneWidget);
+  });
+
+  testWidgets('shows filters only for authors in the feed', (tester) async {
+    await tester.pumpWidget(_host(_FakeMemoriesRepository(_memories())));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Everyone'), findsOneWidget);
+    expect(find.text('Alex'), findsOneWidget);
+    expect(find.text('Sam'), findsOneWidget);
+    expect(find.text('Nadia'), findsNothing);
+  });
+
+  testWidgets('filters the grid by author and back to everyone', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host(_FakeMemoriesRepository(_memories())));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Sam'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 moment'), findsOneWidget);
+    expect(find.text('Flat white and a card game'), findsOneWidget);
+    expect(find.text('Golden hour on Entoto'), findsNothing);
+
+    await tester.tap(find.text('Everyone'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 moments'), findsOneWidget);
+    expect(find.text('Golden hour on Entoto'), findsOneWidget);
+    expect(find.text('Flat white and a card game'), findsOneWidget);
+  });
+
+  testWidgets('tapping the selected author again shows everyone', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host(_FakeMemoriesRepository(_memories())));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Alex'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 moment'), findsOneWidget);
+
+    await tester.tap(find.text('Alex'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 moments'), findsOneWidget);
+    expect(find.text('Flat white and a card game'), findsOneWidget);
   });
 
   testWidgets('opens the detail screen from a tile', (tester) async {

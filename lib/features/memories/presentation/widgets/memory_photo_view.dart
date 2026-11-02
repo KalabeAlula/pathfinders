@@ -48,18 +48,29 @@ class MemoryPhotoView extends ConsumerWidget {
         height: height,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final available = constraints.maxWidth.isFinite
+            final boxWidth = constraints.maxWidth.isFinite
                 ? constraints.maxWidth
                 : (width ?? 400);
-            final cacheWidth =
-                (available * MediaQuery.devicePixelRatioOf(context)).round();
+            final boxHeight = constraints.maxHeight.isFinite
+                ? constraints.maxHeight
+                : (height ?? boxWidth);
+            final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+            final cacheWidth = (boxWidth * pixelRatio).round();
+            final cacheHeight = (boxHeight * pixelRatio).round();
             return url.when(
-              data: (value) => Image.network(
-                value,
+              data: (value) => Image(
+                // The fit policy caps both decoded dimensions while keeping
+                // the photo's aspect ratio; the default exact policy would
+                // stretch a photo that does not match the tile.
+                image: ResizeImage(
+                  NetworkImage(value),
+                  width: cacheWidth,
+                  height: cacheHeight,
+                  policy: ResizeImagePolicy.fit,
+                ),
                 width: width,
                 height: height,
                 fit: fit,
-                cacheWidth: cacheWidth,
                 loadingBuilder: (context, child, progress) =>
                     progress == null ? child : placeholder,
                 errorBuilder: (context, error, stack) => placeholder,

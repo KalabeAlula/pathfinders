@@ -2,7 +2,7 @@
 ///
 /// Sharing runs all day, so the interval widens as the battery drains: a
 /// full phone tracks every few seconds, a nearly flat one only every couple
-/// of minutes. [keepAlive] is capped below the three-minute window the circle
+/// of minutes. [keepAlive] stays well inside the five-minute window the circle
 /// uses to decide a member is offline, so someone who sits still keeps
 /// looking live without waking the GPS.
 class TelemetryCadence {

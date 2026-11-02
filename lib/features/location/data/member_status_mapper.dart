@@ -9,7 +9,7 @@ import '../domain/privacy_mode.dart';
 class MemberStatusMapper {
   const MemberStatusMapper._();
 
-  static const Duration onlineWindow = Duration(minutes: 3);
+  static final RegExp _timezoneSuffix = RegExp(r'(Z|[+-]\d{2}:?\d{2})$');
 
   static MemberStatus fromRow(
     Map<String, dynamic> row, {
@@ -29,20 +29,36 @@ class MemberStatusMapper {
           : null,
       batteryPercent: (row['battery_percent'] as num?)?.round(),
       isCharging: row['is_charging'] as bool? ?? false,
-      speedKph: (row['speed_kph'] as num?)?.toDouble() ?? 0,
-      isOnline: now.difference(updatedAt) <= onlineWindow,
+      speedKph: _speed(row['speed_kph']),
+      isOnline:
+          now.toUtc().difference(updatedAt.toUtc()) <=
+          MemberStatus.onlineWindow,
       privacyMode: mode,
       updatedAt: updatedAt,
       arrivedAt: _time(row['arrived_at']),
     );
   }
 
-  static PrivacyMode _mode(Object? value) => switch (value) {
-        'approximate' => PrivacyMode.approximate,
-        'paused' => PrivacyMode.paused,
-        _ => PrivacyMode.exact,
-      };
+  /// Rows written before the device-side deadband can carry jitter, so the
+  /// same threshold is applied on the way in.
+  static double _speed(Object? value) {
+    final speed = (value as num?)?.toDouble() ?? 0;
+    return speed >= MemberStatus.movingThresholdKph ? speed : 0;
+  }
 
-  static DateTime? _time(Object? value) =>
-      value is String ? DateTime.tryParse(value)?.toLocal() : null;
+  static PrivacyMode _mode(Object? value) => switch (value) {
+    'approximate' => PrivacyMode.approximate,
+    'paused' => PrivacyMode.paused,
+    _ => PrivacyMode.exact,
+  };
+
+  static DateTime? _time(Object? value) {
+    if (value is! String) return null;
+    final text = value.trim();
+    if (text.isEmpty) return null;
+    // A timestamp without an offset is UTC from PostgREST. Reading it as local
+    // time would shift it by hours and make an active member look offline.
+    final normalized = _timezoneSuffix.hasMatch(text) ? text : '${text}Z';
+    return DateTime.tryParse(normalized)?.toLocal();
+  }
 }

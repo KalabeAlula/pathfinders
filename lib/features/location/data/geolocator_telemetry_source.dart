@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -8,13 +9,16 @@ import 'package:permission_handler/permission_handler.dart' as permissions;
 
 import '../domain/device_telemetry.dart';
 import '../domain/geo_point.dart';
+import '../domain/speed_filter.dart';
 
 class GeolocatorTelemetrySource implements DeviceTelemetrySource {
-  GeolocatorTelemetrySource([Battery? battery]) : _battery = battery ?? Battery();
+  GeolocatorTelemetrySource([Battery? battery])
+    : _battery = battery ?? Battery();
 
   static const Duration _fixTimeout = Duration(seconds: 20);
 
   final Battery _battery;
+  final StationarySpeedFilter _speedFilter = StationarySpeedFilter();
 
   @override
   Future<TelemetryPermission> checkPermission() async {
@@ -178,27 +182,36 @@ class GeolocatorTelemetrySource implements DeviceTelemetrySource {
   @override
   Future<void> openLocationSettings() => Geolocator.openLocationSettings();
 
-  static DeviceReading _toReading(Position position) {
-    final speed = position.speed;
-    return DeviceReading(
+  DeviceReading _toReading(Position position) {
+    final speed = position.hasSpeed && position.speed.isFinite
+        ? math.max(position.speed, 0.0)
+        : 0.0;
+    final speedAccuracy =
+        position.hasSpeedAccuracy && position.speedAccuracy.isFinite
+        ? math.max(position.speedAccuracy, 0.0)
+        : 0.0;
+    final accuracy = position.hasAccuracy && position.accuracy.isFinite
+        ? math.max(position.accuracy, 0.0)
+        : 0.0;
+
+    return _speedFilter.apply(
       point: GeoPoint(
         latitude: position.latitude,
         longitude: position.longitude,
       ),
-      accuracyMeters: position.accuracy.isFinite ? position.accuracy : 0,
-      speedKph: speed.isFinite && speed > 0 ? speed * 3.6 : 0,
+      accuracyMeters: accuracy,
+      speedKph: speed * 3.6,
+      speedAccuracyKph: speedAccuracy * 3.6,
     );
   }
 
   static TelemetryPermission _map(LocationPermission permission) {
     return switch (permission) {
       LocationPermission.always ||
-      LocationPermission.whileInUse =>
-        TelemetryPermission.granted,
+      LocationPermission.whileInUse => TelemetryPermission.granted,
       LocationPermission.deniedForever => TelemetryPermission.deniedForever,
       LocationPermission.denied ||
-      LocationPermission.unableToDetermine =>
-        TelemetryPermission.denied,
+      LocationPermission.unableToDetermine => TelemetryPermission.denied,
     };
   }
 }

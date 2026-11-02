@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart'
+    show ProviderListenableSelect;
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -92,13 +94,14 @@ class NavigationController extends _$NavigationController {
     }
 
     final snapshot = ref.watch(circleSnapshotProvider(userId)).value;
-    final telemetry = ref.watch(telemetryControllerProvider(userId));
+    final liveReading = ref.watch(
+      telemetryControllerProvider(userId).select((state) => state.lastReading),
+    );
     final members = snapshot?.members ?? const <CircleMember>[];
 
     final located = {
       for (final member in members)
-        if (_originFor(member, userId, telemetry.lastReading) != null)
-          member.profile.id,
+        if (_originFor(member, userId, liveReading) != null) member.profile.id,
     };
     _cache.removeWhere((id, _) => !located.contains(id));
     _loading.removeWhere((id) => !located.contains(id));
@@ -108,7 +111,7 @@ class NavigationController extends _$NavigationController {
         userId: userId,
         destination: destination,
         members: members,
-        liveReading: telemetry.lastReading,
+        liveReading: liveReading,
       );
     }
 
@@ -153,6 +156,10 @@ class NavigationController extends _$NavigationController {
     final now = DateTime.now();
     final work = <String, GeoPoint>{};
     for (final entry in origins.entries) {
+      // A telemetry rebuild can land while the previous Directions call is
+      // still open; never stack a second request for the same member.
+      if (_loading.contains(entry.key)) continue;
+
       final cached = _cache[entry.key];
       if (cached == null) {
         work[entry.key] = entry.value;
@@ -172,6 +179,7 @@ class NavigationController extends _$NavigationController {
     if (work.isEmpty) return;
 
     final run = ++_run;
+    final destinationKey = _destinationKey;
     _loading.addAll(work.keys);
     _error = null;
     state = _state(gateway.isConfigured, destination);
@@ -186,20 +194,37 @@ class NavigationController extends _$NavigationController {
           target: target,
         ),
     ]);
-    if (!ref.mounted || run != _run) return;
+    if (!ref.mounted) return;
 
     _loading.removeAll(work.keys);
+
+    // Re-read the live destination: a change during the request already
+    // cleared the cache, and a label-only update must not be rolled back by
+    // a request that started against the previous value.
+    final current = ref.read(circleDestinationProvider(circleId)).value;
+    if (current == null ||
+        '${current.latitude},${current.longitude}' != destinationKey) {
+      return;
+    }
+
     String? failure;
     for (final outcome in outcomes) {
-      if (outcome.route != null) {
-        _cache[outcome.memberId] = outcome.route!;
-      } else {
+      final route = outcome.route;
+      if (route == null) {
         failure ??= outcome.error;
+        continue;
+      }
+      final cached = _cache[outcome.memberId];
+      // A newer run may already have published a fresher route.
+      if (cached == null || !cached.computedAt.isAfter(route.computedAt)) {
+        _cache[outcome.memberId] = route;
       }
     }
 
-    _error = failure;
-    state = _state(gateway.isConfigured, destination);
+    if (run == _run) _error = failure;
+    // Publish even if a newer run is open, so a paid-for response is not
+    // dropped before it reaches the map.
+    state = _state(gateway.isConfigured, current);
   }
 
   Future<_RouteOutcome> _routeFor(

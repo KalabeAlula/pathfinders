@@ -24,6 +24,7 @@ class MemberCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final status = member.status;
+    final online = status?.isOnlineAt(now) ?? false;
     final radius = BorderRadius.circular(AppRadius.tile);
 
     return SizedBox(
@@ -51,7 +52,7 @@ class MemberCard extends StatelessWidget {
                       MemberAvatar(
                         profile: member.profile,
                         size: 38,
-                        isOnline: status?.isOnline ?? false,
+                        isOnline: online,
                         isPaused: status?.isPaused ?? false,
                         isApproximate: status?.isApproximate ?? false,
                         showStatusBadge: status != null,
@@ -90,9 +91,8 @@ class MemberCard extends StatelessWidget {
                           member.profile.firstName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                       ),
                       if (isCurrentUser) ...[
@@ -107,9 +107,9 @@ class MemberCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontSize: 11,
-                        ),
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 11,
+                    ),
                   ),
                 ],
               ),
@@ -137,10 +137,10 @@ class _YouBadge extends StatelessWidget {
       child: Text(
         'you',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              fontSize: 9,
-              color: Theme.of(context).colorScheme.onSecondaryContainer,
-              letterSpacing: 0.1,
-            ),
+          fontSize: 9,
+          color: Theme.of(context).colorScheme.onSecondaryContainer,
+          letterSpacing: 0.1,
+        ),
       ),
     );
   }

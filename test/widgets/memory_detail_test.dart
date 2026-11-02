@@ -15,21 +15,31 @@ const _alex = UserProfile(
   avatarColor: 0xFF8A5A3B,
 );
 
-MemoryPost _memory({String authorId = 'alex'}) => MemoryPost(
+MemoryPost _memory({
+  String authorId = 'alex',
+  Map<String, int> reactions = const {},
+  String? myReaction,
+}) => MemoryPost(
   id: 'm1',
   authorId: authorId,
   text: 'Golden hour on Entoto',
   mood: MemoryMood.joyful,
   createdAt: DateTime(2026, 11, 2, 9),
   placeLabel: 'Entoto Park',
+  reactions: reactions,
+  myReaction: myReaction,
 );
 
 class _FakeMemoriesRepository implements MemoriesRepository {
-  _FakeMemoriesRepository({this.deleteError});
+  _FakeMemoriesRepository({this.deleteError, this.reactionError});
 
   final MemoriesFailure? deleteError;
+  final MemoriesFailure? reactionError;
   String? deletedId;
   String? deletedPhotoPath;
+  String? reactedMemoryId;
+  String? reactedEmoji;
+  String? clearedMemoryId;
 
   @override
   Stream<List<MemoryPost>> watchMemories() => const Stream.empty();
@@ -51,14 +61,33 @@ class _FakeMemoriesRepository implements MemoriesRepository {
     deletedId = memoryId;
     deletedPhotoPath = photoPath;
   }
+
+  @override
+  Future<void> setReaction({
+    required String memoryId,
+    required String emoji,
+  }) async {
+    reactedMemoryId = memoryId;
+    reactedEmoji = emoji;
+    final error = reactionError;
+    if (error != null) throw error;
+  }
+
+  @override
+  Future<void> clearReaction(String memoryId) async {
+    clearedMemoryId = memoryId;
+    final error = reactionError;
+    if (error != null) throw error;
+  }
 }
 
 Widget _host({
   required _FakeMemoriesRepository repository,
   String currentUserId = 'alex',
   String memoryAuthorId = 'alex',
+  MemoryPost? memory,
 }) {
-  final memory = _memory(authorId: memoryAuthorId);
+  final post = memory ?? _memory(authorId: memoryAuthorId);
   return ProviderScope(
     overrides: [memoriesRepositoryProvider('c1').overrideWithValue(repository)],
     child: MaterialApp(
@@ -71,7 +100,7 @@ Widget _host({
                   builder: (_) => MemoryDetailScreen(
                     circleId: 'c1',
                     currentUserId: currentUserId,
-                    memory: memory,
+                    memory: post,
                     author: _alex,
                     now: DateTime(2026, 11, 2, 10),
                   ),
@@ -167,5 +196,74 @@ void main() {
     expect(repository.deletedId, isNull);
     expect(find.text('Golden hour on Entoto'), findsOneWidget);
     expect(find.text('Could not delete that memory.'), findsOneWidget);
+  });
+
+  testWidgets('invites a reaction when nobody has reacted', (tester) async {
+    final repository = _FakeMemoriesRepository();
+    await tester.pumpWidget(_host(repository: repository));
+    await _open(tester);
+
+    expect(find.text('How did this moment land?'), findsOneWidget);
+    expect(find.text('Be the first to react to this moment.'), findsOneWidget);
+    expect(find.text('🧡'), findsOneWidget);
+    expect(find.text('🌱'), findsOneWidget);
+  });
+
+  testWidgets('leaves a reaction and shows its count', (tester) async {
+    final repository = _FakeMemoriesRepository();
+    await tester.pumpWidget(_host(repository: repository));
+    await _open(tester);
+
+    await tester.tap(find.text('🧡'));
+    await tester.pumpAndSettle();
+
+    expect(repository.reactedMemoryId, 'm1');
+    expect(repository.reactedEmoji, '🧡');
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Be the first to react to this moment.'), findsNothing);
+  });
+
+  testWidgets('tapping your reaction again removes it', (tester) async {
+    final repository = _FakeMemoriesRepository();
+    await tester.pumpWidget(
+      _host(
+        repository: repository,
+        memory: _memory(reactions: const {'🧡': 2}, myReaction: '🧡'),
+      ),
+    );
+    await _open(tester);
+
+    expect(find.text('2'), findsOneWidget);
+
+    await tester.tap(find.text('🧡'));
+    await tester.pumpAndSettle();
+
+    expect(repository.clearedMemoryId, 'm1');
+    expect(repository.reactedEmoji, isNull);
+    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Add yours — one reaction per person.'), findsOneWidget);
+  });
+
+  testWidgets('rolls back a failed reaction', (tester) async {
+    final repository = _FakeMemoriesRepository(
+      reactionError: const MemoriesFailure(
+        'Could not save your reaction. Check your connection and try again.',
+      ),
+    );
+    await tester.pumpWidget(_host(repository: repository));
+    await _open(tester);
+
+    await tester.tap(find.text('🌱'));
+    await tester.pumpAndSettle();
+
+    expect(repository.reactedEmoji, '🌱');
+    expect(
+      find.text(
+        'Could not save your reaction. Check your connection and try again.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('1'), findsNothing);
+    expect(find.text('Be the first to react to this moment.'), findsOneWidget);
   });
 }

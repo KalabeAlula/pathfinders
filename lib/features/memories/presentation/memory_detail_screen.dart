@@ -38,8 +38,69 @@ class MemoryDetailScreen extends ConsumerStatefulWidget {
 
 class _MemoryDetailScreenState extends ConsumerState<MemoryDetailScreen> {
   bool _deleting = false;
+  bool _reacting = false;
+  late Map<String, int> _reactions;
+  late String? _myReaction;
 
   bool get _canDelete => widget.memory.authorId == widget.currentUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _reactions = Map.of(widget.memory.reactions);
+    _myReaction = widget.memory.myReaction;
+  }
+
+  Future<void> _toggleReaction(String emoji) async {
+    if (_reacting) return;
+    final memory = widget.memory;
+    final previousReaction = _myReaction;
+    final previousCounts = Map<String, int>.of(_reactions);
+    final removing = previousReaction == emoji;
+
+    void adjust(String? target, int delta) {
+      if (target == null) return;
+      final next = (_reactions[target] ?? 0) + delta;
+      if (next <= 0) {
+        _reactions.remove(target);
+      } else {
+        _reactions[target] = next;
+      }
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() {
+      _reacting = true;
+      if (removing) {
+        adjust(emoji, -1);
+        _myReaction = null;
+      } else {
+        adjust(previousReaction, -1);
+        adjust(emoji, 1);
+        _myReaction = emoji;
+      }
+    });
+
+    try {
+      final repository = ref.read(memoriesRepositoryProvider(widget.circleId));
+      if (removing) {
+        await repository.clearReaction(memory.id);
+      } else {
+        await repository.setReaction(memoryId: memory.id, emoji: emoji);
+      }
+      if (!mounted) return;
+      ref.invalidate(recentMemoriesProvider(widget.circleId));
+      setState(() => _reacting = false);
+    } on MemoriesFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _reactions = previousCounts;
+        _myReaction = previousReaction;
+        _reacting = false;
+      });
+      messenger.showSnackBar(SnackBar(content: Text(failure.message)));
+    }
+  }
 
   Future<void> _confirmDelete() async {
     if (_deleting) return;
@@ -91,6 +152,7 @@ class _MemoryDetailScreenState extends ConsumerState<MemoryDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final memory = widget.memory;
     final author = widget.author;
     final now = widget.now ?? DateTime.now();
@@ -195,15 +257,30 @@ class _MemoryDetailScreenState extends ConsumerState<MemoryDetailScreen> {
               ],
             ),
           ],
-          if (memory.reactions.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.lg),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final entry in memory.reactions.entries)
-                  _ReactionChip(emoji: entry.key, count: entry.value),
-              ],
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            'How did this moment land?',
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _ReactionBar(
+            counts: _reactions,
+            myReaction: _myReaction,
+            busy: _reacting,
+            onTap: _toggleReaction,
+          ),
+          if (_myReaction == null) ...[
+            const SizedBox(height: 6),
+            Text(
+              _reactions.isEmpty
+                  ? 'Be the first to react to this moment.'
+                  : 'Add yours — one reaction per person.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+                fontSize: 11,
+              ),
             ),
           ],
         ],
@@ -311,24 +388,99 @@ class _MetaChip extends StatelessWidget {
   }
 }
 
-class _ReactionChip extends StatelessWidget {
-  const _ReactionChip({required this.emoji, required this.count});
+class _ReactionBar extends StatelessWidget {
+  const _ReactionBar({
+    required this.counts,
+    required this.myReaction,
+    required this.busy,
+    required this.onTap,
+  });
 
-  final String emoji;
-  final int count;
+  final Map<String, int> counts;
+  final String? myReaction;
+  final bool busy;
+  final ValueChanged<String> onTap;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: Text(
-        '$emoji $count',
-        style: Theme.of(context).textTheme.labelSmall,
+    return Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
+      children: [
+        for (final emoji in memoryReactionEmojis)
+          _ReactionButton(
+            emoji: emoji,
+            count: counts[emoji] ?? 0,
+            selected: myReaction == emoji,
+            onTap: busy ? null : () => onTap(emoji),
+          ),
+      ],
+    );
+  }
+}
+
+class _ReactionButton extends StatelessWidget {
+  const _ReactionButton({
+    required this.emoji,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String emoji;
+  final int count;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final radius = BorderRadius.circular(AppRadius.pill);
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'React with $emoji',
+      child: Material(
+        color: selected
+            ? scheme.secondaryContainer
+            : scheme.surfaceContainerHighest,
+        borderRadius: radius,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: radius,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              border: Border.all(
+                color: selected
+                    ? scheme.primary.withValues(alpha: 0.45)
+                    : Colors.transparent,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(emoji, style: const TextStyle(fontSize: 17)),
+                if (count > 0) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    '$count',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: selected
+                          ? scheme.onSecondaryContainer
+                          : scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

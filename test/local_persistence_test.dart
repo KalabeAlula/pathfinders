@@ -14,6 +14,8 @@ MemoryPost _memory(
   String id, {
   MemoryMood mood = MemoryMood.cozy,
   String? photoPath,
+  Map<String, int> reactions = const {},
+  String? myReaction,
 }) {
   return MemoryPost(
     id: id,
@@ -24,6 +26,8 @@ MemoryPost _memory(
     placeLabel: 'Entoto Park',
     voiceNoteSeconds: 12,
     photoPath: photoPath,
+    reactions: reactions,
+    myReaction: myReaction,
   );
 }
 
@@ -44,7 +48,13 @@ void main() {
       final preferences = await SharedPreferences.getInstance();
       final cache = MemoriesCache(preferences, circleId: 'c1');
       final memories = [
-        _memory('m1', mood: MemoryMood.joyful, photoPath: 'c1/alex/m1.jpg'),
+        _memory(
+          'm1',
+          mood: MemoryMood.joyful,
+          photoPath: 'c1/alex/m1.jpg',
+          reactions: const {'🧡': 2, '🌱': 1},
+          myReaction: '🧡',
+        ),
         _memory('m2', mood: MemoryMood.proud),
       ];
 
@@ -58,7 +68,11 @@ void main() {
       expect(restored.first.placeLabel, 'Entoto Park');
       expect(restored.first.voiceNoteSeconds, 12);
       expect(restored.first.photoPath, 'c1/alex/m1.jpg');
+      expect(restored.first.reactions, const {'🧡': 2, '🌱': 1});
+      expect(restored.first.myReaction, '🧡');
       expect(restored.last.photoPath, isNull);
+      expect(restored.last.reactions, isEmpty);
+      expect(restored.last.myReaction, isNull);
       expect(MemoriesCache(preferences, circleId: 'c2').read(), isNull);
     });
 

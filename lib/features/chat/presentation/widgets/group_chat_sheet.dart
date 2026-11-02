@@ -430,7 +430,17 @@ class _SenderAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = message.senderAvatarUrl;
     if (url != null && url.trim().isNotEmpty) {
-      return CircleAvatar(radius: 14, backgroundImage: NetworkImage(url));
+      final avatarPixels = (28 * MediaQuery.devicePixelRatioOf(context))
+          .round();
+      return CircleAvatar(
+        radius: 14,
+        backgroundImage: ResizeImage(
+          NetworkImage(url),
+          width: avatarPixels,
+          height: avatarPixels,
+          policy: ResizeImagePolicy.fit,
+        ),
+      );
     }
     return MemberAvatar(
       profile: UserProfile(
@@ -566,8 +576,16 @@ class _LocationBubble extends StatelessWidget {
                           color: scheme.onSurfaceVariant,
                         ),
                       )
-                    : Image.network(
-                        preview,
+                    : Image(
+                        image: ResizeImage(
+                          NetworkImage(preview),
+                          width:
+                              (_width * MediaQuery.devicePixelRatioOf(context))
+                                  .round(),
+                          height: (112 * MediaQuery.devicePixelRatioOf(context))
+                              .round(),
+                          policy: ResizeImagePolicy.fit,
+                        ),
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) => Container(
                           color: scheme.surfaceContainerHighest,

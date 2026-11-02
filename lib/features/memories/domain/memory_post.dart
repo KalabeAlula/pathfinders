@@ -11,6 +11,9 @@ enum MemoryMood {
   final String emoji;
 }
 
+/// The reactions a member can leave. One per person per memory.
+const List<String> memoryReactionEmojis = ['🧡', '✨', '😂', '🌱'];
+
 class MemoryPost {
   const MemoryPost({
     required this.id,
@@ -22,6 +25,7 @@ class MemoryPost {
     this.voiceNoteSeconds,
     this.photoPath,
     this.reactions = const {},
+    this.myReaction,
   });
 
   final String id;
@@ -39,6 +43,9 @@ class MemoryPost {
 
   /// Emoji to count, e.g. `{'🧡': 3}`.
   final Map<String, int> reactions;
+
+  /// The emoji the signed-in member left, if any.
+  final String? myReaction;
 
   int get reactionTotal =>
       reactions.values.fold(0, (total, count) => total + count);
