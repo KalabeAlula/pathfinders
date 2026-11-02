@@ -6,6 +6,7 @@ import '../../../app/theme/app_tokens.dart';
 import '../../../app/widgets/bento_card.dart';
 import '../../../core/application/clock_provider.dart';
 import '../../../core/utils/time_format.dart';
+import '../../chat/application/chat_providers.dart';
 import '../../circle/domain/circle_member.dart';
 import '../../circle/domain/circle_snapshot.dart';
 import '../../circle/presentation/widgets/member_detail_sheet.dart';
@@ -50,11 +51,17 @@ class DashboardScreen extends ConsumerWidget {
     final now = ref.watch(appClockProvider).value ?? DateTime.now();
 
     final circleId = snapshot.circle.id;
-    final memories = ref.watch(recentMemoriesProvider(circleId)).value ??
+    // Keeps the unread baseline and the realtime stream warm while the crew is
+    // on the dashboard, so the map badge counts messages that arrive meanwhile.
+    ref.watch(
+      chatUnreadCountProvider((circleId: circleId, userId: currentUserId)),
+    );
+    final memories =
+        ref.watch(recentMemoriesProvider(circleId)).value ??
         const <MemoryPost>[];
     final milestones =
         ref.watch(milestonesProvider(circleId)).value ??
-            const <SharedMilestone>[];
+        const <SharedMilestone>[];
 
     SharedMilestone? milestone;
     for (final item in milestones) {
@@ -191,7 +198,10 @@ class _DashboardBody extends StatelessWidget {
     final latestMemory = memories.isEmpty ? null : memories.first;
 
     return ListView(
-      padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.xxl),
+      padding: const EdgeInsets.only(
+        top: AppSpacing.md,
+        bottom: AppSpacing.xxl,
+      ),
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
@@ -246,9 +256,7 @@ class _DashboardBody extends StatelessWidget {
               if (latestMemory != null)
                 MemorySnippetCard(
                   memory: latestMemory,
-                  author: snapshot
-                      .memberById(latestMemory.authorId)
-                      ?.profile,
+                  author: snapshot.memberById(latestMemory.authorId)?.profile,
                   now: now,
                   onTap: onAddMemory,
                 )
@@ -270,10 +278,7 @@ class _DashboardBody extends StatelessWidget {
                             ),
                     ),
                     const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      flex: 2,
-                      child: NudgeTile(onSend: onNudge),
-                    ),
+                    Expanded(flex: 2, child: NudgeTile(onSend: onNudge)),
                   ],
                 ),
               ),
@@ -340,9 +345,8 @@ class _SharingBanner extends StatelessWidget {
                   notice.text,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: scheme.onTertiaryContainer,
-                      ),
+                  style: Theme.of(context).textTheme.labelMedium
+                      ?.copyWith(color: scheme.onTertiaryContainer),
                 ),
               ),
               Icon(
@@ -401,9 +405,9 @@ class _EmptyMemoryCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontSize: 10.5,
-                      ),
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 10.5,
+                  ),
                 ),
               ],
             ),
@@ -460,10 +464,8 @@ class _EmptyMilestoneCard extends StatelessWidget {
             'Add a countdown for the next thing you all care about.',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                  fontSize: 10.5,
-                ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: scheme.onSurfaceVariant, fontSize: 10.5),
           ),
         ],
       ),
@@ -491,8 +493,8 @@ class _SkeletonBox extends StatelessWidget {
 
 extension on NudgeKind {
   String get label => switch (this) {
-        NudgeKind.thinkingOfYou => 'Thinking of you',
-        NudgeKind.onMyWay => 'On my way',
-        NudgeKind.needYou => 'Missing you',
-      };
+    NudgeKind.thinkingOfYou => 'Thinking of you',
+    NudgeKind.onMyWay => 'On my way',
+    NudgeKind.needYou => 'Missing you',
+  };
 }

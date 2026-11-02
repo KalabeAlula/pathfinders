@@ -60,7 +60,7 @@ final class DestinationDraftControllerProvider
 }
 
 String _$destinationDraftControllerHash() =>
-    r'83627d22f011e9be53a9c29d7ebddf58a452c756';
+    r'790e01c3d157eab33f392bdcc1c9617960fe439f';
 
 final class DestinationDraftControllerFamily extends $Family
     with

@@ -32,24 +32,28 @@ class VenueHit {
     if (isBuilding) return 'Building';
     final raw = category?.trim();
     if (raw == null || raw.isEmpty) return null;
+    if (raw == 'poi') return null;
     final words = raw.replaceAll(RegExp('[-_]'), ' ').trim();
     if (words.isEmpty) return null;
     return words
         .split(' ')
-        .map((word) => word.isEmpty
-            ? word
-            : '${word[0].toUpperCase()}${word.substring(1)}')
+        .map(
+          (word) => word.isEmpty
+              ? word
+              : '${word[0].toUpperCase()}${word.substring(1)}',
+        )
         .join(' ');
   }
-
-  IconData get icon => venueIcon(category: category, maki: maki);
 }
 
 /// Maps a Maki/class string to a Material icon for the venue card.
-IconData venueIcon({String? category, String? maki, bool building = false}) {
-  if (building) return Icons.apartment_rounded;
-
+IconData venueIcon({String? category, String? maki}) {
   final key = '${category ?? ''} ${maki ?? ''}'.toLowerCase();
+  if (key.contains('building') ||
+      key.contains('apartment') ||
+      key.contains('house')) {
+    return Icons.apartment_rounded;
+  }
   if (key.contains('cafe') || key.contains('coffee')) {
     return Icons.local_cafe_rounded;
   }
@@ -75,6 +79,9 @@ IconData venueIcon({String? category, String? maki, bool building = false}) {
   }
   if (key.contains('hotel') || key.contains('lodging')) {
     return Icons.hotel_rounded;
+  }
+  if (key.contains('fuel') || key.contains('gas') || key.contains('petrol')) {
+    return Icons.local_gas_station_rounded;
   }
   if (key.contains('transit') ||
       key.contains('bus') ||
@@ -129,9 +136,10 @@ Future<VenueHit?> venueAt(
     if (poi != null && point != null) {
       return VenueHit(
         point: point,
-        name: _text(poi.properties['name']) ??
-            _text(poi.properties['name_en']),
-        category: _text(poi.properties['class']) ??
+        name: _text(poi.properties['name']) ?? _text(poi.properties['name_en']),
+        category:
+            _text(poi.properties['maki']) ??
+            _text(poi.properties['class']) ??
             _text(poi.properties['group']),
         maki: _text(poi.properties['maki']),
         feature: poi,
@@ -146,7 +154,7 @@ Future<VenueHit?> venueAt(
       featureset: StandardBuildings(),
       geometry: geometry,
     );
-    final building = _nearest(buildings, tap);
+    final building = _buildingAt(buildings, tap);
     final point = building == null ? null : _pointOf(building);
     if (building != null && point != null) {
       return VenueHit(
@@ -190,6 +198,61 @@ FeaturesetFeature? _nearest(List<FeaturesetFeature> features, Point tap) {
     }
   }
   return best;
+}
+
+/// The footprint whose polygon contains the tap, falling back to the nearest
+/// centroid when the finger landed just beside the geometry.
+FeaturesetFeature? _buildingAt(List<FeaturesetFeature> features, Point tap) {
+  final longitude = tap.coordinates.lng.toDouble();
+  final latitude = tap.coordinates.lat.toDouble();
+  for (final feature in features) {
+    if (_contains(feature, longitude, latitude)) return feature;
+  }
+  return _nearest(features, tap);
+}
+
+bool _contains(FeaturesetFeature feature, double longitude, double latitude) {
+  final coordinates = feature.geometry['coordinates'];
+  if (coordinates is! List) return false;
+
+  final polygons = switch (feature.geometry['type']) {
+    'Polygon' => [coordinates],
+    'MultiPolygon' => coordinates,
+    _ => const <Object?>[],
+  };
+
+  for (final polygon in polygons) {
+    if (polygon is! List || polygon.isEmpty) continue;
+    final ring = polygon.first;
+    if (ring is List && _inRing(ring, longitude, latitude)) return true;
+  }
+  return false;
+}
+
+/// Ray casting on the exterior ring; holes are ignored because tapping a hole
+/// is overwhelmingly a tap on the courtyard beside the building anyway.
+bool _inRing(List<Object?> ring, double longitude, double latitude) {
+  var inside = false;
+  for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    final a = ring[i];
+    final b = ring[j];
+    if (a is! List || b is! List || a.length < 2 || b.length < 2) continue;
+    final ax = a[0];
+    final ay = a[1];
+    final bx = b[0];
+    final by = b[1];
+    if (ax is! num || ay is! num || bx is! num || by is! num) continue;
+
+    final xi = ax.toDouble();
+    final yi = ay.toDouble();
+    final xj = bx.toDouble();
+    final yj = by.toDouble();
+    final crosses =
+        ((yi > latitude) != (yj > latitude)) &&
+        (longitude < (xj - xi) * (latitude - yi) / (yj - yi) + xi);
+    if (crosses) inside = !inside;
+  }
+  return inside;
 }
 
 GeoPoint? _pointOf(FeaturesetFeature feature) {

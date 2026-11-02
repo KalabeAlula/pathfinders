@@ -19,10 +19,17 @@ abstract final class MapboxStandardStyle {
 
   /// Turns on 3D objects and every label class a Maps-style search expects.
   /// [dark] switches the lighting preset instead of using a different style.
+  ///
+  /// Facades are off by default in Standard, so the individual toggles are set
+  /// explicitly instead of relying on [show3dObjects] alone.
   static Future<void> apply(MapboxMap map, {required bool dark}) async {
     try {
       await map.setStyleImportConfigProperties(importId, {
         'show3dObjects': true,
+        'show3dBuildings': true,
+        'show3dFacades': true,
+        'show3dLandmarks': true,
+        'show3dTrees': true,
         'showPointOfInterestLabels': true,
         'showPlaceLabels': true,
         'showTransitLabels': true,

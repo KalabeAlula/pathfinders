@@ -15,7 +15,7 @@ import 'polyline_decoder.dart';
 /// profile so ETAs reflect the road, not straight-line distance.
 class MapboxNavigationGateway implements NavigationGateway {
   MapboxNavigationGateway(this._client, {required String accessToken})
-      : _token = accessToken;
+    : _token = accessToken;
 
   final http.Client _client;
   final String _token;
@@ -35,13 +35,17 @@ class MapboxNavigationGateway implements NavigationGateway {
 
     final coordinates =
         '${from.longitude},${from.latitude};${to.longitude},${to.latitude}';
-    final uri = Uri.https(_host, '/directions/v5/mapbox/$_profile/$coordinates', {
-      'alternatives': 'false',
-      'geometries': 'polyline',
-      'overview': 'full',
-      'steps': 'false',
-      'access_token': _token,
-    });
+    final uri = Uri.https(
+      _host,
+      '/directions/v5/mapbox/$_profile/$coordinates',
+      {
+        'alternatives': 'false',
+        'geometries': 'polyline',
+        'overview': 'full',
+        'steps': 'false',
+        'access_token': _token,
+      },
+    );
 
     final body = await _getJson(uri);
     final routes = body['routes'];
@@ -74,7 +78,9 @@ class MapboxNavigationGateway implements NavigationGateway {
 
     final encoded = Uri.encodeComponent(clean);
     final uri = Uri.https(_host, '/geocoding/v5/mapbox.places/$encoded.json', {
-      'limit': '5',
+      'limit': '6',
+      'types': 'poi,address,place,locality,neighborhood',
+      'autocomplete': 'true',
       'access_token': _token,
       if (proximity != null)
         'proximity': '${proximity.longitude},${proximity.latitude}',
@@ -85,16 +91,7 @@ class MapboxNavigationGateway implements NavigationGateway {
     if (features is! List) return const [];
 
     return [
-      for (final feature in features)
-        if (feature is Map<String, dynamic> &&
-            feature['place_name'] is String &&
-            feature['center'] is List &&
-            (feature['center'] as List).length == 2)
-          PlaceSuggestion(
-            label: feature['place_name'] as String,
-            longitude: ((feature['center'] as List)[0] as num).toDouble(),
-            latitude: ((feature['center'] as List)[1] as num).toDouble(),
-          ),
+      for (final feature in features) ?PlaceSuggestion.fromFeature(feature),
     ];
   }
 
@@ -105,7 +102,7 @@ class MapboxNavigationGateway implements NavigationGateway {
     final uri = Uri.https(
       _host,
       '/geocoding/v5/mapbox.places/'
-          '${point.longitude},${point.latitude}.json',
+      '${point.longitude},${point.latitude}.json',
       {
         'limit': '1',
         'types': 'address,poi,place,locality,neighborhood',
@@ -126,9 +123,9 @@ class MapboxNavigationGateway implements NavigationGateway {
 
   Future<Map<String, dynamic>> _getJson(Uri uri) async {
     try {
-      final response = await _client.get(uri).timeout(
-            const Duration(seconds: 12),
-          );
+      final response = await _client
+          .get(uri)
+          .timeout(const Duration(seconds: 12));
       final decoded = jsonDecode(response.body);
       if (decoded is! Map<String, dynamic>) {
         throw const NavigationFailure('Mapbox returned an unexpected reply.');

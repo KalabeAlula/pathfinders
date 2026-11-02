@@ -48,9 +48,8 @@ class DestinationDraft {
 
   bool get hasPoint => latitude != null && longitude != null;
 
-  GeoPoint? get point => hasPoint
-      ? GeoPoint(latitude: latitude!, longitude: longitude!)
-      : null;
+  GeoPoint? get point =>
+      hasPoint ? GeoPoint(latitude: latitude!, longitude: longitude!) : null;
 
   String get coordinates => hasPoint
       ? '${latitude!.toStringAsFixed(5)}, ${longitude!.toStringAsFixed(5)}'
@@ -140,23 +139,28 @@ class DestinationDraftController extends _$DestinationDraftController {
     required double latitude,
     required double longitude,
     String? name,
+    String? address,
     String? category,
     String? maki,
   }) {
+    final clean = address?.trim();
+    final hasAddress = clean != null && clean.isNotEmpty;
+
     _lastPointKey = '$latitude,$longitude';
     _lookup++;
     state = DestinationDraft(
       latitude: latitude,
       longitude: longitude,
       label: name,
+      address: hasAddress ? clean : null,
       category: category,
       maki: maki,
       isVenue: true,
-      resolvingAddress: true,
+      resolvingAddress: !hasAddress,
     );
-    unawaited(
-      _resolveAddress(latitude, longitude, intoLabel: name == null),
-    );
+    if (!hasAddress) {
+      unawaited(_resolveAddress(latitude, longitude, intoLabel: name == null));
+    }
   }
 
   Future<void> _resolveAddress(

@@ -7,6 +7,8 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
 
 import '../../../app/theme/app_tokens.dart';
 import '../../../core/config/mapbox_config.dart';
+import '../../chat/application/chat_providers.dart';
+import '../../chat/presentation/widgets/group_chat_sheet.dart';
 import '../../circle/domain/circle_member.dart';
 import '../../location/application/telemetry_providers.dart';
 import '../../location/domain/geo_point.dart';
@@ -15,19 +17,23 @@ import '../../location/presentation/widgets/map_marker_images.dart';
 import '../../location/presentation/widgets/mapbox_live_annotations.dart';
 import '../../location/presentation/widgets/mapbox_standard_style.dart';
 import '../application/destination_draft_providers.dart';
+import '../application/map_search_providers.dart';
 import '../application/navigation_providers.dart';
 import '../domain/navigation_destination.dart';
 import '../domain/navigation_failure.dart';
+import '../domain/place_suggestion.dart';
 import '../domain/route_geometry.dart';
 import 'venue_selection.dart';
+import 'widgets/map_search_bar.dart';
 
 const _fallbackCenter = GeoPoint(latitude: 8.999, longitude: 38.775);
 
 /// Full-screen Mapbox picker for the circle's shared destination.
 ///
-/// A tap (or long-press) drops the pin where the finger landed. Afterwards the
-/// pin stays glued to the middle of the map, so dragging the map is the way to
-/// fine-tune the exact spot.
+/// A tap first looks for a named POI or extruded building under the finger.
+/// When one is found the camera tilts onto it and the card shows the venue's
+/// name, category and address. Taps on empty map drop a plain pin that stays
+/// glued to the middle of the map, so dragging is how you fine-tune it.
 class DestinationPickerScreen extends ConsumerStatefulWidget {
   const DestinationPickerScreen({
     super.key,
@@ -63,6 +69,7 @@ class _DestinationPickerScreenState
   bool _saving = false;
   bool _querying = false;
   bool _venueFlight = false;
+  bool _searchSelection = false;
   String? _error;
   double _zoom = 15.2;
   int _idleRun = 0;
@@ -85,8 +92,9 @@ class _DestinationPickerScreenState
   }
 
   GeoPoint _resolveInitialCenter() {
-    final destination =
-        ref.read(navigationControllerProvider(widget.circleId)).destination;
+    final destination = ref
+        .read(navigationControllerProvider(widget.circleId))
+        .destination;
     if (destination != null) return destination.point;
 
     final reading = ref
@@ -141,7 +149,7 @@ class _DestinationPickerScreenState
     final latitude = context.point.coordinates.lat.toDouble();
     final map = _map;
 
-    if (map == null || kIsWeb) {
+    if (map == null) {
       _selectFallback(longitude, latitude);
       return;
     }
@@ -167,6 +175,7 @@ class _DestinationPickerScreenState
   }
 
   void _selectVenue(VenueHit venue) {
+    _searchSelection = false;
     _selectedVenue = venue;
     ref
         .read(destinationDraftControllerProvider(widget.circleId).notifier)
@@ -182,7 +191,74 @@ class _DestinationPickerScreenState
     unawaited(_flyToVenue(venue.point));
   }
 
+  /// Handles a Mapbox autocomplete result: the address is already known, so
+  /// no reverse geocode is needed before the venue card opens.
+  void _selectSuggestion(PlaceSuggestion place) {
+    _showSearchVenue(
+      point: GeoPoint(latitude: place.latitude, longitude: place.longitude),
+      name: place.displayName,
+      address: place.address,
+      category: place.categoryLabel,
+      maki: place.maki,
+    );
+  }
+
+  /// Jumps to a place shared in the chat thread.
+  void _showSharedLocation(GeoPoint point, String? label) {
+    final name = label?.trim();
+    _showSearchVenue(
+      point: point,
+      name: name == null || name.isEmpty ? 'Shared location' : name,
+    );
+  }
+
+  void _showSearchVenue({
+    required GeoPoint point,
+    required String name,
+    String? address,
+    String? category,
+    String? maki,
+  }) {
+    _searchSelection = true;
+    final venue = VenueHit(
+      point: point,
+      name: name,
+      category: category,
+      maki: maki,
+    );
+    _selectedVenue = venue;
+    ref
+        .read(destinationDraftControllerProvider(widget.circleId).notifier)
+        .selectVenue(
+          latitude: point.latitude,
+          longitude: point.longitude,
+          name: name,
+          address: address,
+          category: category,
+          maki: maki,
+        );
+    unawaited(_highlightBuilding(null));
+    unawaited(_drawVenueHighlight(venue, pin: true));
+    unawaited(_flyToVenue(point));
+  }
+
+  void _openChat() {
+    FocusScope.of(context).unfocus();
+    ref
+        .read(mapSearchControllerProvider(widget.currentUserId).notifier)
+        .dismiss();
+    unawaited(
+      showGroupChat(
+        context,
+        circleId: widget.circleId,
+        currentUserId: widget.currentUserId,
+        onShowLocation: _showSharedLocation,
+      ),
+    );
+  }
+
   void _clearVenueSelection() {
+    _searchSelection = false;
     if (_selectedVenue == null && _selectedBuilding == null) return;
     _selectedVenue = null;
     unawaited(_highlightBuilding(null));
@@ -198,34 +274,37 @@ class _DestinationPickerScreenState
     if (previous == next) return;
     _selectedBuilding = next;
 
+    await _setBuildingSelected(map, previous, false);
+    await _setBuildingSelected(map, next, true);
+  }
+
+  Future<void> _setBuildingSelected(
+    MapboxMap map,
+    FeaturesetFeature? feature,
+    bool selected,
+  ) async {
+    if (feature == null) return;
     try {
-      if (previous != null) {
-        await map.setFeatureStateForFeaturesetFeature(
-          previous,
-          StandardBuildingsState(select: false),
-        );
-      }
-      if (next != null) {
-        await map.setFeatureStateForFeaturesetFeature(
-          next,
-          StandardBuildingsState(select: true),
-        );
-      }
+      await map.setFeatureStateForFeaturesetFeature(
+        feature,
+        StandardBuildingsState(select: selected),
+      );
     } catch (_) {
       // Feature state needs a feature id and a settled Standard style.
     }
   }
 
-  Future<void> _drawVenueHighlight(VenueHit? venue) async {
+  Future<void> _drawVenueHighlight(VenueHit? venue, {bool pin = false}) async {
     final manager = _venueHighlights;
     if (manager == null) return;
 
     try {
       await manager.deleteAll();
       if (venue == null || !mounted) return;
-      final image = await MapMarkerImages.venueHighlight(
-        color: Theme.of(context).colorScheme.tertiary,
-      );
+      final color = Theme.of(context).colorScheme.tertiary;
+      final image = pin
+          ? await MapMarkerImages.destination(color: color)
+          : await MapMarkerImages.venueHighlight(color: color);
       if (!mounted) return;
       await manager.create(
         PointAnnotationOptions(
@@ -233,8 +312,8 @@ class _DestinationPickerScreenState
             coordinates: Position(venue.point.longitude, venue.point.latitude),
           ),
           image: image,
-          iconSize: 0.48,
-          iconAnchor: IconAnchor.CENTER,
+          iconSize: pin ? 0.5 : 0.48,
+          iconAnchor: pin ? IconAnchor.BOTTOM : IconAnchor.CENTER,
         ),
       );
     } catch (_) {
@@ -251,16 +330,16 @@ class _DestinationPickerScreenState
     try {
       await map.flyTo(
         CameraOptions(
-          center: Point(
-            coordinates: Position(point.longitude, point.latitude),
-          ),
+          center: Point(coordinates: Position(point.longitude, point.latitude)),
           zoom: _zoom < 16.2 ? 16.2 : _zoom,
           pitch: MapboxStandardStyle.venuePitch,
         ),
         MapAnimationOptions(duration: 1100),
       );
     } catch (_) {
-      // Camera animations are best effort.
+      // Camera animations are best effort, but a failed flight must not swallow
+      // the next idle event.
+      _venueFlight = false;
     }
     _setMoving(false);
   }
@@ -314,7 +393,7 @@ class _DestinationPickerScreenState
       final venue = _selectedVenue;
       if (venue != null) {
         await _highlightBuilding(venue);
-        await _drawVenueHighlight(venue);
+        await _drawVenueHighlight(venue, pin: _searchSelection);
       }
     } catch (_) {
       // Web has no annotation managers; the venue card still drives selection.
@@ -325,8 +404,7 @@ class _DestinationPickerScreenState
     final annotations = _annotations;
     if (!_styleReady || annotations == null || !mounted) return;
 
-    final navigation =
-        ref.read(navigationControllerProvider(widget.circleId));
+    final navigation = ref.read(navigationControllerProvider(widget.circleId));
     final destination = navigation.destination;
     final view = MapCircleView.from(
       members: widget.members,
@@ -360,7 +438,7 @@ class _DestinationPickerScreenState
         CameraOptions(
           center: Point(coordinates: Position(longitude, latitude)),
           zoom: _zoom,
-          pitch: 0,
+          pitch: MapboxStandardStyle.pickerPitch,
         ),
         MapAnimationOptions(duration: 450),
       );
@@ -391,9 +469,11 @@ class _DestinationPickerScreenState
 
       final latitude = camera.center.coordinates.lat.toDouble();
       final longitude = camera.center.coordinates.lng.toDouble();
-      final draft =
-          ref.read(destinationDraftControllerProvider(widget.circleId));
-      final drifted = !draft.hasPoint ||
+      final draft = ref.read(
+        destinationDraftControllerProvider(widget.circleId),
+      );
+      final drifted =
+          !draft.hasPoint ||
           distanceMeters(
                 GeoPoint(
                   latitude: draft.latitude!,
@@ -448,7 +528,7 @@ class _DestinationPickerScreenState
             ),
           ),
           zoom: 16.2,
-          pitch: 0,
+          pitch: MapboxStandardStyle.pickerPitch,
         ),
         MapAnimationOptions(duration: 900),
       );
@@ -512,7 +592,9 @@ class _DestinationPickerScreenState
           .clearDestination();
       if (!mounted) return;
       navigator.pop(true);
-      messenger.showSnackBar(const SnackBar(content: Text('Navigation ended.')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Navigation ended.')),
+      );
     } on NavigationFailure catch (failure) {
       if (!mounted) return;
       setState(() {
@@ -527,7 +609,15 @@ class _DestinationPickerScreenState
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final navigation = ref.watch(navigationControllerProvider(widget.circleId));
-    final draft = ref.watch(destinationDraftControllerProvider(widget.circleId));
+    final draft = ref.watch(
+      destinationDraftControllerProvider(widget.circleId),
+    );
+    final unread = ref.watch(
+      chatUnreadCountProvider((
+        circleId: widget.circleId,
+        userId: widget.currentUserId,
+      )),
+    );
 
     if (!_seeded) {
       _seeded = true;
@@ -563,7 +653,28 @@ class _DestinationPickerScreenState
             top: MediaQuery.paddingOf(context).top + 8,
             left: 12,
             right: 12,
-            child: _PickerHeader(onClose: () => Navigator.of(context).pop()),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: _MapRoundButton(
+                    icon: Icons.close_rounded,
+                    tooltip: 'Close map',
+                    onTap: () => Navigator.of(context).pop(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: MapSearchBar(
+                    userId: widget.currentUserId,
+                    unreadCount: unread,
+                    onChat: _openChat,
+                    onPlaceSelected: _selectSuggestion,
+                  ),
+                ),
+              ],
+            ),
           ),
           Positioned(
             left: 12,
@@ -590,52 +701,6 @@ class _DestinationPickerScreenState
           ),
         ],
       ),
-    );
-  }
-}
-
-class _PickerHeader extends StatelessWidget {
-  const _PickerHeader({required this.onClose});
-
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    return Row(
-      children: [
-        _MapRoundButton(
-          icon: Icons.close_rounded,
-          tooltip: 'Close map',
-          onTap: onClose,
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerLowest.withValues(alpha: 0.94),
-              borderRadius: BorderRadius.circular(AppRadius.tile),
-              border: Border.all(color: scheme.outlineVariant),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Pick a destination', style: theme.textTheme.titleSmall),
-                const SizedBox(height: 1),
-                Text(
-                  'Tap a cafe, cinema or building · drag to fine-tune',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -728,10 +793,8 @@ class _SelectionSheet extends StatelessWidget {
                       draft.resolvingAddress
                           ? 'Looking up the address…'
                           : draft.hasPoint
-                              ? (draft.isVenue
-                                  ? draft.detail
-                                  : draft.coordinates)
-                              : 'Tap a place or the map to choose a point',
+                          ? (draft.isVenue ? draft.detail : draft.coordinates)
+                          : 'Tap a place or the map to choose a point',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
@@ -876,8 +939,7 @@ class _PinTailPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_PinTailPainter oldDelegate) =>
-      oldDelegate.color != color;
+  bool shouldRepaint(_PinTailPainter oldDelegate) => oldDelegate.color != color;
 }
 
 class _LocateButton extends StatelessWidget {
@@ -940,10 +1002,7 @@ class _MissingMapToken extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            scheme.surfaceContainerHigh,
-            scheme.surfaceContainerHighest,
-          ],
+          colors: [scheme.surfaceContainerHigh, scheme.surfaceContainerHighest],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
