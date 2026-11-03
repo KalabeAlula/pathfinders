@@ -9,6 +9,7 @@ import '../../auth/application/auth_providers.dart';
 import '../../auth/domain/auth_failure.dart';
 import '../application/circle_providers.dart';
 import '../domain/circle_failure.dart';
+import '../domain/group_type.dart';
 
 enum _SetupMode { create, join }
 
@@ -62,10 +63,18 @@ class _CircleOnboardingScreenState
           ref.read(circleRepositoryProvider(widget.userId));
       switch (_mode) {
         case _SetupMode.create:
-          await repository.createCircle(name: _nameController.text);
+          final type = GroupType.friends;
+          final companion = type.defaultPet;
+          await repository.createCircle(
+            name: _nameController.text,
+            type: type,
+            petId: companion.id,
+            petName: companion.defaultName,
+          );
         case _SetupMode.join:
           await repository.joinCircle(code: _codeController.text);
       }
+      ref.invalidate(circlesProvider(widget.userId));
       ref.invalidate(circleSnapshotProvider(widget.userId));
     } on CircleFailure catch (failure) {
       if (mounted) setState(() => _error = failure.message);
@@ -100,8 +109,8 @@ class _CircleOnboardingScreenState
           const BrandHeader(
             title: 'One more step',
             subtitle:
-                'Circles hold two to four people — the ones you actually '
-                'travel through life with.',
+                'Circles hold two to six people, depending on the group type — '
+                'the ones you actually travel through life with.',
           ),
           const SizedBox(height: AppSpacing.xl),
           BentoCard(

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pathfinders/features/circle/domain/circle.dart';
 import 'package:pathfinders/features/pet/domain/pet_care_action.dart';
 import 'package:pathfinders/features/pet/domain/shared_pet.dart';
 
@@ -129,6 +130,60 @@ void main() {
         updatedAt: createdAt,
       );
       expect(sleepy.moodAt(createdAt), PetMood.sleepy);
+    });
+  });
+
+  group('circle state', () {
+    test('maps a persisted circle pet into live stats', () {
+      final circle = Circle(
+        id: 'c1',
+        name: 'Bole Crew',
+        inviteCode: 'MOMO24',
+        memberIds: const ['u1'],
+        createdAt: createdAt,
+        petId: 'gelada',
+        petName: 'Rusty',
+        petLevel: 4,
+        petExperience: 380,
+        petHunger: 55,
+        petEnergy: 60,
+        petHygiene: 65,
+        petHappiness: 90,
+        petLastAction: 'clean',
+        petLastActionAt: createdAt,
+        petUpdatedAt: createdAt,
+      );
+
+      final mapped = SharedPet.fromCircle(circle);
+
+      expect(mapped.name, 'Rusty');
+      expect(mapped.species, 'gelada');
+      expect(mapped.level, 4);
+      expect(mapped.experience, 380);
+      expect(mapped.hunger, 55);
+      expect(mapped.energy, 60);
+      expect(mapped.hygiene, 65);
+      expect(mapped.happiness, 90);
+      expect(mapped.updatedAt, createdAt);
+      expect(mapped.lastAction, PetCareAction.clean);
+      expect(mapped.lastActionAt, createdAt);
+      expect(mapped.moodAt(createdAt), PetMood.happy);
+    });
+
+    test('falls back to creation time when a circle has no pet timestamp', () {
+      final circle = Circle(
+        id: 'c1',
+        name: 'Bole Crew',
+        inviteCode: 'MOMO24',
+        memberIds: const ['u1'],
+        createdAt: createdAt,
+      );
+
+      final mapped = SharedPet.fromCircle(circle);
+
+      expect(mapped.updatedAt, createdAt);
+      expect(mapped.lastAction, isNull);
+      expect(mapped.level, 1);
     });
   });
 }

@@ -10,6 +10,7 @@ import '../../chat/application/chat_providers.dart';
 import '../../chat/presentation/widgets/group_chat_sheet.dart';
 import '../../circle/domain/circle_member.dart';
 import '../../circle/domain/circle_snapshot.dart';
+import '../../circle/presentation/widgets/group_switcher_sheet.dart';
 import '../../circle/presentation/widgets/member_detail_sheet.dart';
 import '../../circle/presentation/widgets/member_presence_header.dart';
 import '../../location/application/telemetry_providers.dart';
@@ -33,8 +34,10 @@ import '../../navigation/presentation/widgets/arrival_card.dart';
 import '../../nudges/presentation/widgets/nudge_overlay.dart';
 import '../../nudges/presentation/widgets/nudge_tile.dart';
 import '../../pet/application/pet_providers.dart';
+import '../../pet/domain/ethiopian_pet.dart';
 import '../../pet/domain/pet_care_action.dart';
 import '../../pet/domain/shared_pet.dart';
+import '../../pet/presentation/widgets/companion_sheet.dart';
 import '../../pet/presentation/widgets/pet_card.dart';
 import 'widgets/dashboard_header.dart';
 
@@ -50,7 +53,6 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pet = ref.watch(petControllerProvider);
     final activeNudge = ref.watch(nudgeControllerProvider);
     // Only permission and privacy mode change the banner; watching the whole
     // telemetry state would rebuild the dashboard on every GPS fix.
@@ -58,6 +60,8 @@ class DashboardScreen extends ConsumerWidget {
       telemetryControllerProvider(currentUserId).select(_sharingNotice),
     );
     final now = ref.watch(appClockProvider).value ?? DateTime.now();
+    final petState = SharedPet.fromCircle(snapshot.circle);
+    final pet = petState.decayed(now.difference(petState.updatedAt), now);
 
     final circleId = snapshot.circle.id;
     // Keeps the thread stream warm on Home so the unread badge and chat update
@@ -112,6 +116,16 @@ class DashboardScreen extends ConsumerWidget {
       );
     }
 
+    void openCompanion() {
+      showCompanionCard(
+        context,
+        pet: EthiopianPet.byId(snapshot.circle.petId),
+        state: pet,
+        groupType: snapshot.circle.type,
+        now: now,
+      );
+    }
+
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -133,7 +147,8 @@ class DashboardScreen extends ConsumerWidget {
                   if (me != null) openMember(me);
                 },
                 onCare: (action) =>
-                    ref.read(petControllerProvider.notifier).care(action),
+                    _careForPet(context, ref, circleId, action),
+                onOpenPet: openCompanion,
                 onNudge: () => ref
                     .read(nudgeControllerProvider.notifier)
                     .sendNudge(
@@ -148,6 +163,8 @@ class DashboardScreen extends ConsumerWidget {
                   authorId: currentUserId,
                 ),
                 onChat: openChat,
+                onOpenGroups: () =>
+                    showGroupSwitcher(context, userId: currentUserId),
                 onAddMilestone: () => showMilestoneComposer(
                   context,
                   circleId: circleId,
@@ -166,6 +183,22 @@ class DashboardScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _careForPet(
+    BuildContext context,
+    WidgetRef ref,
+    String circleId,
+    PetCareAction action,
+  ) async {
+    try {
+      await ref.read(petRepositoryProvider(circleId)).care(action);
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not reach your companion.')),
+      );
+    }
   }
 
   Future<void> _copyInviteCode(BuildContext context, String code) async {
@@ -204,16 +237,18 @@ class _DashboardBody extends StatelessWidget {
     required this.onMemberTap,
     required this.onSharingTap,
     required this.onCare,
+    required this.onOpenPet,
     required this.onNudge,
     required this.onCopyInvite,
     required this.onAddMemory,
     required this.onAddMilestone,
     required this.onChat,
+    required this.onOpenGroups,
   });
 
   final CircleSnapshot snapshot;
   final String currentUserId;
-  final AsyncValue<SharedPet> pet;
+  final SharedPet pet;
   final List<MemoryPost> memories;
   final SharedMilestone? milestone;
   final DateTime now;
@@ -222,11 +257,13 @@ class _DashboardBody extends StatelessWidget {
   final ValueChanged<CircleMember> onMemberTap;
   final VoidCallback onSharingTap;
   final ValueChanged<PetCareAction> onCare;
+  final VoidCallback onOpenPet;
   final VoidCallback onNudge;
   final VoidCallback onCopyInvite;
   final VoidCallback onAddMemory;
   final VoidCallback onAddMilestone;
   final VoidCallback onChat;
+  final VoidCallback onOpenGroups;
 
   @override
   Widget build(BuildContext context) {
@@ -252,6 +289,13 @@ class _DashboardBody extends StatelessWidget {
             onCopyInvite: onCopyInvite,
             unreadCount: unreadChats,
             onChat: onChat,
+            type: snapshot.circle.type,
+            memberCount: snapshot.members.length,
+            memberCapacity: snapshot.circle.capacity,
+            pet: EthiopianPet.byId(snapshot.circle.petId),
+            petName: snapshot.circle.petName,
+            onOpenGroups: onOpenGroups,
+            onOpenPet: onOpenPet,
           ),
         ),
         const SizedBox(height: 18),
@@ -288,13 +332,14 @@ class _DashboardBody extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
-              pet.when(
-                data: (value) => SizedBox(
-                  height: 164,
-                  child: PetCard(pet: value, now: now, onCare: onCare),
+              SizedBox(
+                height: 164,
+                child: PetCard(
+                  pet: pet,
+                  now: now,
+                  onCare: onCare,
+                  onOpen: onOpenPet,
                 ),
-                loading: () => const _SkeletonBox(height: 164),
-                error: (error, stack) => const _SkeletonBox(height: 164),
               ),
               const SizedBox(height: AppSpacing.md),
               if (latestMemory != null) ...[
@@ -562,26 +607,7 @@ class _EmptyMilestoneCard extends StatelessWidget {
   }
 }
 
-class _SkeletonBox extends StatelessWidget {
-  const _SkeletonBox({required this.height});
-
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      height: height,
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHigh.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(AppRadius.tile),
-      ),
-    );
-  }
-}
-
-extension on NudgeKind {
-  String get label => switch (this) {
+extension on NudgeKind {  String get label => switch (this) {
     NudgeKind.thinkingOfYou => 'Thinking of you',
     NudgeKind.onMyWay => 'On my way',
     NudgeKind.needYou => 'Missing you',

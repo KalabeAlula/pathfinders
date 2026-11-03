@@ -64,7 +64,7 @@ final class ArrivalControllerProvider
   }
 }
 
-String _$arrivalControllerHash() => r'71802db6d613d650dbb59c8a658615d1e70dc8c4';
+String _$arrivalControllerHash() => r'fa1f4e6f9d70c01b90bb4bc8f0dcd4873375bf6b';
 
 /// Detects the local member's arrival at the shared destination and announces
 /// it in the crew thread once per trip.

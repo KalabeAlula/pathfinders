@@ -17,34 +17,58 @@ class CircleGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final snapshot = ref.watch(circleSnapshotProvider(userId));
+    final circles = ref.watch(circlesProvider(userId));
     // Keep sharing alive for the whole signed-in session. This gate stays
     // mounted under pushed screens, whereas watching telemetry from individual
     // widgets would let auto-dispose stop the heartbeat on navigation.
     ref.listen(telemetryControllerProvider(userId), (_, _) {});
 
+    if (circles.hasError && !circles.hasValue) {
+      return _errorStatus(
+        ref,
+        circles.error!,
+        () {
+          ref.invalidate(circlesProvider(userId));
+          ref.invalidate(circleSnapshotProvider(userId));
+        },
+      );
+    }
+
+    if (!circles.hasValue) {
+      return const GateStatus(title: 'Opening your circles', showSpinner: true);
+    }
+
+    if (circles.requireValue.isEmpty) {
+      return CircleOnboardingScreen(userId: userId);
+    }
+
+    final snapshot = ref.watch(circleSnapshotProvider(userId));
     return snapshot.when(
       data: (value) => value == null
-          ? CircleOnboardingScreen(userId: userId)
+          ? const GateStatus(title: 'Opening your group', showSpinner: true)
           : DashboardScreen(snapshot: value, currentUserId: userId),
       loading: () =>
-          const GateStatus(title: 'Opening your circle', showSpinner: true),
-      error: (error, stack) {
-        final message = error is CircleFailure
-            ? error.message
-            : 'Could not load your circle.';
-        return GateStatus(
-          title: 'Your circle is out of reach',
-          message: message,
-          onRetry: () => ref.invalidate(circleSnapshotProvider(userId)),
-          footer: TextButton(
-            onPressed: () async {
-              await ref.read(authRepositoryProvider).signOut();
-            },
-            child: const Text('Sign out'),
-          ),
-        );
-      },
+          const GateStatus(title: 'Opening your group', showSpinner: true),
+      error: (error, stack) => _errorStatus(ref, error, () {
+        ref.invalidate(circleSnapshotProvider(userId));
+      }),
+    );
+  }
+
+  Widget _errorStatus(WidgetRef ref, Object error, VoidCallback onRetry) {
+    final message = error is CircleFailure
+        ? error.message
+        : 'Could not load your circle.';
+    return GateStatus(
+      title: 'Your circle is out of reach',
+      message: message,
+      onRetry: onRetry,
+      footer: TextButton(
+        onPressed: () async {
+          await ref.read(authRepositoryProvider).signOut();
+        },
+        child: const Text('Sign out'),
+      ),
     );
   }
 }

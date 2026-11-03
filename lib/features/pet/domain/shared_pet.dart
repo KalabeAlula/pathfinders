@@ -1,3 +1,4 @@
+import '../../circle/domain/circle.dart';
 import 'pet_care_action.dart';
 
 enum PetMood { happy, content, hungry, sleepy, dirty, playing }
@@ -22,6 +23,31 @@ class SharedPet {
   static const double maxStat = 100;
   static const int experiencePerLevel = 100;
   static const Duration playingWindow = Duration(minutes: 2);
+
+  /// Builds the live companion state stored alongside the circle. Callers
+  /// should apply [decayed] up to the current time before rendering.
+  factory SharedPet.fromCircle(Circle circle) {
+    return SharedPet(
+      name: circle.petName,
+      species: circle.petId,
+      level: circle.petLevel,
+      experience: circle.petExperience,
+      hunger: circle.petHunger,
+      energy: circle.petEnergy,
+      hygiene: circle.petHygiene,
+      happiness: circle.petHappiness,
+      updatedAt: circle.petUpdatedAt ?? circle.createdAt,
+      lastAction: _careAction(circle.petLastAction),
+      lastActionAt: circle.petLastActionAt,
+    );
+  }
+
+  static PetCareAction? _careAction(String? name) {
+    for (final action in PetCareAction.values) {
+      if (action.name == name) return action;
+    }
+    return null;
+  }
 
   final String name;
   final String species;

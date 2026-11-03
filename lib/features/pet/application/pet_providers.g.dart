@@ -10,24 +10,31 @@ part of 'pet_providers.dart';
 // ignore_for_file: type=lint, type=warning
 
 @ProviderFor(petRepository)
-final petRepositoryProvider = PetRepositoryProvider._();
+final petRepositoryProvider = PetRepositoryFamily._();
 
 final class PetRepositoryProvider
     extends $FunctionalProvider<PetRepository, PetRepository, PetRepository>
     with $Provider<PetRepository> {
-  PetRepositoryProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'petRepositoryProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
+  PetRepositoryProvider._({
+    required PetRepositoryFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'petRepositoryProvider',
+         isAutoDispose: false,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
 
   @override
   String debugGetCreateSourceHash() => _$petRepositoryHash();
+
+  @override
+  String toString() {
+    return r'petRepositoryProvider'
+        ''
+        '($argument)';
+  }
 
   @$internal
   @override
@@ -36,7 +43,8 @@ final class PetRepositoryProvider
 
   @override
   PetRepository create(Ref ref) {
-    return petRepository(ref);
+    final argument = this.argument as String;
+    return petRepository(ref, argument);
   }
 
   /// {@macro riverpod.override_with_value}
@@ -46,50 +54,34 @@ final class PetRepositoryProvider
       providerOverride: $SyncValueProvider<PetRepository>(value),
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is PetRepositoryProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
 }
 
-String _$petRepositoryHash() => r'a58475c8e18730ad91492749b5de6ca4da40fe2f';
+String _$petRepositoryHash() => r'2280057446c772828ad97132d2d5d3f1c73bbdbd';
 
-@ProviderFor(PetController)
-final petControllerProvider = PetControllerProvider._();
-
-final class PetControllerProvider
-    extends $StreamNotifierProvider<PetController, SharedPet> {
-  PetControllerProvider._()
+final class PetRepositoryFamily extends $Family
+    with $FunctionalFamilyOverride<PetRepository, String> {
+  PetRepositoryFamily._()
     : super(
-        from: null,
-        argument: null,
         retry: null,
-        name: r'petControllerProvider',
-        isAutoDispose: false,
+        name: r'petRepositoryProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
+        isAutoDispose: false,
       );
 
-  @override
-  String debugGetCreateSourceHash() => _$petControllerHash();
+  PetRepositoryProvider call(String circleId) =>
+      PetRepositoryProvider._(argument: circleId, from: this);
 
-  @$internal
   @override
-  PetController create() => PetController();
-}
-
-String _$petControllerHash() => r'9380b7e9661b9beb99625b8f1eee249a1bcdebe3';
-
-abstract class _$PetController extends $StreamNotifier<SharedPet> {
-  Stream<SharedPet> build();
-  @$mustCallSuper
-  @override
-  WhenComplete runBuild() {
-    final ref = this.ref as $Ref<AsyncValue<SharedPet>, SharedPet>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<AsyncValue<SharedPet>, SharedPet>,
-              AsyncValue<SharedPet>,
-              Object?,
-              Object?
-            >;
-    return element.handleCreate(ref, build);
-  }
+  String toString() => r'petRepositoryProvider';
 }

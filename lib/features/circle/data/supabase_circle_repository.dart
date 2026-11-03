@@ -9,12 +9,15 @@ import '../domain/circle_failure.dart';
 import '../domain/circle_member.dart';
 import '../domain/circle_repository.dart';
 import '../domain/circle_snapshot.dart';
+import '../domain/circle_summary.dart';
+import '../domain/group_type.dart';
 import '../domain/user_profile.dart';
 
-/// Reads the signed-in user's circle and refreshes it on realtime changes.
+/// Reads the signed-in user's groups and refreshes them on realtime changes.
 ///
-/// Status rows arrive already masked by the database, so a paused member has
-/// no coordinates and an approximate member only has a coarse point.
+/// Every membership is watched through its own channel so switching groups
+/// disposes exactly the old stream; there is no shared channel that could leak
+/// a listener from the group the member just left.
 class SupabaseCircleRepository implements CircleRepository {
   SupabaseCircleRepository(
     this._client, {
@@ -23,9 +26,31 @@ class SupabaseCircleRepository implements CircleRepository {
 
   final sb.SupabaseClient _client;
   final String userId;
+  int _channelSequence = 0;
 
   @override
-  Stream<CircleSnapshot?> watchCircle() async* {
+  Stream<List<CircleSummary>> watchCircles() {
+    return _liveStream(
+      channelName: 'circle-list-$userId-${_channelSequence++}',
+      tables: const ['circle_members', 'circles'],
+      fetch: _fetchSummaries,
+    );
+  }
+
+  @override
+  Stream<CircleSnapshot?> watchCircle(String circleId) {
+    return _liveStream(
+      channelName: 'circle-$circleId-$userId-${_channelSequence++}',
+      tables: const ['circle_members', 'circles', 'member_status'],
+      fetch: () => _fetch(circleId),
+    );
+  }
+
+  Stream<T> _liveStream<T>({
+    required String channelName,
+    required List<String> tables,
+    required Future<T> Function() fetch,
+  }) async* {
     final changes = StreamController<void>.broadcast();
     Timer? debounce;
 
@@ -36,37 +61,26 @@ class SupabaseCircleRepository implements CircleRepository {
       });
     }
 
-    final channel = _client
-        .channel('circle-changes-$userId')
-        .onPostgresChanges(
-          event: sb.PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'circle_members',
-          callback: (_) => scheduleRefresh(),
-        )
-        .onPostgresChanges(
-          event: sb.PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'circles',
-          callback: (_) => scheduleRefresh(),
-        )
-        .onPostgresChanges(
-          event: sb.PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'member_status',
-          callback: (_) => scheduleRefresh(),
-        )
-      ..subscribe();
+    var channel = _client.channel(channelName);
+    for (final table in tables) {
+      channel = channel.onPostgresChanges(
+        event: sb.PostgresChangeEvent.all,
+        schema: 'public',
+        table: table,
+        callback: (_) => scheduleRefresh(),
+      );
+    }
+    channel.subscribe();
 
     try {
-      yield await _fetch();
+      yield await fetch();
       await for (final _ in changes.stream) {
         try {
-          yield await _fetch();
+          yield await fetch();
         } catch (error) {
-          // Keep showing the last good snapshot; the next event retries.
+          // Keep showing the last good state; the next event retries.
           developer.log(
-            'Could not refresh the circle snapshot',
+            'Could not refresh circle data',
             name: 'pathfinders.circle',
             error: error,
           );
@@ -80,45 +94,108 @@ class SupabaseCircleRepository implements CircleRepository {
   }
 
   @override
-  Future<void> createCircle({required String name}) => _runRpc(
-        () => _client.rpc(
-          'create_circle',
-          params: {'p_name': name.trim()},
-        ),
-      );
+  Future<Circle> createCircle({
+    required String name,
+    required GroupType type,
+    required String petId,
+    required String petName,
+  }) async {
+    final row = await _runRpc(
+      () => _client.rpc(
+        'create_circle',
+        params: {
+          'p_name': name.trim(),
+          'p_group_type': type.dbValue,
+          'p_pet_id': petId.trim(),
+          'p_pet_name': petName.trim(),
+        },
+      ),
+    );
+    return Circle.fromRow(row, memberIds: [userId]);
+  }
 
   @override
-  Future<void> joinCircle({required String code}) => _runRpc(
-        () => _client.rpc(
-          'join_circle',
-          params: {'p_code': code.trim().toUpperCase()},
-        ),
-      );
+  Future<Circle> joinCircle({required String code}) async {
+    final row = await _runRpc(
+      () => _client.rpc(
+        'join_circle',
+        params: {'p_code': code.trim().toUpperCase()},
+      ),
+    );
+    return Circle.fromRow(row, memberIds: [userId]);
+  }
 
-  Future<void> _runRpc(Future<Object?> Function() call) async {
+  Future<Map<String, dynamic>> _runRpc(
+    Future<Object?> Function() call,
+  ) async {
     try {
-      await call();
+      final data = await call();
+      if (data is Map<String, dynamic>) return data;
+      return Map<String, dynamic>.from(data as Map);
     } on sb.PostgrestException catch (error) {
       throw _mapFailure(error);
     }
   }
 
-  Future<CircleSnapshot?> _fetch() async {
+  Future<List<CircleSummary>> _fetchSummaries() async {
     try {
-      final membership = await _client
+      final membershipRows = await _client
           .from('circle_members')
           .select('circle_id')
           .eq('user_id', userId)
-          .maybeSingle();
-      if (membership == null) return null;
+          .order('joined_at', ascending: true);
 
-      final circleId = membership['circle_id'] as String;
+      final orderedIds = [
+        for (final row in membershipRows) row['circle_id'] as String,
+      ];
+      if (orderedIds.isEmpty) return const [];
 
+      final circleRows = await _client
+          .from('circles')
+          .select(
+            'id, name, group_type, pet_id, pet_species, pet_name, pet_level, '
+            'created_at',
+          )
+          .inFilter('id', orderedIds);
+
+      final memberRows = await _client
+          .from('circle_members')
+          .select('circle_id')
+          .inFilter('circle_id', orderedIds);
+
+      final counts = <String, int>{};
+      for (final row in memberRows) {
+        final id = row['circle_id'] as String;
+        counts[id] = (counts[id] ?? 0) + 1;
+      }
+
+      final rowsById = {
+        for (final row in circleRows) row['id'] as String: row,
+      };
+
+      return [
+        for (final id in orderedIds)
+          if (rowsById[id] case final row?)
+            CircleSummary.fromRow(row, memberCount: counts[id] ?? 1),
+      ];
+    } on sb.PostgrestException catch (error) {
+      throw _mapFailure(error);
+    }
+  }
+
+  Future<CircleSnapshot?> _fetch(String circleId) async {
+    try {
       final circleRow = await _client
           .from('circles')
-          .select('id, name, invite_code, created_at')
+          .select(
+            'id, name, invite_code, group_type, pet_id, pet_species, pet_name, '
+            'pet_level, pet_mood, pet_experience, pet_hunger, pet_energy, '
+            'pet_hygiene, pet_happiness, pet_last_action, pet_last_action_at, '
+            'pet_updated_at, created_at',
+          )
           .eq('id', circleId)
-          .single();
+          .maybeSingle();
+      if (circleRow == null) return null;
 
       final membershipRows = await _client
           .from('circle_members')
@@ -170,12 +247,9 @@ class SupabaseCircleRepository implements CircleRepository {
       ];
 
       return CircleSnapshot(
-        circle: Circle(
-          id: circleRow['id'] as String,
-          name: circleRow['name'] as String,
-          inviteCode: circleRow['invite_code'] as String,
+        circle: Circle.fromRow(
+          circleRow,
           memberIds: [for (final member in members) member.profile.id],
-          createdAt: DateTime.parse(circleRow['created_at'] as String).toLocal(),
         ),
         members: members,
       );
@@ -191,7 +265,7 @@ class SupabaseCircleRepository implements CircleRepository {
 
   static CircleFailure _mapFailure(sb.PostgrestException error) {
     final message = switch (error.code) {
-      '23505' => 'You are already in a circle.',
+      '23505' => 'You are already in this circle.',
       '23514' => 'This circle is full.',
       'P0002' => 'No circle matches that invite code.',
       '42501' => 'Sign in again to continue.',

@@ -198,7 +198,7 @@ final class TelemetryControllerProvider
 }
 
 String _$telemetryControllerHash() =>
-    r'7b4b392187c6d1714d953de7a25594537874e387';
+    r'792f2c83080f129f426b4ac88ee9be8c1e41b1e9';
 
 /// Drives this device's half of the circle telemetry: permission, a fix stream
 /// that keeps running off-screen, battery, and the member's sharing mode.

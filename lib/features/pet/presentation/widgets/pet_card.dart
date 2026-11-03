@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_tokens.dart';
 import '../../../../app/widgets/bento_card.dart';
+import '../../domain/ethiopian_pet.dart';
 import '../../domain/pet_care_action.dart';
 import '../../domain/shared_pet.dart';
 import '../pet_visuals.dart';
-import 'capybara_art.dart';
+import 'pet_avatar.dart';
 
 class PetCard extends StatelessWidget {
   const PetCard({
@@ -13,38 +14,34 @@ class PetCard extends StatelessWidget {
     required this.pet,
     required this.now,
     required this.onCare,
+    this.onOpen,
   });
 
   final SharedPet pet;
   final DateTime now;
   final ValueChanged<PetCareAction> onCare;
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final mood = pet.moodAt(now);
     final badgeIcon = mood.badgeIcon ?? Icons.pets_rounded;
+    final companion = EthiopianPet.byId(pet.species);
 
     return Semantics(
       label:
-          '${pet.name} the ${pet.species} is ${mood.label}. '
+          '${pet.name} the ${companion.commonName} is ${mood.label}. '
           'Happiness ${pet.happiness.round()} percent, level ${pet.level}.',
       child: BentoCard(
         padding: const EdgeInsets.all(14),
         child: Row(
           children: [
-            Container(
-              width: 92,
-              height: 92,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: scheme.secondaryContainer.withValues(alpha: 0.6),
-                border: Border.all(
-                  color: scheme.outlineVariant.withValues(alpha: 0.6),
-                ),
-              ),
-              child: Center(
-                child: CapybaraArt(mood: mood, size: 78),
+            GestureDetector(
+              onTap: onOpen,
+              child: Tooltip(
+                message: 'Meet ${pet.name}',
+                child: PetAvatar(pet: companion, size: 92),
               ),
             ),
             const SizedBox(width: 14),
@@ -86,7 +83,7 @@ class PetCard extends StatelessWidget {
                     ],
                   ),
                   Text(
-                    mood.message,
+                    mood.messageFor(pet.name),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -102,6 +99,7 @@ class PetCard extends StatelessWidget {
                         Expanded(
                           child: _CareButton(
                             action: PetCareAction.values[i],
+                            petName: pet.name,
                             onTap: () => onCare(PetCareAction.values[i]),
                           ),
                         ),
@@ -180,16 +178,21 @@ class _JoyBar extends StatelessWidget {
 }
 
 class _CareButton extends StatelessWidget {
-  const _CareButton({required this.action, required this.onTap});
+  const _CareButton({
+    required this.action,
+    required this.petName,
+    required this.onTap,
+  });
 
   final PetCareAction action;
+  final String petName;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Tooltip(
-      message: '${action.label} Momo',
+      message: '${action.label} $petName',
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(

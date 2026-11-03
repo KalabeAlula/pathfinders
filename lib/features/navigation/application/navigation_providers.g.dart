@@ -356,7 +356,7 @@ final class NavigationControllerProvider
 }
 
 String _$navigationControllerHash() =>
-    r'3c0105616c9d93c1e5eb29b100c28a112f66d764';
+    r'396539e8a3f66aeae63ebcb340214e6e582f70f2';
 
 /// Keeps one route per member up to date between the live fixes and the
 /// shared destination.

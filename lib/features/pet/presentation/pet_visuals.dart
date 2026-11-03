@@ -12,13 +12,13 @@ extension PetMoodVisuals on PetMood {
         PetMood.playing => 'Playing',
       };
 
-  String get message => switch (this) {
-        PetMood.happy => 'Momo is glowing — the whole crew showed up today.',
-        PetMood.content => 'Momo is cozy. A little play would go a long way.',
-        PetMood.hungry => 'Momo is staring at the snack drawer.',
-        PetMood.sleepy => 'Momo is dozing. Maybe let the lights dim.',
-        PetMood.dirty => 'Momo needs a little spa moment.',
-        PetMood.playing => 'Momo is bouncing around — someone just played!',
+  String messageFor(String name) => switch (this) {
+        PetMood.happy => '$name is glowing — the whole crew showed up today.',
+        PetMood.content => '$name is cozy. A little play would go a long way.',
+        PetMood.hungry => '$name is staring at the snack drawer.',
+        PetMood.sleepy => '$name is dozing. Maybe let the lights dim.',
+        PetMood.dirty => '$name needs a little spa moment.',
+        PetMood.playing => '$name is bouncing around — someone just played!',
       };
 
   IconData? get badgeIcon => switch (this) {
