@@ -62,7 +62,8 @@ class Circle {
     required List<String> memberIds,
   }) {
     final type = GroupType.fromDb(row['group_type']);
-    final petId = EthiopianPet.tryById(_optionalText(row['pet_id']))?.id ??
+    final petId =
+        EthiopianPet.tryById(_optionalText(row['pet_id']))?.id ??
         EthiopianPet.tryById(_optionalText(row['pet_species']))?.id ??
         type.defaultPet.id;
     return Circle(

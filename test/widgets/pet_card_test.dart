@@ -10,10 +10,7 @@ import 'package:pathfinders/features/pet/presentation/widgets/pet_card.dart';
 
 final _now = DateTime(2026, 11, 3, 9);
 
-SharedPet _pet({
-  String species = 'ethiopian_wolf',
-  String name = 'Sene',
-}) {
+SharedPet _pet({String species = 'ethiopian_wolf', String name = 'Sene'}) {
   return SharedPet(
     name: name,
     species: species,
@@ -39,8 +36,9 @@ Widget _host(SharedPet pet, ValueChanged<PetCareAction> onCare) {
 }
 
 void main() {
-  testWidgets('shows the Ethiopian companion and names it in care tooltips',
-      (tester) async {
+  testWidgets('shows the Ethiopian companion and names it in care tooltips', (
+    tester,
+  ) async {
     PetCareAction? tapped;
     await tester.pumpWidget(_host(_pet(), (action) => tapped = action));
 
@@ -79,8 +77,9 @@ void main() {
     expect(find.byTooltip('Feed Chele'), findsOneWidget);
   });
 
-  testWidgets('companion card shows species, habitat, and level',
-      (tester) async {
+  testWidgets('companion card shows species, habitat, and level', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(

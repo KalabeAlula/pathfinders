@@ -88,8 +88,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Enter your account email and we will send a 6-digit '
-                    'recovery code.',
+                    'Enter your account email and we will send a recovery '
+                    'code.',
                     style: Theme.of(context).textTheme.bodyMedium
                         ?.copyWith(color: scheme.onSurfaceVariant),
                   ),

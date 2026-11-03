@@ -8,10 +8,7 @@ void main() {
       expect(formatDwell(const Duration(minutes: 20)), '20m');
       expect(formatDwell(const Duration(minutes: 135)), '2h 15m');
       expect(formatDwell(const Duration(hours: 2)), '2h');
-      expect(
-        formatDwell(const Duration(days: 5, hours: 3)),
-        '5d 3h',
-      );
+      expect(formatDwell(const Duration(days: 5, hours: 3)), '5d 3h');
     });
   });
 

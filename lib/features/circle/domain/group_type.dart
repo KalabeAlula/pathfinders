@@ -42,8 +42,8 @@ enum GroupType {
   final List<String> petIds;
 
   List<EthiopianPet> get pets => [
-        for (final id in petIds) EthiopianPet.byId(id),
-      ];
+    for (final id in petIds) EthiopianPet.byId(id),
+  ];
 
   EthiopianPet get defaultPet => pets.first;
 

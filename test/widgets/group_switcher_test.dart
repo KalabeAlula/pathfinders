@@ -40,7 +40,7 @@ class _FakeCircleRepository implements CircleRepository {
   final List<CircleSummary> summaries;
   final _summaries = StreamController<List<CircleSummary>>.broadcast();
   final List<({String name, GroupType type, String petId, String petName})>
-      created = [];
+  created = [];
 
   void dispose() {
     _summaries.close();
@@ -64,12 +64,7 @@ class _FakeCircleRepository implements CircleRepository {
     required String petId,
     required String petName,
   }) async {
-    created.add((
-      name: name,
-      type: type,
-      petId: petId,
-      petName: petName,
-    ));
+    created.add((name: name, type: type, petId: petId, petName: petName));
     return Circle(
       id: 'new-group',
       name: name,
@@ -121,9 +116,7 @@ Future<ProviderContainer> _pump(
     ),
   );
   await tester.pumpAndSettle();
-  return ProviderScope.containerOf(
-    tester.element(find.byType(MaterialApp)),
-  );
+  return ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
 }
 
 void main() {
@@ -155,7 +148,10 @@ void main() {
     expect(find.text('FRIENDS'), findsOneWidget);
     expect(find.text('3 of 4 members · Gelada Momo'), findsOneWidget);
     expect(find.text('FAMILY'), findsOneWidget);
-    expect(find.text('5 of 6 members · Black-maned Ethiopian Lion Anbessa'), findsOneWidget);
+    expect(
+      find.text('5 of 6 members · Black-maned Ethiopian Lion Anbessa'),
+      findsOneWidget,
+    );
     expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
 
     await tester.tap(find.text('Family Table'));
@@ -184,18 +180,15 @@ void main() {
     expect(find.text('Step 1 of 4 · Name it'), findsOneWidget);
   });
 
-  testWidgets('creates a family group with the chosen companion',
-      (tester) async {
+  testWidgets('creates a family group with the chosen companion', (
+    tester,
+  ) async {
     final repository = _FakeCircleRepository([
       _summary('c1', name: 'Bole Crew'),
     ]);
     addTearDown(repository.dispose);
 
-    await _pump(
-      tester,
-      repository,
-      const CreateGroupScreen(userId: 'u'),
-    );
+    await _pump(tester, repository, const CreateGroupScreen(userId: 'u'));
 
     await tester.enterText(
       find.byKey(const ValueKey('group-name')),

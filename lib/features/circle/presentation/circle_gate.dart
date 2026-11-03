@@ -24,14 +24,10 @@ class CircleGate extends ConsumerWidget {
     ref.listen(telemetryControllerProvider(userId), (_, _) {});
 
     if (circles.hasError && !circles.hasValue) {
-      return _errorStatus(
-        ref,
-        circles.error!,
-        () {
-          ref.invalidate(circlesProvider(userId));
-          ref.invalidate(circleSnapshotProvider(userId));
-        },
-      );
+      return _errorStatus(ref, circles.error!, () {
+        ref.invalidate(circlesProvider(userId));
+        ref.invalidate(circleSnapshotProvider(userId));
+      });
     }
 
     if (!circles.hasValue) {

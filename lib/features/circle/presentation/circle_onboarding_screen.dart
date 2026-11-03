@@ -59,8 +59,7 @@ class _CircleOnboardingScreenState
     });
 
     try {
-      final repository =
-          ref.read(circleRepositoryProvider(widget.userId));
+      final repository = ref.read(circleRepositoryProvider(widget.userId));
       switch (_mode) {
         case _SetupMode.create:
           final type = GroupType.friends;
@@ -90,9 +89,8 @@ class _CircleOnboardingScreenState
       await ref.read(authRepositoryProvider).signOut();
     } on AuthFailure catch (failure) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(failure.message)),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(failure.message)));
     }
   }
 
@@ -158,9 +156,8 @@ class _CircleOnboardingScreenState
                       textInputAction: TextInputAction.done,
                       textAlign: TextAlign.center,
                       onFieldSubmitted: (_) => _submit(),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            letterSpacing: 6,
-                          ),
+                      style: Theme.of(context).textTheme.titleLarge
+                          ?.copyWith(letterSpacing: 6),
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(
                           RegExp('[A-Za-z0-9]'),
@@ -180,8 +177,9 @@ class _CircleOnboardingScreenState
                         if (code.length != 6) {
                           return 'Invite codes are six characters.';
                         }
-                        final usesAllowedCharacters =
-                            RegExp(r'^[A-HJ-NP-Z2-9]{6}$').hasMatch(code);
+                        final usesAllowedCharacters = RegExp(
+                          r'^[A-HJ-NP-Z2-9]{6}$',
+                        ).hasMatch(code);
                         if (!usesAllowedCharacters) {
                           return 'That code has a character we do not use. '
                               'Check it again.';
@@ -195,9 +193,9 @@ class _CircleOnboardingScreenState
                         ? 'You can share the invite code right after creating it.'
                         : 'Ask the person who made the circle for its code.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontSize: 10.5,
-                        ),
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 10.5,
+                    ),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: AppSpacing.lg),
@@ -229,9 +227,8 @@ class _CircleOnboardingScreenState
                     'Signed in as $email',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: scheme.onSurfaceVariant),
                   ),
                 ),
               ],

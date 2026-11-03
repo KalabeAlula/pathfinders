@@ -27,11 +27,8 @@ class SupabaseTelemetryRepository implements TelemetryRepository {
 
   @override
   Future<void> setPrivacyMode(PrivacyMode mode) => _run(
-        () => _client.rpc(
-          'set_privacy_mode',
-          params: {'p_mode': mode.name},
-        ),
-      );
+    () => _client.rpc('set_privacy_mode', params: {'p_mode': mode.name}),
+  );
 
   @override
   Future<void> report({
@@ -40,20 +37,19 @@ class SupabaseTelemetryRepository implements TelemetryRepository {
     double speedKph = 0,
     int? batteryPercent,
     bool isCharging = false,
-  }) =>
-      _run(
-        () => _client.rpc(
-          'report_status',
-          params: {
-            'p_latitude': point?.latitude,
-            'p_longitude': point?.longitude,
-            'p_accuracy_meters': accuracyMeters,
-            'p_battery_percent': batteryPercent,
-            'p_is_charging': isCharging,
-            'p_speed_kph': speedKph,
-          },
-        ),
-      );
+  }) => _run(
+    () => _client.rpc(
+      'report_status',
+      params: {
+        'p_latitude': point?.latitude,
+        'p_longitude': point?.longitude,
+        'p_accuracy_meters': accuracyMeters,
+        'p_battery_percent': batteryPercent,
+        'p_is_charging': isCharging,
+        'p_speed_kph': speedKph,
+      },
+    ),
+  );
 
   Future<void> _run(Future<Object?> Function() call) async {
     try {
@@ -64,10 +60,10 @@ class SupabaseTelemetryRepository implements TelemetryRepository {
   }
 
   static PrivacyMode _modeFromName(String? name) => switch (name) {
-        'approximate' => PrivacyMode.approximate,
-        'paused' => PrivacyMode.paused,
-        _ => PrivacyMode.exact,
-      };
+    'approximate' => PrivacyMode.approximate,
+    'paused' => PrivacyMode.paused,
+    _ => PrivacyMode.exact,
+  };
 
   static TelemetryFailure _mapFailure(sb.PostgrestException error) {
     final message = switch (error.code) {

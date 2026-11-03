@@ -16,8 +16,8 @@ class BatteryBadge extends StatelessWidget {
     final color = percent <= 20
         ? scheme.error
         : isCharging
-            ? const Color(0xFF6F9E62)
-            : scheme.onSurfaceVariant;
+        ? const Color(0xFF6F9E62)
+        : scheme.onSurfaceVariant;
 
     return Tooltip(
       message: isCharging ? 'Charging · $percent%' : 'Battery · $percent%',
@@ -29,9 +29,9 @@ class BatteryBadge extends StatelessWidget {
           Text(
             '$percent%',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+              color: color,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
           ),
         ],
       ),

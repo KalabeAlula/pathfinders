@@ -5,11 +5,7 @@ import 'package:flutter/services.dart';
 
 /// Full-screen confirmation + tactile burst shown after sending a nudge.
 class NudgeOverlay extends StatefulWidget {
-  const NudgeOverlay({
-    super.key,
-    required this.title,
-    required this.message,
-  });
+  const NudgeOverlay({super.key, required this.title, required this.message});
 
   final String title;
   final String message;
@@ -74,7 +70,12 @@ class _NudgeOverlayState extends State<NudgeOverlay>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Transform.scale(
-                          scale: 0.9 + 0.1 * Curves.easeOutBack.transform(t.clamp(0.0, 1.0)),
+                          scale:
+                              0.9 +
+                              0.1 *
+                                  Curves.easeOutBack.transform(
+                                    t.clamp(0.0, 1.0),
+                                  ),
                           child: Container(
                             width: 88,
                             height: 88,
@@ -104,9 +105,8 @@ class _NudgeOverlayState extends State<NudgeOverlay>
                         Text(
                           widget.title,
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                color: Colors.white,
-                              ),
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(color: Colors.white),
                         ),
                         const SizedBox(height: 6),
                         Padding(
@@ -114,7 +114,8 @@ class _NudgeOverlayState extends State<NudgeOverlay>
                           child: Text(
                             widget.message,
                             textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
                                   color: Colors.white.withValues(alpha: 0.78),
                                 ),
                           ),

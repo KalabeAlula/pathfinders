@@ -37,6 +37,7 @@ class _EmailVerificationScreenState
 
   Timer? _timer;
   int _secondsLeft = _resendSeconds;
+  int _codeLength = 0;
   bool _busy = false;
   bool _resending = false;
   String? _error;
@@ -67,8 +68,13 @@ class _EmailVerificationScreenState
     });
   }
 
-  Future<void> _verify(String code) async {
+  Future<void> _verify([String? completedCode]) async {
     if (_busy) return;
+    final code = completedCode ?? _codeKey.currentState?.code ?? '';
+    if (code.length < CodeInput.minLength) {
+      setState(() => _error = 'Enter the full code from your email.');
+      return;
+    }
 
     setState(() {
       _busy = true;
@@ -82,11 +88,17 @@ class _EmailVerificationScreenState
       // The auth stream flips SessionGate to onboarding/dashboard.
     } on AuthFailure catch (failure) {
       if (!mounted) return;
-      setState(() => _error = failure.message);
+      setState(() {
+        _error = failure.message;
+        _codeLength = 0;
+      });
       _codeKey.currentState?.clear();
     } catch (_) {
       if (!mounted) return;
-      setState(() => _error = 'Something went wrong. Try again.');
+      setState(() {
+        _error = 'Something went wrong. Try again.';
+        _codeLength = 0;
+      });
       _codeKey.currentState?.clear();
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -108,6 +120,7 @@ class _EmailVerificationScreenState
       if (!mounted) return;
       setState(() => _secondsLeft = _resendSeconds);
       _startCountdown();
+      _codeLength = 0;
       _codeKey.currentState?.clear();
     } on AuthFailure catch (failure) {
       if (mounted) setState(() => _error = failure.message);
@@ -144,7 +157,7 @@ class _EmailVerificationScreenState
           ),
           const SizedBox(height: 6),
           Text(
-            'We sent a 6-digit code to ${widget.email}.',
+            'We sent a verification code to ${widget.email}.',
             style: Theme.of(context).textTheme.bodyMedium
                 ?.copyWith(color: scheme.onSurfaceVariant),
           ),
@@ -153,8 +166,19 @@ class _EmailVerificationScreenState
             key: _codeKey,
             error: _error,
             enabled: !_busy,
-            onChanged: (_) => setState(() => _error = null),
+            onChanged: (value) => setState(() {
+              _codeLength = value.length;
+              _error = null;
+            }),
             onCompleted: (code) => unawaited(_verify(code)),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          AuthSubmitButton(
+            label: 'Verify',
+            busy: _busy,
+            onPressed: _codeLength >= CodeInput.minLength && !_busy
+                ? () => unawaited(_verify())
+                : null,
           ),
           if (_busy) ...[
             const SizedBox(height: AppSpacing.md),

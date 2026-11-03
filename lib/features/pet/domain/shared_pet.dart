@@ -116,6 +116,5 @@ class SharedPet {
     );
   }
 
-  static double _clamp(double value) =>
-      value.clamp(0, maxStat).toDouble();
+  static double _clamp(double value) => value.clamp(0, maxStat).toDouble();
 }

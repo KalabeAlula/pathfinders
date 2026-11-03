@@ -26,10 +26,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Share location when closed?'), findsOneWidget);
-    expect(
-      find.textContaining('even when the app is closed'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('even when the app is closed'), findsOneWidget);
     expect(find.textContaining('until you pause sharing'), findsOneWidget);
 
     await tester.tap(find.text('Not now'));
@@ -72,9 +69,8 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(textScaler: const TextScaler.linear(1.3)),
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(1.3)),
           child: child!,
         ),
         home: Builder(

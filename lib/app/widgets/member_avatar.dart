@@ -86,9 +86,7 @@ class MemberAvatar extends StatelessWidget {
                 height: badgeSize,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isOnline
-                      ? const Color(0xFF6F9E62)
-                      : scheme.outline,
+                  color: isOnline ? const Color(0xFF6F9E62) : scheme.outline,
                   border: Border.all(color: badgeBorder, width: 2),
                 ),
               ),
@@ -139,10 +137,7 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: backgroundColor,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: backgroundColor),
       child: Icon(icon, size: size * 0.62, color: iconColor),
     );
   }

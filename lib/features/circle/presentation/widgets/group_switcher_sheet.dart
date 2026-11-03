@@ -10,10 +10,7 @@ import '../../domain/circle_summary.dart';
 import '../create_group_screen.dart';
 import 'group_type_badge.dart';
 
-Future<void> showGroupSwitcher(
-  BuildContext context, {
-  required String userId,
-}) {
+Future<void> showGroupSwitcher(BuildContext context, {required String userId}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -67,22 +64,23 @@ class GroupSwitcherSheet extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
-              Text('Your groups', style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                'Your groups',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 2),
               Text(
                 'Switch what you are sharing with, or start another one.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: AppSpacing.lg),
               groups.when(
                 data: (items) => items.isEmpty
                     ? Text(
                         'You are not in a group yet.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(color: scheme.onSurfaceVariant),
                       )
                     : ConstrainedBox(
                         constraints: const BoxConstraints(maxHeight: 360),
@@ -123,9 +121,8 @@ class GroupSwitcherSheet extends ConsumerWidget {
                         error is CircleFailure
                             ? error.message
                             : 'Could not load your groups.',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: scheme.error,
-                            ),
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: scheme.error),
                       ),
                     ),
                     TextButton(
@@ -244,9 +241,8 @@ class _GroupRow extends StatelessWidget {
                         '$seats · ${companion.commonName} ${circle.petName}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant),
                       ),
                     ],
                   ),

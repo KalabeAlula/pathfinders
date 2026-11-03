@@ -44,8 +44,9 @@ void main() {
     expect(find.text('0'), findsNothing);
   });
 
-  testWidgets('shows the active group identity and opens the switcher',
-      (tester) async {
+  testWidgets('shows the active group identity and opens the switcher', (
+    tester,
+  ) async {
     var opened = 0;
     var petOpened = 0;
     await tester.pumpWidget(

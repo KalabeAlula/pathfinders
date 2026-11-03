@@ -69,10 +69,7 @@ void main() {
   });
 
   testWidgets('paused members show no location copy', (tester) async {
-    await pumpCard(
-      tester,
-      status(privacyMode: PrivacyMode.paused),
-    );
+    await pumpCard(tester, status(privacyMode: PrivacyMode.paused));
 
     expect(find.text('Location paused'), findsOneWidget);
   });

@@ -16,7 +16,8 @@ abstract final class MapMarkerImages {
     required Color background,
     bool approximate = false,
   }) {
-    final key = 'member:$initials:${accent.toARGB32()}:'
+    final key =
+        'member:$initials:${accent.toARGB32()}:'
         '${background.toARGB32()}:$approximate';
     return _cache.putIfAbsent(
       key,
@@ -91,7 +92,8 @@ abstract final class MapMarkerImages {
     return _encode(recorder, size, size);
   }
 
-  static Future<Uint8List> _paintDestination(Color color) async {    const width = 76.0;
+  static Future<Uint8List> _paintDestination(Color color) async {
+    const width = 76.0;
     const height = 96.0;
     const circleY = 36.0;
 
@@ -167,9 +169,10 @@ abstract final class MapMarkerImages {
     double width,
     double height,
   ) async {
-    final image = await recorder
-        .endRecording()
-        .toImage(width.round(), height.round());
+    final image = await recorder.endRecording().toImage(
+      width.round(),
+      height.round(),
+    );
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
     image.dispose();
     return data!.buffer.asUint8List();

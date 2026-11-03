@@ -14,8 +14,7 @@ class SupabaseNavigationRepository implements NavigationRepository {
   final sb.SupabaseClient _client;
   final String circleId;
 
-  static const _columns =
-      'latitude, longitude, label, set_by, updated_at';
+  static const _columns = 'latitude, longitude, label, set_by, updated_at';
 
   @override
   Stream<NavigationDestination?> watchDestination() async* {
@@ -29,15 +28,16 @@ class SupabaseNavigationRepository implements NavigationRepository {
       });
     }
 
-    final channel = _client
-        .channel('destination-changes-$circleId')
-        .onPostgresChanges(
-          event: sb.PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'circle_destinations',
-          callback: (_) => scheduleRefresh(),
-        )
-      ..subscribe();
+    final channel =
+        _client
+            .channel('destination-changes-$circleId')
+            .onPostgresChanges(
+              event: sb.PostgresChangeEvent.all,
+              schema: 'public',
+              table: 'circle_destinations',
+              callback: (_) => scheduleRefresh(),
+            )
+          ..subscribe();
 
     try {
       yield await _fetch();
@@ -67,21 +67,19 @@ class SupabaseNavigationRepository implements NavigationRepository {
     required String setBy,
   }) async {
     try {
-      await _client.from('circle_destinations').upsert(
-        {
-          'circle_id': circleId,
-          'label': label.trim(),
-          'latitude': latitude,
-          'longitude': longitude,
-          'set_by': setBy,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-        onConflict: 'circle_id',
-      );
+      await _client.from('circle_destinations').upsert({
+        'circle_id': circleId,
+        'label': label.trim(),
+        'latitude': latitude,
+        'longitude': longitude,
+        'set_by': setBy,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'circle_id');
     } on sb.PostgrestException catch (error) {
       throw _mapFailure(
         error,
-        fallback: 'Could not share that destination. Check your connection '
+        fallback:
+            'Could not share that destination. Check your connection '
             'and try again.',
       );
     } on Exception {
@@ -102,7 +100,8 @@ class SupabaseNavigationRepository implements NavigationRepository {
     } on sb.PostgrestException catch (error) {
       throw _mapFailure(
         error,
-        fallback: 'Could not end navigation. Check your connection and try '
+        fallback:
+            'Could not end navigation. Check your connection and try '
             'again.',
       );
     } on Exception {
@@ -131,7 +130,8 @@ class SupabaseNavigationRepository implements NavigationRepository {
     } on sb.PostgrestException catch (error) {
       throw _mapFailure(
         error,
-        fallback: 'Could not read the shared destination. Check your '
+        fallback:
+            'Could not read the shared destination. Check your '
             'connection and try again.',
       );
     }

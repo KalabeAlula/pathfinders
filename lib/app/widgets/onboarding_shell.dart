@@ -95,9 +95,8 @@ class BrandHeader extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           subtitle,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: scheme.onSurfaceVariant),
         ),
       ],
     );
@@ -196,9 +195,8 @@ class InlineError extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onErrorContainer,
-                  ),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: scheme.onErrorContainer),
             ),
           ),
         ],
@@ -217,14 +215,12 @@ class AuthSubmitButton extends StatelessWidget {
 
   final String label;
   final bool busy;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     return FilledButton(
-      style: FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(54),
-      ),
+      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
       onPressed: busy ? null : onPressed,
       child: busy
           ? const SizedBox(
@@ -301,14 +297,16 @@ class _Segment extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 9),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: selected ? scheme.surfaceContainerLowest : Colors.transparent,
+            color: selected
+                ? scheme.surfaceContainerLowest
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
           child: Text(
             label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
-                ),
+              color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
+            ),
           ),
         ),
       ),
@@ -355,17 +353,13 @@ class GateStatus extends StatelessWidget {
             Text(
               message!,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ],
           if (onRetry != null) ...[
             const SizedBox(height: AppSpacing.xl),
-            FilledButton.tonal(
-              onPressed: onRetry,
-              child: Text(retryLabel),
-            ),
+            FilledButton.tonal(onPressed: onRetry, child: Text(retryLabel)),
           ],
           if (showSpinner) ...[
             const SizedBox(height: AppSpacing.xl),

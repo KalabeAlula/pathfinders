@@ -19,10 +19,7 @@ import '../domain/user_profile.dart';
 /// disposes exactly the old stream; there is no shared channel that could leak
 /// a listener from the group the member just left.
 class SupabaseCircleRepository implements CircleRepository {
-  SupabaseCircleRepository(
-    this._client, {
-    required this.userId,
-  });
+  SupabaseCircleRepository(this._client, {required this.userId});
 
   final sb.SupabaseClient _client;
   final String userId;
@@ -125,9 +122,7 @@ class SupabaseCircleRepository implements CircleRepository {
     return Circle.fromRow(row, memberIds: [userId]);
   }
 
-  Future<Map<String, dynamic>> _runRpc(
-    Future<Object?> Function() call,
-  ) async {
+  Future<Map<String, dynamic>> _runRpc(Future<Object?> Function() call) async {
     try {
       final data = await call();
       if (data is Map<String, dynamic>) return data;
@@ -169,9 +164,7 @@ class SupabaseCircleRepository implements CircleRepository {
         counts[id] = (counts[id] ?? 0) + 1;
       }
 
-      final rowsById = {
-        for (final row in circleRows) row['id'] as String: row,
-      };
+      final rowsById = {for (final row in circleRows) row['id'] as String: row};
 
       return [
         for (final id in orderedIds)
@@ -210,9 +203,9 @@ class SupabaseCircleRepository implements CircleRepository {
       final profileRows = orderedIds.isEmpty
           ? const <Map<String, dynamic>>[]
           : await _client
-              .from('profiles')
-              .select('id, display_name, avatar_color')
-              .inFilter('id', orderedIds);
+                .from('profiles')
+                .select('id, display_name, avatar_color')
+                .inFilter('id', orderedIds);
 
       final profiles = {
         for (final row in profileRows)
@@ -226,13 +219,13 @@ class SupabaseCircleRepository implements CircleRepository {
       final statusRows = orderedIds.isEmpty
           ? const <Map<String, dynamic>>[]
           : await _client
-              .from('member_status')
-              .select(
-                'user_id, latitude, longitude, accuracy_meters, '
-                'battery_percent, is_charging, speed_kph, privacy_mode, '
-                'arrived_at, updated_at',
-              )
-              .inFilter('user_id', orderedIds);
+                .from('member_status')
+                .select(
+                  'user_id, latitude, longitude, accuracy_meters, '
+                  'battery_percent, is_charging, speed_kph, privacy_mode, '
+                  'arrived_at, updated_at',
+                )
+                .inFilter('user_id', orderedIds);
 
       final now = DateTime.now();
       final statuses = {

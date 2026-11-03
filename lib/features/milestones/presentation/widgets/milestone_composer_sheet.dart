@@ -16,10 +16,8 @@ Future<void> showMilestoneComposer(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) => MilestoneComposerSheet(
-      circleId: circleId,
-      createdBy: createdBy,
-    ),
+    builder: (_) =>
+        MilestoneComposerSheet(circleId: circleId, createdBy: createdBy),
   );
 }
 
@@ -49,8 +47,7 @@ class _MilestoneComposerSheetState
 
   static DateTime _defaultDate() {
     final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day)
-        .add(const Duration(days: 7));
+    return DateTime(now.year, now.month, now.day).add(const Duration(days: 7));
   }
 
   @override
@@ -88,7 +85,9 @@ class _MilestoneComposerSheetState
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     try {
-      await ref.read(milestonesRepositoryProvider(widget.circleId)).addMilestone(
+      await ref
+          .read(milestonesRepositoryProvider(widget.circleId))
+          .addMilestone(
             createdBy: widget.createdBy,
             title: title,
             date: _date,
@@ -217,16 +216,16 @@ class _MilestoneComposerSheetState
 
 extension on MilestoneKind {
   String get label => switch (this) {
-        MilestoneKind.birthday => 'Birthday',
-        MilestoneKind.anniversary => 'Milestone',
-        MilestoneKind.trip => 'Trip',
-        MilestoneKind.goal => 'Goal',
-      };
+    MilestoneKind.birthday => 'Birthday',
+    MilestoneKind.anniversary => 'Milestone',
+    MilestoneKind.trip => 'Trip',
+    MilestoneKind.goal => 'Goal',
+  };
 
   IconData get icon => switch (this) {
-        MilestoneKind.birthday => Icons.cake_rounded,
-        MilestoneKind.anniversary => Icons.favorite_rounded,
-        MilestoneKind.trip => Icons.luggage_rounded,
-        MilestoneKind.goal => Icons.flag_rounded,
-      };
+    MilestoneKind.birthday => Icons.cake_rounded,
+    MilestoneKind.anniversary => Icons.favorite_rounded,
+    MilestoneKind.trip => Icons.luggage_rounded,
+    MilestoneKind.goal => Icons.flag_rounded,
+  };
 }

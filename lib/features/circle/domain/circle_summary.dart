@@ -33,7 +33,8 @@ class CircleSummary {
     required int memberCount,
   }) {
     final type = GroupType.fromDb(row['group_type']);
-    final petId = EthiopianPet.tryById(_text(row['pet_id'], ''))?.id ??
+    final petId =
+        EthiopianPet.tryById(_text(row['pet_id'], ''))?.id ??
         EthiopianPet.tryById(_text(row['pet_species'], ''))?.id ??
         type.defaultPet.id;
     return CircleSummary(

@@ -73,8 +73,7 @@ class _FakeCircleRepository implements CircleRepository {
     required GroupType type,
     required String petId,
     required String petName,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<Circle> joinCircle({required String code}) =>
@@ -107,10 +106,7 @@ void main() {
     ]);
     final container = await _start(repository);
     final circles = container.listen(circlesProvider('u'), (_, _) {});
-    final snapshots = container.listen(
-      circleSnapshotProvider('u'),
-      (_, _) {},
-    );
+    final snapshots = container.listen(circleSnapshotProvider('u'), (_, _) {});
     addTearDown(circles.close);
     addTearDown(snapshots.close);
 
@@ -127,10 +123,7 @@ void main() {
     final repository = _FakeCircleRepository([_summary('c1'), _summary('c2')]);
     final container = await _start(repository);
     final circles = container.listen(circlesProvider('u'), (_, _) {});
-    final snapshots = container.listen(
-      circleSnapshotProvider('u'),
-      (_, _) {},
-    );
+    final snapshots = container.listen(circleSnapshotProvider('u'), (_, _) {});
     addTearDown(circles.close);
     addTearDown(snapshots.close);
 
@@ -154,32 +147,37 @@ void main() {
     expect(container.read(activeCircleControllerProvider('u')), 'c1');
   });
 
-  test('selecting a group persists it and tears down the old snapshot',
-      () async {
-    final repository = _FakeCircleRepository([_summary('c1'), _summary('c2')]);
-    final container = await _start(repository);
-    final circles = container.listen(circlesProvider('u'), (_, _) {});
-    final snapshots = container.listen(
-      circleSnapshotProvider('u'),
-      (_, _) {},
-    );
-    addTearDown(circles.close);
-    addTearDown(snapshots.close);
+  test(
+    'selecting a group persists it and tears down the old snapshot',
+    () async {
+      final repository = _FakeCircleRepository([
+        _summary('c1'),
+        _summary('c2'),
+      ]);
+      final container = await _start(repository);
+      final circles = container.listen(circlesProvider('u'), (_, _) {});
+      final snapshots = container.listen(
+        circleSnapshotProvider('u'),
+        (_, _) {},
+      );
+      addTearDown(circles.close);
+      addTearDown(snapshots.close);
 
-    await container.read(circlesProvider('u').future);
-    await Future<void>.delayed(Duration.zero);
-    expect(repository.watched, ['c1']);
+      await container.read(circlesProvider('u').future);
+      await Future<void>.delayed(Duration.zero);
+      expect(repository.watched, ['c1']);
 
-    final preferences = await SharedPreferences.getInstance();
-    await container
-        .read(activeCircleControllerProvider('u').notifier)
-        .select('c2');
-    await Future<void>.delayed(Duration.zero);
+      final preferences = await SharedPreferences.getInstance();
+      await container
+          .read(activeCircleControllerProvider('u').notifier)
+          .select('c2');
+      await Future<void>.delayed(Duration.zero);
 
-    expect(container.read(activeCircleControllerProvider('u')), 'c2');
-    expect(container.read(activeCircleProvider('u'))?.id, 'c2');
-    expect(ActiveCircleStore(preferences).read('u'), 'c2');
-    expect(repository.watched, ['c1', 'c2']);
-    expect(repository.cancelled, ['c1']);
-  });
+      expect(container.read(activeCircleControllerProvider('u')), 'c2');
+      expect(container.read(activeCircleProvider('u'))?.id, 'c2');
+      expect(ActiveCircleStore(preferences).read('u'), 'c2');
+      expect(repository.watched, ['c1', 'c2']);
+      expect(repository.cancelled, ['c1']);
+    },
+  );
 }

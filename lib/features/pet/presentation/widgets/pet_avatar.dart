@@ -13,8 +13,7 @@ class PetAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final cacheWidth =
-        (size * MediaQuery.devicePixelRatioOf(context)).round();
+    final cacheWidth = (size * MediaQuery.devicePixelRatioOf(context)).round();
     return ClipOval(
       child: SizedBox(
         width: size,
@@ -29,10 +28,7 @@ class PetAvatar extends StatelessWidget {
           errorBuilder: (_, _, _) => ColoredBox(
             color: scheme.surfaceContainerHighest,
             child: Center(
-              child: Text(
-                pet.emoji,
-                style: TextStyle(fontSize: size * 0.48),
-              ),
+              child: Text(pet.emoji, style: TextStyle(fontSize: size * 0.48)),
             ),
           ),
         ),

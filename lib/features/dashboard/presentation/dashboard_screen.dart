@@ -146,8 +146,7 @@ class DashboardScreen extends ConsumerWidget {
                   final me = snapshot.memberById(currentUserId);
                   if (me != null) openMember(me);
                 },
-                onCare: (action) =>
-                    _careForPet(context, ref, circleId, action),
+                onCare: (action) => _careForPet(context, ref, circleId, action),
                 onOpenPet: openCompanion,
                 onNudge: () => ref
                     .read(nudgeControllerProvider.notifier)
@@ -607,7 +606,8 @@ class _EmptyMilestoneCard extends StatelessWidget {
   }
 }
 
-extension on NudgeKind {  String get label => switch (this) {
+extension on NudgeKind {
+  String get label => switch (this) {
     NudgeKind.thinkingOfYou => 'Thinking of you',
     NudgeKind.onMyWay => 'On my way',
     NudgeKind.needYou => 'Missing you',

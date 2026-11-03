@@ -19,12 +19,8 @@ Future<void> showCompanionCard(
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => CompanionCard(
-      pet: pet,
-      state: state,
-      groupType: groupType,
-      now: now,
-    ),
+    builder: (_) =>
+        CompanionCard(pet: pet, state: state, groupType: groupType, now: now),
   );
 }
 
@@ -152,9 +148,9 @@ class CompanionCard extends StatelessWidget {
                       child: Text(
                         pet.funFact,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: scheme.onTertiaryContainer,
-                              height: 1.35,
-                            ),
+                          color: scheme.onTertiaryContainer,
+                          height: 1.35,
+                        ),
                       ),
                     ),
                   ],
@@ -165,16 +161,14 @@ class CompanionCard extends StatelessWidget {
                 children: [
                   Text(
                     'Level ${state.level}',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                    style: Theme.of(context).textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700),
                   ),
                   const Spacer(),
                   Text(
                     '$xpLeft XP to level ${state.level + 1}',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
+                    style: Theme.of(context).textTheme.labelSmall
+                        ?.copyWith(color: scheme.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -216,18 +210,13 @@ class _HabitatLine extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.landscape_rounded,
-            size: 17,
-            color: scheme.secondary,
-          ),
+          Icon(Icons.landscape_rounded, size: 17, color: scheme.secondary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               'Native to $habitat',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurface,
-                  ),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: scheme.onSurface),
             ),
           ),
         ],
@@ -257,11 +246,8 @@ class _Pill extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: foreground,
-              fontSize: 8.5,
-              letterSpacing: 0.6,
-            ),
+        style: Theme.of(context).textTheme.labelSmall
+            ?.copyWith(color: foreground, fontSize: 8.5, letterSpacing: 0.6),
       ),
     );
   }

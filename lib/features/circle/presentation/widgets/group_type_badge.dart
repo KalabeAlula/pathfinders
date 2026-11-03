@@ -20,10 +20,10 @@ class GroupTypeBadge extends StatelessWidget {
       child: Text(
         type.label.toUpperCase(),
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: scheme.onPrimaryContainer,
-              fontSize: 8.5,
-              letterSpacing: 0.7,
-            ),
+          color: scheme.onPrimaryContainer,
+          fontSize: 8.5,
+          letterSpacing: 0.7,
+        ),
       ),
     );
   }

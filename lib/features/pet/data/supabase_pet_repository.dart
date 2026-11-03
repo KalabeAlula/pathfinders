@@ -23,9 +23,7 @@ class SupabasePetRepository implements PetRepository {
       final row = data is Map<String, dynamic>
           ? data
           : Map<String, dynamic>.from(data as Map);
-      return SharedPet.fromCircle(
-        Circle.fromRow(row, memberIds: const []),
-      );
+      return SharedPet.fromCircle(Circle.fromRow(row, memberIds: const []));
     } on sb.PostgrestException catch (error) {
       throw StateError(error.message);
     }

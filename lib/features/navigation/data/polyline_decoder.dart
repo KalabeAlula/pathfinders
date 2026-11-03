@@ -27,9 +27,7 @@ List<GeoPoint> decodePolyline(String encoded) {
     } while (byte >= 0x20);
     longitude += (result & 1) != 0 ? ~(result >> 1) : result >> 1;
 
-    points.add(
-      GeoPoint(latitude: latitude / 1e5, longitude: longitude / 1e5),
-    );
+    points.add(GeoPoint(latitude: latitude / 1e5, longitude: longitude / 1e5));
   }
 
   return points;

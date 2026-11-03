@@ -51,10 +51,10 @@ class CountdownCard extends StatelessWidget {
                       Text(
                         kind.label.toUpperCase(),
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: faded,
-                              fontSize: 8.5,
-                              letterSpacing: 1.1,
-                            ),
+                          color: faded,
+                          fontSize: 8.5,
+                          letterSpacing: 1.1,
+                        ),
                       ),
                       if (onTap != null) const Spacer(),
                       if (onTap != null)
@@ -71,18 +71,16 @@ class CountdownCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: white,
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
-                        ),
+                      color: white,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     formatMilestoneDate(milestone.date),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: faded,
-                          fontSize: 10.5,
-                        ),
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: faded, fontSize: 10.5),
                   ),
                 ],
               ),
@@ -94,22 +92,17 @@ class CountdownCard extends StatelessWidget {
               children: [
                 Text(
                   '$displayDays',
-                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        color: white,
-                        fontSize: 40,
-                        height: 0.95,
-                      ),
+                  style: Theme.of(context).textTheme.displaySmall
+                      ?.copyWith(color: white, fontSize: 40, height: 0.95),
                 ),
                 Text(
                   days == 0
                       ? 'today'
                       : days == 1
-                          ? 'day left'
-                          : 'days left',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: faded,
-                        fontSize: 9,
-                      ),
+                      ? 'day left'
+                      : 'days left',
+                  style: Theme.of(context).textTheme.labelSmall
+                      ?.copyWith(color: faded, fontSize: 9),
                 ),
               ],
             ),
@@ -122,26 +115,23 @@ class CountdownCard extends StatelessWidget {
 
 extension on MilestoneKind {
   List<Color> get colors => switch (this) {
-        MilestoneKind.birthday => const [Color(0xFFB86B4F), Color(0xFF8F4B36)],
-        MilestoneKind.anniversary => const [
-            Color(0xFF8D6F88),
-            Color(0xFF5E4659),
-          ],
-        MilestoneKind.trip => const [Color(0xFF7C8C6B), Color(0xFF56654A)],
-        MilestoneKind.goal => const [Color(0xFFC7974C), Color(0xFF8E6A2F)],
-      };
+    MilestoneKind.birthday => const [Color(0xFFB86B4F), Color(0xFF8F4B36)],
+    MilestoneKind.anniversary => const [Color(0xFF8D6F88), Color(0xFF5E4659)],
+    MilestoneKind.trip => const [Color(0xFF7C8C6B), Color(0xFF56654A)],
+    MilestoneKind.goal => const [Color(0xFFC7974C), Color(0xFF8E6A2F)],
+  };
 
   IconData get icon => switch (this) {
-        MilestoneKind.birthday => Icons.cake_rounded,
-        MilestoneKind.anniversary => Icons.favorite_rounded,
-        MilestoneKind.trip => Icons.luggage_rounded,
-        MilestoneKind.goal => Icons.flag_rounded,
-      };
+    MilestoneKind.birthday => Icons.cake_rounded,
+    MilestoneKind.anniversary => Icons.favorite_rounded,
+    MilestoneKind.trip => Icons.luggage_rounded,
+    MilestoneKind.goal => Icons.flag_rounded,
+  };
 
   String get label => switch (this) {
-        MilestoneKind.birthday => 'Birthday',
-        MilestoneKind.anniversary => 'Milestone',
-        MilestoneKind.trip => 'Trip',
-        MilestoneKind.goal => 'Goal',
-      };
+    MilestoneKind.birthday => 'Birthday',
+    MilestoneKind.anniversary => 'Milestone',
+    MilestoneKind.trip => 'Trip',
+    MilestoneKind.goal => 'Goal',
+  };
 }

@@ -14,12 +14,12 @@ const memberIds = [kaleabId, hanaId, 'user-sofi', 'user-momo'];
 void main() {
   group('Circle', () {
     Circle build(List<String> ids) => Circle(
-          id: circleId,
-          name: 'Bole Crew',
-          inviteCode: 'MOMO24',
-          memberIds: ids,
-          createdAt: DateTime(2025, 3, 14),
-        );
+      id: circleId,
+      name: 'Bole Crew',
+      inviteCode: 'MOMO24',
+      memberIds: ids,
+      createdAt: DateTime(2025, 3, 14),
+    );
 
     test('a four-person circle is full', () {
       final circle = build(memberIds);
@@ -39,13 +39,13 @@ void main() {
 
   group('Group types', () {
     Circle typed(GroupType type, List<String> ids) => Circle(
-          id: circleId,
-          name: 'Bole Crew',
-          inviteCode: 'MOMO24',
-          memberIds: ids,
-          createdAt: DateTime(2025, 3, 14),
-          type: type,
-        );
+      id: circleId,
+      name: 'Bole Crew',
+      inviteCode: 'MOMO24',
+      memberIds: ids,
+      createdAt: DateTime(2025, 3, 14),
+      type: type,
+    );
 
     test('caps match the database contract', () {
       expect(GroupType.couple.capacity, 2);
@@ -101,23 +101,20 @@ void main() {
     });
 
     test('pet care stats parse with safe fallbacks', () {
-      final circle = Circle.fromRow(
-        {
-          'id': circleId,
-          'name': 'Bole Crew',
-          'invite_code': 'MOMO24',
-          'pet_experience': 240,
-          'pet_hunger': 62.5,
-          'pet_energy': 140,
-          'pet_hygiene': -9,
-          'pet_happiness': 76,
-          'pet_last_action': 'feed',
-          'pet_last_action_at': '2025-03-14T06:00:00Z',
-          'pet_updated_at': '2025-03-14T06:00:00Z',
-          'created_at': '2025-03-14T00:00:00Z',
-        },
-        memberIds: const [],
-      );
+      final circle = Circle.fromRow({
+        'id': circleId,
+        'name': 'Bole Crew',
+        'invite_code': 'MOMO24',
+        'pet_experience': 240,
+        'pet_hunger': 62.5,
+        'pet_energy': 140,
+        'pet_hygiene': -9,
+        'pet_happiness': 76,
+        'pet_last_action': 'feed',
+        'pet_last_action_at': '2025-03-14T06:00:00Z',
+        'pet_updated_at': '2025-03-14T06:00:00Z',
+        'created_at': '2025-03-14T00:00:00Z',
+      }, memberIds: const []);
 
       expect(circle.petExperience, 240);
       expect(circle.petHunger, 62.5);
@@ -130,15 +127,12 @@ void main() {
     });
 
     test('rows written before group types fall back safely', () {
-      final circle = Circle.fromRow(
-        {
-          'id': circleId,
-          'name': 'Bole Crew',
-          'invite_code': 'MOMO24',
-          'created_at': '2025-03-14T00:00:00Z',
-        },
-        memberIds: const [],
-      );
+      final circle = Circle.fromRow({
+        'id': circleId,
+        'name': 'Bole Crew',
+        'invite_code': 'MOMO24',
+        'created_at': '2025-03-14T00:00:00Z',
+      }, memberIds: const []);
 
       expect(circle.type, GroupType.friends);
       expect(circle.petId, 'gelada');
@@ -155,18 +149,15 @@ void main() {
     });
 
     test('the switcher summary reports seats and the companion', () {
-      final summary = CircleSummary.fromRow(
-        {
-          'id': circleId,
-          'name': 'Bole Crew',
-          'group_type': 'couple',
-          'pet_id': 'ethiopian_wolf',
-          'pet_name': 'Rusty',
-          'pet_level': 2,
-          'created_at': '2025-03-14T00:00:00Z',
-        },
-        memberCount: 2,
-      );
+      final summary = CircleSummary.fromRow({
+        'id': circleId,
+        'name': 'Bole Crew',
+        'group_type': 'couple',
+        'pet_id': 'ethiopian_wolf',
+        'pet_name': 'Rusty',
+        'pet_level': 2,
+        'created_at': '2025-03-14T00:00:00Z',
+      }, memberCount: 2);
 
       expect(summary.type, GroupType.couple);
       expect(summary.isFull, isTrue);
@@ -194,19 +185,28 @@ void main() {
       members: const [CircleMember(profile: profile, status: null)],
     );
 
-    expect(snapshot.memberById(kaleabId)?.profile.displayName, 'Kaleab Tesfaye');
+    expect(
+      snapshot.memberById(kaleabId)?.profile.displayName,
+      'Kaleab Tesfaye',
+    );
     expect(snapshot.memberById('missing'), isNull);
   });
 
   test('profiles derive initials safely', () {
     expect(
-      const UserProfile(id: '1', displayName: 'Kaleab', avatarColor: 0)
-          .initials,
+      const UserProfile(
+        id: '1',
+        displayName: 'Kaleab',
+        avatarColor: 0,
+      ).initials,
       'K',
     );
     expect(
-      const UserProfile(id: '2', displayName: 'Kaleab Tesfaye', avatarColor: 0)
-          .initials,
+      const UserProfile(
+        id: '2',
+        displayName: 'Kaleab Tesfaye',
+        avatarColor: 0,
+      ).initials,
       'KT',
     );
     expect(

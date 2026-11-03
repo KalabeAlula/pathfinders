@@ -12,10 +12,7 @@ part 'circle_providers.g.dart';
 
 @Riverpod(keepAlive: true)
 CircleRepository circleRepository(Ref ref, String userId) =>
-    SupabaseCircleRepository(
-      ref.watch(supabaseClientProvider),
-      userId: userId,
-    );
+    SupabaseCircleRepository(ref.watch(supabaseClientProvider), userId: userId);
 
 @Riverpod(keepAlive: true)
 ActiveCircleStore activeCircleStore(Ref ref) =>

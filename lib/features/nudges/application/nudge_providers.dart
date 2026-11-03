@@ -33,11 +33,9 @@ class NudgeController extends _$NudgeController {
         .toList(growable: false);
     if (recipients.isEmpty) return;
 
-    final ping = await ref.read(nudgeRepositoryProvider).send(
-          fromUserId: fromUserId,
-          recipientIds: recipients,
-          kind: kind,
-        );
+    final ping = await ref
+        .read(nudgeRepositoryProvider)
+        .send(fromUserId: fromUserId, recipientIds: recipients, kind: kind);
     if (!ref.mounted) return;
 
     state = ping;

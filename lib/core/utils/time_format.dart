@@ -6,7 +6,9 @@ String formatDwell(Duration duration) {
   if (duration.inHours < 1) return '${duration.inMinutes}m';
   if (duration.inDays < 1) {
     final minutes = duration.inMinutes.remainder(60);
-    return minutes == 0 ? '${duration.inHours}h' : '${duration.inHours}h ${minutes}m';
+    return minutes == 0
+        ? '${duration.inHours}h'
+        : '${duration.inHours}h ${minutes}m';
   }
   final hours = duration.inHours.remainder(24);
   return hours == 0 ? '${duration.inDays}d' : '${duration.inDays}d ${hours}h';
@@ -28,7 +30,8 @@ String formatCountdown(int days) {
   return 'In $days days';
 }
 
-String formatMilestoneDate(DateTime date) => DateFormat('EEE, MMM d').format(date);
+String formatMilestoneDate(DateTime date) =>
+    DateFormat('EEE, MMM d').format(date);
 
 String formatDateLine(DateTime date) => DateFormat('EEEE, MMM d').format(date);
 

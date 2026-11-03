@@ -49,8 +49,8 @@ class DashboardHeader extends StatelessWidget {
     final memberLine = memberCount == null
         ? null
         : memberCapacity == null
-            ? (memberCount == 1 ? '1 member' : '$memberCount members')
-            : '$memberCount of $memberCapacity members';
+        ? (memberCount == 1 ? '1 member' : '$memberCount members')
+        : '$memberCount of $memberCapacity members';
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -94,8 +94,7 @@ class DashboardHeader extends StatelessWidget {
                         child: Material(
                           type: MaterialType.transparency,
                           child: InkWell(
-                            borderRadius:
-                                BorderRadius.circular(AppRadius.pill),
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
                             onTap: onOpenGroups,
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 2),
@@ -135,9 +134,7 @@ class DashboardHeader extends StatelessWidget {
                   ],
                 ),
                 Text(
-                  memberLine == null
-                      ? dateLine
-                      : '$memberLine · $dateLine',
+                  memberLine == null ? dateLine : '$memberLine · $dateLine',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall

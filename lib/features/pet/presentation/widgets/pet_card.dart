@@ -57,9 +57,8 @@ class PetCard extends StatelessWidget {
                           pet.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                       ),
                       _LevelPill(level: pet.level),
@@ -87,9 +86,9 @@ class PetCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          height: 1.25,
-                        ),
+                      color: scheme.onSurfaceVariant,
+                      height: 1.25,
+                    ),
                   ),
                   _JoyBar(value: pet.happiness),
                   Row(
@@ -132,10 +131,8 @@ class _LevelPill extends StatelessWidget {
       ),
       child: Text(
         'Lv $level',
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: scheme.onPrimaryContainer,
-              fontSize: 9.5,
-            ),
+        style: Theme.of(context).textTheme.labelSmall
+            ?.copyWith(color: scheme.onPrimaryContainer, fontSize: 9.5),
       ),
     );
   }
@@ -167,10 +164,8 @@ class _JoyBar extends StatelessWidget {
         const SizedBox(width: 7),
         Text(
           '${value.round()}%',
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-                fontSize: 9.5,
-              ),
+          style: Theme.of(context).textTheme.labelSmall
+              ?.copyWith(color: scheme.onSurfaceVariant, fontSize: 9.5),
         ),
       ],
     );
@@ -218,10 +213,8 @@ class _CareButton extends StatelessWidget {
                 const SizedBox(width: 3),
                 Text(
                   action.label,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontSize: 9.5,
-                        color: scheme.onSurface,
-                      ),
+                  style: Theme.of(context).textTheme.labelSmall
+                      ?.copyWith(fontSize: 9.5, color: scheme.onSurface),
                 ),
               ],
             ),
@@ -233,13 +226,13 @@ class _CareButton extends StatelessWidget {
 }
 
 IconData _iconFor(PetCareAction action) => switch (action) {
-      PetCareAction.feed => Icons.restaurant_rounded,
-      PetCareAction.clean => Icons.water_drop_rounded,
-      PetCareAction.play => Icons.sports_esports_rounded,
-    };
+  PetCareAction.feed => Icons.restaurant_rounded,
+  PetCareAction.clean => Icons.water_drop_rounded,
+  PetCareAction.play => Icons.sports_esports_rounded,
+};
 
 Color _tintFor(PetCareAction action, ColorScheme scheme) => switch (action) {
-      PetCareAction.feed => const Color(0xFFD98548),
-      PetCareAction.clean => const Color(0xFF6C93A8),
-      PetCareAction.play => scheme.primary,
-    };
+  PetCareAction.feed => const Color(0xFFD98548),
+  PetCareAction.clean => const Color(0xFF6C93A8),
+  PetCareAction.play => scheme.primary,
+};

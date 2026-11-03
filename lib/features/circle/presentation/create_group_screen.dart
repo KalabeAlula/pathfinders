@@ -122,13 +122,14 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     });
 
     try {
-      final circle =
-          await ref.read(circleRepositoryProvider(widget.userId)).createCircle(
-                name: _name.text.trim(),
-                type: _type,
-                petId: _companion.id,
-                petName: petName,
-              );
+      final circle = await ref
+          .read(circleRepositoryProvider(widget.userId))
+          .createCircle(
+            name: _name.text.trim(),
+            type: _type,
+            petId: _companion.id,
+            petName: petName,
+          );
       ref.invalidate(circlesProvider(widget.userId));
       await ref
           .read(activeCircleControllerProvider(widget.userId).notifier)
@@ -160,9 +161,8 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
   Future<void> _copy(String text, String confirmation) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(confirmation)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(confirmation)));
   }
 
   Future<void> _copyInviteCode() async {
@@ -240,13 +240,15 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Name your group', style: Theme.of(context).textTheme.headlineSmall),
+        Text(
+          'Name your group',
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
         const SizedBox(height: 6),
         Text(
           'Something everyone will recognise at a glance.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: scheme.onSurfaceVariant),
         ),
         const SizedBox(height: AppSpacing.xl),
         TextField(
@@ -280,9 +282,8 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         const SizedBox(height: 6),
         Text(
           'The type sets how many people can join, and which companions fit.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: scheme.onSurfaceVariant),
         ),
         const SizedBox(height: AppSpacing.xl),
         for (final type in GroupType.values) ...[
@@ -310,9 +311,8 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         Text(
           'Your group companion lives on the dashboard and grows as you care '
           'for it together.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: scheme.onSurfaceVariant),
         ),
         const SizedBox(height: AppSpacing.xl),
         for (final companion in _type.pets) ...[
@@ -372,9 +372,8 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         Text(
           '${_type.label} · ${created.petName} · up to ${_type.capacity} people',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: scheme.onSurfaceVariant),
         ),
         const SizedBox(height: AppSpacing.xl),
         Container(
@@ -392,18 +391,16 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
               Text(
                 'INVITE CODE',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontSize: 8,
-                      letterSpacing: 1.3,
-                    ),
+                  color: scheme.onSurfaceVariant,
+                  fontSize: 8,
+                  letterSpacing: 1.3,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 created.inviteCode,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      letterSpacing: 6,
-                      fontWeight: FontWeight.w700,
-                    ),
+                style: Theme.of(context).textTheme.headlineSmall
+                    ?.copyWith(letterSpacing: 6, fontWeight: FontWeight.w700),
               ),
             ],
           ),
@@ -412,18 +409,15 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         Text(
           'Share this code with the people you want in. They can join with it '
           'from their circle screen.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: scheme.onSurfaceVariant),
         ),
         const SizedBox(height: AppSpacing.lg),
         FilledButton.tonalIcon(
           onPressed: _copyInviteCode,
           icon: const Icon(Icons.copy_rounded, size: 18),
           label: const Text('Copy invite code'),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-          ),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
         ),
         const SizedBox(height: AppSpacing.sm),
         TextButton.icon(
@@ -435,14 +429,11 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         Text(
           '${created.memberIds.length} of ${created.capacity} seats filled',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+          style: Theme.of(context).textTheme.labelSmall
+              ?.copyWith(color: scheme.onSurfaceVariant),
         ),
         const SizedBox(height: AppSpacing.xs),
-        Center(
-          child: GroupTypeBadge(type: created.type),
-        ),
+        Center(child: GroupTypeBadge(type: created.type)),
       ],
     );
   }
@@ -466,8 +457,8 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
             label: _step == 2
                 ? 'Create group'
                 : _step == 3
-                    ? 'Open group'
-                    : 'Continue',
+                ? 'Open group'
+                : 'Continue',
             busy: _busy,
             onPressed: switch (_step) {
               2 => _create,
@@ -522,9 +513,8 @@ class _StepRail extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           Text(
             'Step ${step + 1} of ${labels.length} · ${labels[step]}',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
+            style: Theme.of(context).textTheme.labelSmall
+                ?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -589,17 +579,13 @@ class _TypeCard extends StatelessWidget {
                           Expanded(
                             child: Text(
                               type.label,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
+                              style: Theme.of(context).textTheme.titleSmall
                                   ?.copyWith(fontWeight: FontWeight.w700),
                             ),
                           ),
                           Text(
                             '${type.capacity} seats',
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
+                            style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(color: scheme.onSurfaceVariant),
                           ),
                         ],
@@ -607,9 +593,8 @@ class _TypeCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         type.blurb,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant),
                       ),
                     ],
                   ),
