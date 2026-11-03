@@ -18,10 +18,7 @@ class SessionGate extends ConsumerWidget {
     return session.when(
       data: (value) {
         if (value == null) return const AuthScreen();
-        return CircleGate(
-          key: ValueKey(value.userId),
-          userId: value.userId,
-        );
+        return CircleGate(key: ValueKey(value.userId), userId: value.userId);
       },
       loading: () => const GateStatus(
         title: 'Finding your circle',

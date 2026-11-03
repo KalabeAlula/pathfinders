@@ -6,6 +6,8 @@ import '../../../app/widgets/bento_card.dart';
 import '../../../app/widgets/onboarding_shell.dart';
 import '../application/auth_providers.dart';
 import '../domain/auth_failure.dart';
+import 'email_verification_screen.dart';
+import 'forgot_password_screen.dart';
 
 enum _AuthMode { signIn, signUp }
 
@@ -26,7 +28,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   bool _obscurePassword = true;
   bool _busy = false;
   String? _error;
-  String? _pendingEmail;
+  String? _verifyEmail;
 
   @override
   void dispose() {
@@ -71,13 +73,24 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         );
         if (outcome.needsEmailConfirmation && mounted) {
           setState(() {
-            _pendingEmail = email;
+            _verifyEmail = email;
             _passwordController.clear();
           });
         }
       }
     } on AuthFailure catch (failure) {
-      if (mounted) setState(() => _error = failure.message);
+      if (!mounted) return;
+      // The account exists but was never verified: send the code step instead
+      // of leaving the person on a dead-end sign-in error.
+      if (failure.code == 'email_not_confirmed' && _mode == _AuthMode.signIn) {
+        setState(() {
+          _verifyEmail = email;
+          _passwordController.clear();
+          _error = null;
+        });
+        return;
+      }
+      setState(() => _error = failure.message);
     } catch (_) {
       if (mounted) setState(() => _error = 'Something went wrong. Try again.');
     } finally {
@@ -85,18 +98,28 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
   }
 
-  void _returnToSignIn() {
+  void _editEmail() {
     setState(() {
-      _pendingEmail = null;
-      _mode = _AuthMode.signIn;
+      _verifyEmail = null;
       _error = null;
     });
+  }
+
+  void _openForgotPassword() {
+    if (_busy) return;
+    FocusScope.of(context).unfocus();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ForgotPasswordScreen(initialEmail: _emailController.text.trim()),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final pendingEmail = _pendingEmail;
+    final verifyEmail = _verifyEmail;
 
     return AuthShell(
       child: Column(
@@ -106,44 +129,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             subtitle: 'A quiet place for your small circle of people.',
           ),
           const SizedBox(height: AppSpacing.xl),
-          if (pendingEmail != null)
-            BentoCard(
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.mark_email_unread_rounded,
-                    size: 30,
-                    color: scheme.primary,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'Check your inbox',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'We sent a confirmation link to $pendingEmail. Open it once, '
-                    'then come back and sign in.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.tonal(
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(50),
-                      ),
-                      onPressed: _returnToSignIn,
-                      child: const Text('Back to sign in'),
-                    ),
-                  ),
-                ],
-              ),
-            )
+          if (verifyEmail != null)
+            EmailVerificationScreen(email: verifyEmail, onEditEmail: _editEmail)
           else
             BentoCard(
               padding: const EdgeInsets.all(AppSpacing.lg),
@@ -174,7 +161,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         ),
                         validator: (value) {
                           final name = value?.trim() ?? '';
-                          if (name.isEmpty) return 'Add a name your crew knows.';
+                          if (name.isEmpty) {
+                            return 'Add a name your crew knows.';
+                          }
                           if (name.length > 40) {
                             return 'Keep it under 40 characters.';
                           }
@@ -248,6 +237,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         return null;
                       },
                     ),
+                    if (_mode == _AuthMode.signIn)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          key: const ValueKey('auth-forgot-password'),
+                          onPressed: _busy ? null : _openForgotPassword,
+                          child: const Text('Forgot password?'),
+                        ),
+                      ),
                     if (_error != null) ...[
                       const SizedBox(height: AppSpacing.lg),
                       InlineError(message: _error!),
@@ -267,9 +265,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           : 'You will create your circle on the next screen.',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                            fontSize: 10.5,
-                          ),
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 10.5,
+                      ),
                     ),
                   ],
                 ),

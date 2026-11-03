@@ -9,10 +9,7 @@ void main() {
       'fields', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
-        child: MaterialApp(
-          theme: AppTheme.light(),
-          home: const AuthScreen(),
-        ),
+        child: MaterialApp(theme: AppTheme.light(), home: const AuthScreen()),
       ),
     );
 

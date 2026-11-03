@@ -11,6 +11,7 @@ import '../../../auth/application/auth_providers.dart';
 import '../../../location/application/telemetry_providers.dart';
 import '../../../location/domain/device_telemetry.dart';
 import '../../../location/domain/privacy_mode.dart';
+import '../../../location/presentation/widgets/background_location_disclosure.dart';
 import '../../../nudges/application/nudge_providers.dart';
 import '../../application/circle_providers.dart';
 import '../../domain/circle_member.dart';
@@ -23,6 +24,18 @@ typedef _SharingConfig = ({
   bool backgroundGranted,
   bool? notificationsGranted,
 });
+
+Future<void> _requestBackgroundSharing(
+  BuildContext context,
+  WidgetRef ref,
+  String currentUserId,
+) async {
+  final confirmed = await showBackgroundLocationDisclosure(context);
+  if (!confirmed || !context.mounted) return;
+  await ref
+      .read(telemetryControllerProvider(currentUserId).notifier)
+      .requestBackgroundAccess();
+}
 
 Future<void> showMemberDetailSheet(
   BuildContext context, {
@@ -205,9 +218,7 @@ class MemberDetailSheet extends ConsumerWidget {
                       .openLocationSettings(),
                 ),
                 onEnableBackground: () => unawaited(
-                  ref
-                      .read(telemetryControllerProvider(currentUserId).notifier)
-                      .requestBackgroundAccess(),
+                  _requestBackgroundSharing(context, ref, currentUserId),
                 ),
               ),
               const SizedBox(height: 24),

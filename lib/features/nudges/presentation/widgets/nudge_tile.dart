@@ -4,11 +4,7 @@ import '../../../../app/theme/app_tokens.dart';
 import '../../../../app/widgets/bento_card.dart';
 
 class NudgeTile extends StatefulWidget {
-  const NudgeTile({
-    super.key,
-    required this.onSend,
-    this.isSending = false,
-  });
+  const NudgeTile({super.key, required this.onSend, this.isSending = false});
 
   final VoidCallback onSend;
   final bool isSending;
@@ -46,63 +42,81 @@ class _NudgeTileState extends State<NudgeTile>
       borderColor: scheme.primary.withValues(alpha: 0.25),
       onTap: widget.isSending ? null : widget.onSend,
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.sm,
+        ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedBuilder(
-              animation: _pulse,
-              builder: (context, child) {
-                return SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    alignment: Alignment.center,
-                    children: [
-                      for (var i = 0; i < 3; i++)
-                        _Ring(progress: (_pulse.value + i / 3) % 1, color: scheme.primary),
-                      child!,
-                    ],
-                  ),
-                );
-              },
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: scheme.primary,
-                ),
-                child: widget.isSending
-                    ? Padding(
-                        padding: const EdgeInsets.all(10),
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: scheme.onPrimary,
-                        ),
-                      )
-                    : Icon(
-                        Icons.wifi_tethering_rounded,
-                        size: 19,
-                        color: scheme.onPrimary,
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: AnimatedBuilder(
+                  animation: _pulse,
+                  builder: (context, child) {
+                    return SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.center,
+                        children: [
+                          for (var i = 0; i < 3; i++)
+                            _Ring(
+                              progress: (_pulse.value + i / 3) % 1,
+                              color: scheme.primary,
+                            ),
+                          child!,
+                        ],
                       ),
+                    );
+                  },
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: scheme.primary,
+                    ),
+                    child: widget.isSending
+                        ? Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: scheme.onPrimary,
+                            ),
+                          )
+                        : Icon(
+                            Icons.wifi_tethering_rounded,
+                            size: 19,
+                            color: scheme.onPrimary,
+                          ),
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 7),
-            Text(
-              'Nudge',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: onContainer,
-                    fontWeight: FontWeight.w700,
-                  ),
+            const SizedBox(height: 4),
+            Flexible(
+              child: Text(
+                'Nudge',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleSmall
+                    ?.copyWith(color: onContainer, fontWeight: FontWeight.w700),
+              ),
             ),
-            Text(
-              'Send warmth',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: onContainer.withValues(alpha: 0.72),
-                    fontSize: 9,
-                  ),
+            Flexible(
+              child: Text(
+                'Send warmth',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: onContainer.withValues(alpha: 0.72),
+                  fontSize: 9,
+                ),
+              ),
             ),
           ],
         ),

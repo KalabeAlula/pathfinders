@@ -50,3 +50,10 @@ app.*.map.json
 # Local Mapbox public token (copy mapbox.env.example.json)
 mapbox.env.json
 
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+credentials.json
+*.keystore
+
