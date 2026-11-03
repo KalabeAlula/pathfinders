@@ -192,7 +192,10 @@ void main() {
 
     expect(repo.resetEmail, _email);
     expect(find.text('Set new password'), findsOneWidget);
-    expect(find.text('We sent a recovery code to $_email.'), findsOneWidget);
+    expect(
+      find.text('We sent a 6-digit recovery code to $_email.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('mismatched passwords are flagged before verifying the code', (
@@ -247,7 +250,10 @@ void main() {
     );
     await _tapSubmit(tester);
 
-    expect(find.text('Enter the code from your email first.'), findsOneWidget);
+    expect(
+      find.text('Enter the 6-digit code from your email first.'),
+      findsOneWidget,
+    );
     expect(repo.recoveryCode, isNull);
   });
 

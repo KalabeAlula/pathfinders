@@ -135,65 +135,27 @@ Future<void> _dismount(WidgetTester tester) async {
 TextButton _resendButton(WidgetTester tester) =>
     tester.widget<TextButton>(find.byKey(const ValueKey('otp-resend')));
 
-FilledButton _verifyButton(WidgetTester tester) =>
-    tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Verify'));
-
-Future<void> _tapVerify(WidgetTester tester) async {
-  final button = find.widgetWithText(FilledButton, 'Verify');
-  await tester.ensureVisible(button);
-  await tester.tap(button);
-  await tester.pump();
-  await tester.pump();
-}
-
 void main() {
-  testWidgets('sign-up opens the code step and auto-submits eight digits', (
+  testWidgets('sign-up opens the code step and auto-submits six digits', (
     tester,
   ) async {
     final repo = await _openVerification(tester);
 
     expect(find.text('Verify your email'), findsOneWidget);
-    expect(
-      find.text('We sent a verification code to $_email.'),
-      findsOneWidget,
-    );
+    expect(find.text('We sent a 6-digit code to $_email.'), findsOneWidget);
     expect(find.text('Resend code in 1:00'), findsOneWidget);
-    expect(_verifyButton(tester).onPressed, isNull);
-
-    await tester.enterText(
-      find.byKey(const ValueKey('otp-field')),
-      '12345678',
-    );
-    await tester.pump();
-    await tester.pump();
-
-    expect(repo.verifiedEmail, _email);
-    expect(repo.verifiedCode, '12345678');
-
-    await _dismount(tester);
-  });
-
-  testWidgets('a six-digit code verifies through the explicit button', (
-    tester,
-  ) async {
-    final repo = await _openVerification(tester);
 
     await tester.enterText(find.byKey(const ValueKey('otp-field')), '123456');
     await tester.pump();
     await tester.pump();
 
-    // Six digits alone does not auto-submit; the button takes over.
-    expect(repo.verifiedCode, isNull);
-    expect(_verifyButton(tester).onPressed, isNotNull);
-
-    await _tapVerify(tester);
-
+    expect(repo.verifiedEmail, _email);
     expect(repo.verifiedCode, '123456');
 
     await _dismount(tester);
   });
 
-  testWidgets('a pasted code with separators works via the button', (
+  testWidgets('a pasted code with separators still submits the six digits', (
     tester,
   ) async {
     final repo = await _openVerification(tester);
@@ -201,10 +163,6 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('otp-field')), '123 456');
     await tester.pump();
     await tester.pump();
-
-    expect(repo.verifiedCode, isNull);
-
-    await _tapVerify(tester);
 
     expect(repo.verifiedCode, '123456');
 
@@ -225,7 +183,8 @@ void main() {
     );
 
     await tester.enterText(find.byKey(const ValueKey('otp-field')), '000000');
-    await _tapVerify(tester);
+    await tester.pump();
+    await tester.pump();
 
     expect(
       find.text('That code is incorrect. Check the email and try again.'),
@@ -238,12 +197,11 @@ void main() {
           ?.text,
       isEmpty,
     );
-    expect(_verifyButton(tester).onPressed, isNull);
 
     repo.verifyFailure = null;
     await tester.enterText(find.byKey(const ValueKey('otp-field')), '654321');
     await tester.pump();
-    await _tapVerify(tester);
+    await tester.pump();
 
     expect(
       find.text('That code is incorrect. Check the email and try again.'),
@@ -266,7 +224,8 @@ void main() {
     );
 
     await tester.enterText(find.byKey(const ValueKey('otp-field')), '111111');
-    await _tapVerify(tester);
+    await tester.pump();
+    await tester.pump();
 
     expect(
       find.text('That code has expired. Request a new one.'),
@@ -368,7 +327,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Verify your email'), findsOneWidget);
-    expect(find.text('We sent a verification code to $_email.'), findsOneWidget);
+    expect(find.text('We sent a 6-digit code to $_email.'), findsOneWidget);
 
     await _dismount(tester);
   });

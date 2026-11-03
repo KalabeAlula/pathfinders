@@ -5,14 +5,12 @@ import 'package:flutter/services.dart';
 
 import '../../../../app/theme/app_tokens.dart';
 
-/// One-time-code input shared by the sign-up verification and the password
-/// recovery screens.
+/// Six-box one-time-code input shared by the sign-up verification and the
+/// password recovery screens.
 ///
-/// Supabase can be configured to send anywhere from 6 to 8 digits, so the
-/// input renders [maxLength] boxes and lets the parent decide when a partial
-/// code is submittable via [CodeInputState.code]: [onCompleted] fires once
-/// the full [maxLength] digits land (auto-submit), while shorter codes go
-/// through an explicit button.
+/// Supabase is configured to send exactly 6 digits, so the input is strictly
+/// 6 boxes: [onCompleted] fires once the sixth digit lands and the parent
+/// decides what to do with the code.
 ///
 /// A single hidden [TextField] drives the boxes, so typing, keyboard paste,
 /// and one-time-code autofill all work. Set [error] to colour the boxes red
@@ -24,19 +22,15 @@ class CodeInput extends StatefulWidget {
     this.onChanged,
     this.error,
     this.enabled = true,
-    this.maxLength = 8,
-  }) : assert(maxLength >= 6);
+  });
 
-  /// Shortest code the parent will accept on an explicit submit.
-  static const minLength = 6;
+  /// The exact code length Supabase emails.
+  static const codeLength = 6;
 
   final ValueChanged<String> onCompleted;
   final ValueChanged<String>? onChanged;
   final String? error;
   final bool enabled;
-
-  /// Box count and the length at which [onCompleted] fires.
-  final int maxLength;
 
   @override
   State<CodeInput> createState() => CodeInputState();
@@ -85,12 +79,9 @@ class CodeInputState extends State<CodeInput>
     _focusNode.requestFocus();
   }
 
-  /// The digits entered so far.
-  String get code => _controller.text;
-
   void _onChanged(String value) {
     widget.onChanged?.call(value);
-    if (value.length == widget.maxLength) widget.onCompleted(value);
+    if (value.length == CodeInput.codeLength) widget.onCompleted(value);
   }
 
   @override
@@ -98,8 +89,8 @@ class CodeInputState extends State<CodeInput>
     final scheme = Theme.of(context).colorScheme;
     final digits = _controller.text;
     final focused = _focusNode.hasFocus;
-    final activeIndex = digits.length >= widget.maxLength
-        ? widget.maxLength - 1
+    final activeIndex = digits.length >= CodeInput.codeLength
+        ? CodeInput.codeLength - 1
         : digits.length;
 
     return AnimatedBuilder(
@@ -115,7 +106,7 @@ class CodeInputState extends State<CodeInput>
           children: [
             Row(
               children: [
-                for (var i = 0; i < widget.maxLength; i++) ...[
+                for (var i = 0; i < CodeInput.codeLength; i++) ...[
                   if (i > 0) const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: AnimatedContainer(
@@ -157,7 +148,7 @@ class CodeInputState extends State<CodeInput>
                 enableSuggestions: false,
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(widget.maxLength),
+                  LengthLimitingTextInputFormatter(CodeInput.codeLength),
                 ],
                 style: const TextStyle(
                   height: 58,

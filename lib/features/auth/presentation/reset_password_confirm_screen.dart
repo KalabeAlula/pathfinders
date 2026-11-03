@@ -85,10 +85,10 @@ class _ResetPasswordConfirmScreenState
     if (_busy) return;
     FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (_code.length < CodeInput.minLength) {
+    if (!RegExp(r'^\d{6}$').hasMatch(_code)) {
       setState(() {
-        _error = 'Enter the code from your email first.';
-        _codeError = 'Enter the code from your email first.';
+        _error = 'Enter the 6-digit code from your email first.';
+        _codeError = 'Enter the 6-digit code from your email first.';
       });
       return;
     }
@@ -216,7 +216,7 @@ class _ResetPasswordConfirmScreenState
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'We sent a recovery code to ${widget.email}.',
+                    'We sent a 6-digit recovery code to ${widget.email}.',
                     style: Theme.of(context).textTheme.bodyMedium
                         ?.copyWith(color: scheme.onSurfaceVariant),
                   ),
