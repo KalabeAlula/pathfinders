@@ -80,6 +80,21 @@ class _FakeCircleRepository implements CircleRepository {
   @override
   Future<Circle> joinCircle({required String code}) =>
       throw UnimplementedError();
+
+  @override
+  Future<void> leaveCircle({required String circleId}) async {}
+
+  @override
+  Future<void> deleteCircle({required String circleId}) async {}
+
+  @override
+  Future<void> renameCircle({
+    required String circleId,
+    required String name,
+  }) async {}
+
+  @override
+  Future<String> rotateInviteCode({required String circleId}) async => 'NEW234';
 }
 
 class _Host extends StatelessWidget {
@@ -162,7 +177,7 @@ void main() {
     expect(find.text('Your groups'), findsNothing);
   });
 
-  testWidgets('Create New Group opens the four-step flow', (tester) async {
+  testWidgets('Create Circle opens the four-step flow', (tester) async {
     final repository = _FakeCircleRepository([
       _summary('c1', name: 'Bole Crew'),
     ]);
@@ -172,7 +187,7 @@ void main() {
     await tester.tap(find.text('Open groups'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Create New Group'));
+    await tester.tap(find.text('Create Circle'));
     await tester.pumpAndSettle();
 
     expect(find.byType(CreateGroupScreen), findsOneWidget);

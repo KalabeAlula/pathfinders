@@ -10,6 +10,7 @@ import '../../chat/application/chat_providers.dart';
 import '../../chat/presentation/widgets/group_chat_sheet.dart';
 import '../../circle/domain/circle_member.dart';
 import '../../circle/domain/circle_snapshot.dart';
+import '../../circle/presentation/widgets/circle_settings_sheet.dart';
 import '../../circle/presentation/widgets/group_switcher_sheet.dart';
 import '../../circle/presentation/widgets/member_detail_sheet.dart';
 import '../../circle/presentation/widgets/member_presence_header.dart';
@@ -164,6 +165,11 @@ class DashboardScreen extends ConsumerWidget {
                 onChat: openChat,
                 onOpenGroups: () =>
                     showGroupSwitcher(context, userId: currentUserId),
+                onOpenSettings: () => showCircleSettings(
+                  context,
+                  userId: currentUserId,
+                  snapshot: snapshot,
+                ),
                 onAddMilestone: () => showMilestoneComposer(
                   context,
                   circleId: circleId,
@@ -243,6 +249,7 @@ class _DashboardBody extends StatelessWidget {
     required this.onAddMilestone,
     required this.onChat,
     required this.onOpenGroups,
+    required this.onOpenSettings,
   });
 
   final CircleSnapshot snapshot;
@@ -263,6 +270,7 @@ class _DashboardBody extends StatelessWidget {
   final VoidCallback onAddMilestone;
   final VoidCallback onChat;
   final VoidCallback onOpenGroups;
+  final VoidCallback onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -295,6 +303,7 @@ class _DashboardBody extends StatelessWidget {
             petName: snapshot.circle.petName,
             onOpenGroups: onOpenGroups,
             onOpenPet: onOpenPet,
+            onOpenSettings: onOpenSettings,
           ),
         ),
         const SizedBox(height: 18),

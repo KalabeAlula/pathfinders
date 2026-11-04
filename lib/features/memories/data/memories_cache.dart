@@ -50,6 +50,9 @@ class MemoriesCache {
     return _preferences.setString(_key, encoded);
   }
 
+  /// Drops the cached feed after the member leaves or the circle is deleted.
+  Future<void> clear() => _preferences.remove(_key);
+
   static Map<String, Object?> _encode(MemoryPost memory) => {
     'id': memory.id,
     'authorId': memory.authorId,

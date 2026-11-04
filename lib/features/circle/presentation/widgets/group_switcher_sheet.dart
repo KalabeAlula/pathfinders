@@ -9,6 +9,7 @@ import '../../domain/circle_failure.dart';
 import '../../domain/circle_summary.dart';
 import '../create_group_screen.dart';
 import 'group_type_badge.dart';
+import 'join_circle_sheet.dart';
 
 Future<void> showGroupSwitcher(BuildContext context, {required String userId}) {
   return showModalBottomSheet<void>(
@@ -133,21 +134,42 @@ class GroupSwitcherSheet extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
-              OutlinedButton.icon(
-                onPressed: () {
-                  final navigator = Navigator.of(context);
-                  navigator.pop();
-                  navigator.push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => CreateGroupScreen(userId: userId),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        final navigator = Navigator.of(context);
+                        navigator.pop();
+                        navigator.push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => CreateGroupScreen(userId: userId),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Create Circle'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(50),
+                      ),
                     ),
-                  );
-                },
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Create New Group'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(50),
-                ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        final navigator = Navigator.of(context);
+                        navigator.pop();
+                        showJoinCircleSheet(navigator.context, userId: userId);
+                      },
+                      icon: const Icon(Icons.login_rounded, size: 18),
+                      label: const Text('Join a Circle'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(50),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

@@ -33,6 +33,8 @@ class _FakeCircleRepository implements CircleRepository {
   final _summaryController = StreamController<List<CircleSummary>>.broadcast();
   final List<String> watched = [];
   final List<String> cancelled = [];
+  final List<String> left = [];
+  final List<String> deleted = [];
 
   @override
   Stream<List<CircleSummary>> watchCircles() {
@@ -78,6 +80,27 @@ class _FakeCircleRepository implements CircleRepository {
   @override
   Future<Circle> joinCircle({required String code}) =>
       throw UnimplementedError();
+
+  @override
+  Future<void> leaveCircle({required String circleId}) async {
+    left.add(circleId);
+    summaries.removeWhere((circle) => circle.id == circleId);
+  }
+
+  @override
+  Future<void> deleteCircle({required String circleId}) async {
+    deleted.add(circleId);
+    summaries.removeWhere((circle) => circle.id == circleId);
+  }
+
+  @override
+  Future<void> renameCircle({
+    required String circleId,
+    required String name,
+  }) async {}
+
+  @override
+  Future<String> rotateInviteCode({required String circleId}) async => 'NEW234';
 }
 
 Future<ProviderContainer> _start(_FakeCircleRepository repository) async {
@@ -180,4 +203,57 @@ void main() {
       expect(repository.cancelled, ['c1']);
     },
   );
+
+  test(
+    'leaving the active group falls back to the oldest remaining one',
+    () async {
+      final repository = _FakeCircleRepository([
+        _summary('c1'),
+        _summary('c2'),
+      ]);
+      final container = await _start(repository);
+      final circles = container.listen(circlesProvider('u'), (_, _) {});
+      final snapshots = container.listen(
+        circleSnapshotProvider('u'),
+        (_, _) {},
+      );
+      addTearDown(circles.close);
+      addTearDown(snapshots.close);
+
+      await container.read(circlesProvider('u').future);
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(activeCircleControllerProvider('u')), 'c1');
+
+      final preferences = await SharedPreferences.getInstance();
+      await container
+          .read(activeCircleControllerProvider('u').notifier)
+          .leaveCircle('c1');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.left, ['c1']);
+      expect(container.read(activeCircleControllerProvider('u')), 'c2');
+      expect(ActiveCircleStore(preferences).read('u'), 'c2');
+      expect(repository.watched, ['c1', 'c2']);
+      expect(repository.cancelled, ['c1']);
+    },
+  );
+
+  test('leaving the only group clears the saved active id', () async {
+    final repository = _FakeCircleRepository([_summary('c1')]);
+    final container = await _start(repository);
+    final circles = container.listen(circlesProvider('u'), (_, _) {});
+    addTearDown(circles.close);
+
+    await container.read(circlesProvider('u').future);
+    await Future<void>.delayed(Duration.zero);
+
+    final preferences = await SharedPreferences.getInstance();
+    await container
+        .read(activeCircleControllerProvider('u').notifier)
+        .leaveCircle('c1');
+    await Future<void>.delayed(Duration.zero);
+
+    expect(container.read(activeCircleControllerProvider('u')), isNull);
+    expect(ActiveCircleStore(preferences).read('u'), isNull);
+  });
 }

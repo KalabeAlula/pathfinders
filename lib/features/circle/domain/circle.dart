@@ -12,6 +12,7 @@ class Circle {
     required this.memberIds,
     required this.createdAt,
     this.type = GroupType.friends,
+    this.createdBy,
     this.petId = 'lovebird',
     this.petName = 'Momo',
     this.petLevel = 1,
@@ -36,6 +37,8 @@ class Circle {
   final List<String> memberIds;
   final DateTime createdAt;
   final GroupType type;
+  /// Null when the creator's profile has since been removed.
+  final String? createdBy;
   final String petId;
   final String petName;
   final int petLevel;
@@ -73,6 +76,7 @@ class Circle {
       memberIds: memberIds,
       createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
       type: type,
+      createdBy: _optionalText(row['created_by']),
       petId: petId,
       petName: _text(row['pet_name'], EthiopianPet.byId(petId).defaultName),
       petLevel: _positiveInt(row['pet_level']),

@@ -48,6 +48,10 @@ class MilestonesCache {
     return _preferences.setString(_key, encoded);
   }
 
+  /// Drops the cached countdowns after the member leaves or the circle is
+  /// deleted.
+  Future<void> clear() => _preferences.remove(_key);
+
   static Map<String, Object?> _encode(SharedMilestone milestone) => {
     'id': milestone.id,
     'title': milestone.title,

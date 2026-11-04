@@ -23,4 +23,6 @@ class ChatSeenStore {
       seenAt.toUtc().toIso8601String(),
     );
   }
+
+  Future<void> clear(String circleId) => _preferences.remove(_key(circleId));
 }

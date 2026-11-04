@@ -25,6 +25,7 @@ class DashboardHeader extends StatelessWidget {
     this.petName,
     this.onOpenGroups,
     this.onOpenPet,
+    this.onOpenSettings,
   });
 
   final String greeting;
@@ -42,6 +43,7 @@ class DashboardHeader extends StatelessWidget {
   final String? petName;
   final VoidCallback? onOpenGroups;
   final VoidCallback? onOpenPet;
+  final VoidCallback? onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -208,6 +210,32 @@ class DashboardHeader extends StatelessWidget {
             child: ChatBadgeButton(unreadCount: unreadCount, onTap: onChat),
           ),
         ),
+        if (onOpenSettings != null) ...[
+          const SizedBox(width: 8),
+          Tooltip(
+            message: 'Circle details',
+            child: Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppSpacing.lg),
+                onTap: onOpenSettings,
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(AppSpacing.lg),
+                    border: Border.all(color: scheme.outlineVariant),
+                  ),
+                  child: Icon(
+                    Icons.tune_rounded,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

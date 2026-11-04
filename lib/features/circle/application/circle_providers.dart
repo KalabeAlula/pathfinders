@@ -2,6 +2,9 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/storage/storage_providers.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../chat/application/chat_providers.dart';
+import '../../memories/application/memories_providers.dart';
+import '../../milestones/application/milestones_providers.dart';
 import '../data/active_circle_store.dart';
 import '../data/supabase_circle_repository.dart';
 import '../domain/circle_repository.dart';
@@ -47,6 +50,68 @@ class ActiveCircleController extends _$ActiveCircleController {
     await ref.read(activeCircleStoreProvider).write(userId, circleId);
     if (!ref.mounted) return;
     state = circleId;
+  }
+
+  Future<void> leaveCircle(String circleId) async {
+    await ref
+        .read(circleRepositoryProvider(userId))
+        .leaveCircle(circleId: circleId);
+    await _forgetMembership(circleId);
+  }
+
+  Future<void> deleteCircle(String circleId) async {
+    await ref
+        .read(circleRepositoryProvider(userId))
+        .deleteCircle(circleId: circleId);
+    await _forgetMembership(circleId);
+  }
+
+  Future<void> renameCircle(String circleId, String name) async {
+    await ref
+        .read(circleRepositoryProvider(userId))
+        .renameCircle(circleId: circleId, name: name);
+    // The switcher names groups from this list; realtime also refreshes it,
+    // but invalidating makes the new name immediate.
+    ref.invalidate(circlesProvider(userId));
+  }
+
+  Future<String> rotateInviteCode(String circleId) {
+    return ref
+        .read(circleRepositoryProvider(userId))
+        .rotateInviteCode(circleId: circleId);
+  }
+
+  /// Clears this device's cached view of the circle and moves the active id
+  /// when the circle that just vanished was the one on screen.
+  Future<void> _forgetMembership(String circleId) async {
+    await Future.wait([
+      ref.read(memoriesCacheProvider(circleId)).clear(),
+      ref.read(milestonesCacheProvider(circleId)).clear(),
+      ref.read(chatSeenStoreProvider).clear(circleId),
+    ]);
+
+    final remaining = <CircleSummary>[
+      for (final circle
+          in ref.read(circlesProvider(userId)).value ?? const <CircleSummary>[])
+        if (circle.id != circleId) circle,
+    ];
+
+    if (state == circleId) {
+      if (remaining.isEmpty) {
+        await ref.read(activeCircleStoreProvider).clear(userId);
+        if (!ref.mounted) return;
+        state = null;
+      } else {
+        await ref
+            .read(activeCircleStoreProvider)
+            .write(userId, remaining.first.id);
+        if (!ref.mounted) return;
+        state = remaining.first.id;
+      }
+    }
+
+    // Realtime normally refreshes the list; this makes the switch immediate.
+    ref.invalidate(circlesProvider(userId));
   }
 }
 

@@ -18,4 +18,16 @@ abstract interface class CircleRepository {
   });
 
   Future<Circle> joinCircle({required String code});
+
+  /// Removes the caller from the circle. The creator must delete instead.
+  Future<void> leaveCircle({required String circleId});
+
+  /// Permanently removes the circle and everything it owns. Creator only.
+  Future<void> deleteCircle({required String circleId});
+
+  /// Renames the circle. Creator only.
+  Future<void> renameCircle({required String circleId, required String name});
+
+  /// Issues a fresh invite code and returns it. Creator only.
+  Future<String> rotateInviteCode({required String circleId});
 }

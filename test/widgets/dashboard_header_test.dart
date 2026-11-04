@@ -49,6 +49,7 @@ void main() {
   ) async {
     var opened = 0;
     var petOpened = 0;
+    var settingsOpened = 0;
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -70,6 +71,7 @@ void main() {
               petName: 'Chele',
               onOpenGroups: () => opened++,
               onOpenPet: () => petOpened++,
+              onOpenSettings: () => settingsOpened++,
             ),
           ),
         ),
@@ -86,5 +88,8 @@ void main() {
 
     await tester.tap(find.byType(PetAvatar));
     expect(petOpened, 1);
+
+    await tester.tap(find.byTooltip('Circle details'));
+    expect(settingsOpened, 1);
   });
 }

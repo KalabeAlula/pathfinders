@@ -122,6 +122,52 @@ class SupabaseCircleRepository implements CircleRepository {
     return Circle.fromRow(row, memberIds: [userId]);
   }
 
+  @override
+  Future<void> leaveCircle({required String circleId}) {
+    return _runVoidRpc(
+      () => _client.rpc('leave_circle', params: {'p_circle_id': circleId}),
+    );
+  }
+
+  @override
+  Future<void> deleteCircle({required String circleId}) {
+    return _runVoidRpc(
+      () => _client.rpc('delete_circle', params: {'p_circle_id': circleId}),
+    );
+  }
+
+  @override
+  Future<void> renameCircle({required String circleId, required String name}) {
+    return _runVoidRpc(
+      () => _client.rpc(
+        'rename_circle',
+        params: {'p_circle_id': circleId, 'p_name': name.trim()},
+      ),
+    );
+  }
+
+  @override
+  Future<String> rotateInviteCode({required String circleId}) async {
+    try {
+      final data = await _client.rpc(
+        'rotate_invite_code',
+        params: {'p_circle_id': circleId},
+      );
+      if (data is String && data.isNotEmpty) return data;
+      throw const CircleFailure('Could not issue a new invite code.');
+    } on sb.PostgrestException catch (error) {
+      throw _mapFailure(error);
+    }
+  }
+
+  Future<void> _runVoidRpc(Future<Object?> Function() call) async {
+    try {
+      await call();
+    } on sb.PostgrestException catch (error) {
+      throw _mapFailure(error);
+    }
+  }
+
   Future<Map<String, dynamic>> _runRpc(Future<Object?> Function() call) async {
     try {
       final data = await call();
@@ -181,7 +227,8 @@ class SupabaseCircleRepository implements CircleRepository {
       final circleRow = await _client
           .from('circles')
           .select(
-            'id, name, invite_code, group_type, pet_id, pet_species, pet_name, '
+            'id, name, invite_code, group_type, created_by, pet_id, '
+            'pet_species, pet_name, '
             'pet_level, pet_mood, pet_experience, pet_hunger, pet_energy, '
             'pet_hygiene, pet_happiness, pet_last_action, pet_last_action_at, '
             'pet_updated_at, created_at',
@@ -260,8 +307,15 @@ class SupabaseCircleRepository implements CircleRepository {
     final message = switch (error.code) {
       '23505' => 'You are already in this circle.',
       '23514' => 'This circle is full.',
-      'P0002' => 'No circle matches that invite code.',
-      '42501' => 'Sign in again to continue.',
+      'P0002' =>
+        error.message.trim().isEmpty
+            ? 'No circle matches that invite code.'
+            : error.message,
+      // RPCs raise 42501 with their own copy; keep it when present.
+      '42501' =>
+        error.message.trim().isEmpty
+            ? 'Sign in again to continue.'
+            : error.message,
       '22023' || 'P0001' => error.message,
       _ => null,
     };
