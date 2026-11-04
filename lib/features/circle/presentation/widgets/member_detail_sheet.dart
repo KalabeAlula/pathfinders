@@ -13,8 +13,11 @@ import '../../../location/domain/device_telemetry.dart';
 import '../../../location/domain/privacy_mode.dart';
 import '../../../location/presentation/widgets/background_location_disclosure.dart';
 import '../../../nudges/application/nudge_providers.dart';
+import '../../../nudges/domain/nudge.dart';
+import '../../../nudges/domain/nudge_repository.dart';
 import '../../application/circle_providers.dart';
 import '../../domain/circle_member.dart';
+import '../../domain/group_type.dart';
 import '../member_status_label.dart';
 
 typedef _SharingConfig = ({
@@ -75,6 +78,8 @@ class MemberDetailSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final snapshot = ref.watch(circleSnapshotProvider(currentUserId)).value;
     final member = snapshot?.memberById(memberId) ?? initialMember;
+    final circle = snapshot?.circle;
+    final warmth = NudgeWarmth.defaultFor(circle?.type ?? GroupType.fallback);
     final status = member.status;
     // The sharing controls depend on permission and mode, not on the fix
     // itself, so GPS ticks must not rebuild the sheet.
@@ -251,18 +256,45 @@ class MemberDetailSheet extends ConsumerWidget {
                   style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(52),
                   ),
-                  onPressed: () async {
-                    final controller = ref.read(
-                      nudgeControllerProvider.notifier,
-                    );
-                    Navigator.of(context).pop();
-                    await controller.sendNudge(
-                      fromUserId: currentUserId,
-                      recipientIds: [memberId],
-                    );
-                  },
-                  icon: const Icon(Icons.wifi_tethering_rounded, size: 20),
-                  label: Text('Send ${member.profile.firstName} a nudge'),
+                  onPressed: circle == null
+                      ? null
+                      : () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final controller = ref.read(
+                            nudgeControllerProvider(
+                              circle.id,
+                              currentUserId,
+                            ).notifier,
+                          );
+                          final senderName =
+                              snapshot
+                                  ?.memberById(currentUserId)
+                                  ?.profile
+                                  .firstName ??
+                              'Someone';
+                          Navigator.of(context).pop();
+                          try {
+                            await controller.send(
+                              senderId: currentUserId,
+                              senderName: senderName,
+                              targetId: memberId,
+                              targetName: member.profile.firstName,
+                              warmth: warmth,
+                            );
+                          } on NudgeFailure catch (failure) {
+                            messenger.showSnackBar(
+                              SnackBar(content: Text(failure.message)),
+                            );
+                          }
+                        },
+                  icon: Text(
+                    warmth.emoji,
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                  label: Text(
+                    'Send ${member.profile.firstName} a '
+                    '${warmth.label.toLowerCase()}',
+                  ),
                 ),
               ),
             ],

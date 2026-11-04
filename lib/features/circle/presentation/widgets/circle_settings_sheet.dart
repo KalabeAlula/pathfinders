@@ -639,25 +639,41 @@ class _CircleSettingsSheetState extends ConsumerState<CircleSettingsSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'INVITE CODE',
+                            'Invite code',
                             style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(
                                   color: scheme.onSurfaceVariant,
-                                  letterSpacing: 1.2,
+                                  letterSpacing: 0.6,
                                 ),
                           ),
                           const SizedBox(height: 2),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              _inviteCode,
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(letterSpacing: 4),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
                           Text(
-                            _inviteCode,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(letterSpacing: 3),
+                            'Share this code so someone can join $_name.',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: scheme.onSurfaceVariant),
                           ),
                         ],
                       ),
                     ),
-                    TextButton.icon(
+                    const SizedBox(width: AppSpacing.sm),
+                    FilledButton.tonalIcon(
                       key: const ValueKey('copy-invite-code'),
                       onPressed: _copyInviteCode,
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                      ),
                       icon: const Icon(Icons.copy_rounded, size: 16),
                       label: const Text('Copy'),
                     ),

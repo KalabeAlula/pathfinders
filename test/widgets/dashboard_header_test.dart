@@ -15,8 +15,6 @@ Widget _host({required int unreadCount, required VoidCallback onChat}) {
           firstName: 'Kaleab',
           circleName: 'Trail crew',
           dateLine: 'Sunday, Nov 2',
-          inviteCode: 'ABC123',
-          onCopyInvite: () {},
           unreadCount: unreadCount,
           onChat: onChat,
         ),
@@ -44,7 +42,7 @@ void main() {
     expect(find.text('0'), findsNothing);
   });
 
-  testWidgets('shows the active group identity and opens the switcher', (
+  testWidgets('shows the active group identity without the invite code', (
     tester,
   ) async {
     var opened = 0;
@@ -60,8 +58,6 @@ void main() {
               firstName: 'Kaleab',
               circleName: 'Trail crew',
               dateLine: 'Sunday, Nov 2',
-              inviteCode: 'ABC123',
-              onCopyInvite: () {},
               unreadCount: 0,
               onChat: () {},
               type: GroupType.friends,
@@ -82,6 +78,8 @@ void main() {
     expect(find.byType(PetAvatar), findsOneWidget);
     expect(find.text('FRIENDS'), findsOneWidget);
     expect(find.text('3 of 4 members · Sunday, Nov 2'), findsOneWidget);
+    expect(find.text('ABC123'), findsNothing);
+    expect(find.text('INVITE'), findsNothing);
 
     await tester.tap(find.text('Trail crew'));
     expect(opened, 1);
@@ -89,7 +87,82 @@ void main() {
     await tester.tap(find.byType(PetAvatar));
     expect(petOpened, 1);
 
-    await tester.tap(find.byTooltip('Circle details'));
+    await tester.tap(find.byKey(const ValueKey('group-type-pill')));
     expect(settingsOpened, 1);
+  });
+
+  testWidgets('the type pill carries an icon for every group kind', (
+    tester,
+  ) async {
+    Future<void> pumpType(GroupType type) {
+      return tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: DashboardHeader(
+              greeting: 'Good morning',
+              firstName: 'Kaleab',
+              circleName: 'Trail crew',
+              dateLine: 'Sunday, Nov 2',
+              unreadCount: 0,
+              onChat: () {},
+              type: type,
+              onOpenSettings: () {},
+            ),
+          ),
+        ),
+      );
+    }
+
+    await pumpType(GroupType.couple);
+    expect(find.byIcon(Icons.favorite_rounded), findsOneWidget);
+    expect(find.text('COUPLE'), findsOneWidget);
+
+    await pumpType(GroupType.friends);
+    expect(find.byIcon(Icons.groups_rounded), findsOneWidget);
+
+    await pumpType(GroupType.family);
+    expect(find.byIcon(Icons.home_rounded), findsOneWidget);
+    expect(find.text('FAMILY'), findsOneWidget);
+  });
+
+  testWidgets('fits a 360dp phone at 1.2x text', (tester) async {
+    tester.view.physicalSize = const Size(720, 1600);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(1.2)),
+          child: child!,
+        ),
+        home: Scaffold(
+          body: Padding(
+            padding: const EdgeInsets.all(16),
+            child: DashboardHeader(
+              greeting: 'Good morning',
+              firstName: 'Kaleab',
+              circleName: 'The Bole Trail Crew',
+              dateLine: 'Sunday, Nov 2',
+              unreadCount: 12,
+              onChat: () {},
+              type: GroupType.family,
+              memberCount: 6,
+              memberCapacity: 6,
+              pet: EthiopianPet.waliaIbex,
+              petName: 'Walia',
+              onOpenGroups: () {},
+              onOpenPet: () {},
+              onOpenSettings: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('group-type-pill')), findsOneWidget);
   });
 }

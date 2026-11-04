@@ -348,7 +348,7 @@ final class ActiveCircleControllerProvider
 }
 
 String _$activeCircleControllerHash() =>
-    r'69e64c626f9278e4656faa4ba6e3e69976bbe352';
+    r'ad6d4867a4642b764252bc3130f3360e10842bd0';
 
 /// The group currently on screen. A saved id wins only while it still matches
 /// a membership; otherwise the oldest group is used so a removed group cannot

@@ -13,12 +13,18 @@ class MemberCard extends StatelessWidget {
     required this.isCurrentUser,
     required this.now,
     required this.onTap,
+    this.warmthEmoji,
+    this.onWarmth,
+    this.onWarmthOptions,
   });
 
   final CircleMember member;
   final bool isCurrentUser;
   final DateTime now;
   final VoidCallback onTap;
+  final String? warmthEmoji;
+  final VoidCallback? onWarmth;
+  final VoidCallback? onWarmthOptions;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +48,7 @@ class MemberCard extends StatelessWidget {
           child: InkWell(
             borderRadius: radius,
             onTap: onTap,
+            onLongPress: onWarmthOptions,
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
               child: Column(
@@ -99,6 +106,16 @@ class MemberCard extends StatelessWidget {
                         const SizedBox(width: 5),
                         _YouBadge(color: scheme.secondaryContainer),
                       ],
+                      if (warmthEmoji != null) ...[
+                        const Spacer(),
+                        _WarmthButton(
+                          emoji: warmthEmoji!,
+                          memberId: member.profile.id,
+                          memberName: member.profile.firstName,
+                          onTap: onWarmth,
+                          onLongPress: onWarmthOptions,
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -114,6 +131,48 @@ class MemberCard extends StatelessWidget {
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WarmthButton extends StatelessWidget {
+  const _WarmthButton({
+    required this.emoji,
+    required this.memberId,
+    required this.memberName,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  final String emoji;
+  final String memberId;
+  final String memberName;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      label: 'Send $memberName warmth. Hold for more options.',
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          key: ValueKey('warmth-$memberId'),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Text(emoji, style: const TextStyle(fontSize: 13)),
           ),
         ),
       ),

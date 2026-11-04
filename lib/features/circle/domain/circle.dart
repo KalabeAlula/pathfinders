@@ -37,6 +37,7 @@ class Circle {
   final List<String> memberIds;
   final DateTime createdAt;
   final GroupType type;
+
   /// Null when the creator's profile has since been removed.
   final String? createdBy;
   final String petId;

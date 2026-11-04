@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/app_tokens.dart';
@@ -30,10 +29,11 @@ import '../../milestones/presentation/widgets/countdown_card.dart';
 import '../../milestones/presentation/widgets/milestone_composer_sheet.dart';
 import '../../nudges/application/nudge_providers.dart';
 import '../../nudges/domain/nudge.dart';
+import '../../nudges/domain/nudge_repository.dart';
+import '../../nudges/presentation/widgets/warmth_banner.dart';
+import '../../nudges/presentation/widgets/warmth_picker.dart';
 import '../../navigation/presentation/destination_picker_screen.dart';
 import '../../navigation/presentation/widgets/arrival_card.dart';
-import '../../nudges/presentation/widgets/nudge_overlay.dart';
-import '../../nudges/presentation/widgets/nudge_tile.dart';
 import '../../pet/application/pet_providers.dart';
 import '../../pet/domain/ethiopian_pet.dart';
 import '../../pet/domain/pet_care_action.dart';
@@ -54,7 +54,6 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activeNudge = ref.watch(nudgeControllerProvider);
     // Only permission and privacy mode change the banner; watching the whole
     // telemetry state would rebuild the dashboard on every GPS fix.
     final sharingNotice = ref.watch(
@@ -65,6 +64,9 @@ class DashboardScreen extends ConsumerWidget {
     final pet = petState.decayed(now.difference(petState.updatedAt), now);
 
     final circleId = snapshot.circle.id;
+    final activeNudge = ref.watch(
+      nudgeControllerProvider(circleId, currentUserId),
+    );
     // Keeps the thread stream warm on Home so the unread badge and chat update
     // without opening the map first.
     final unreadChats = ref.watch(
@@ -149,14 +151,21 @@ class DashboardScreen extends ConsumerWidget {
                 },
                 onCare: (action) => _careForPet(context, ref, circleId, action),
                 onOpenPet: openCompanion,
-                onNudge: () => ref
-                    .read(nudgeControllerProvider.notifier)
-                    .sendNudge(
-                      fromUserId: currentUserId,
-                      recipientIds: snapshot.circle.memberIds,
-                    ),
-                onCopyInvite: () =>
-                    _copyInviteCode(context, snapshot.circle.inviteCode),
+                onWarmth: (member) => _sendWarmth(
+                  context,
+                  ref,
+                  snapshot: snapshot,
+                  currentUserId: currentUserId,
+                  member: member,
+                  warmth: NudgeWarmth.defaultFor(snapshot.circle.type),
+                ),
+                onWarmthOptions: (member) => _pickWarmth(
+                  context,
+                  ref,
+                  snapshot: snapshot,
+                  currentUserId: currentUserId,
+                  member: member,
+                ),
                 onAddMemory: () => showMemoryComposer(
                   context,
                   circleId: circleId,
@@ -178,10 +187,14 @@ class DashboardScreen extends ConsumerWidget {
               ),
             ),
             if (activeNudge != null)
-              Positioned.fill(
-                child: NudgeOverlay(
-                  title: activeNudge.kind.label,
-                  message: _nudgeMessage(activeNudge, snapshot, currentUserId),
+              Positioned(
+                top: 8,
+                left: AppSpacing.md,
+                right: AppSpacing.md,
+                child: WarmthBanner(
+                  emoji: activeNudge.warmth.emoji,
+                  message: _warmthMessage(activeNudge, currentUserId),
+                  isIncoming: activeNudge.fromUserId != currentUserId,
                 ),
               ),
           ],
@@ -206,26 +219,67 @@ class DashboardScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _copyInviteCode(BuildContext context, String code) async {
-    await Clipboard.setData(ClipboardData(text: code));
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Invite code $code copied. Share it with your crew.'),
-      ),
+  Future<void> _sendWarmth(
+    BuildContext context,
+    WidgetRef ref, {
+    required CircleSnapshot snapshot,
+    required String currentUserId,
+    required CircleMember member,
+    required NudgeWarmth warmth,
+  }) async {
+    final senderName =
+        snapshot.memberById(currentUserId)?.profile.firstName ?? 'Someone';
+    try {
+      await ref
+          .read(
+            nudgeControllerProvider(snapshot.circle.id, currentUserId).notifier,
+          )
+          .send(
+            senderId: currentUserId,
+            senderName: senderName,
+            targetId: member.profile.id,
+            targetName: member.profile.firstName,
+            warmth: warmth,
+          );
+    } on NudgeFailure catch (failure) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(failure.message)));
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not send that warmth. Try again.')),
+      );
+    }
+  }
+
+  Future<void> _pickWarmth(
+    BuildContext context,
+    WidgetRef ref, {
+    required CircleSnapshot snapshot,
+    required String currentUserId,
+    required CircleMember member,
+  }) async {
+    final choice = await showWarmthPicker(
+      context,
+      type: snapshot.circle.type,
+      memberName: member.profile.firstName,
+    );
+    if (choice == null || !context.mounted) return;
+    await _sendWarmth(
+      context,
+      ref,
+      snapshot: snapshot,
+      currentUserId: currentUserId,
+      member: member,
+      warmth: choice,
     );
   }
 
-  String _nudgeMessage(
-    NudgePing ping,
-    CircleSnapshot snapshot,
-    String currentUserId,
-  ) {
-    final sender =
-        snapshot.memberById(currentUserId)?.profile.firstName ?? 'You';
-    if (ping.isGroupNudge) return '$sender nudged the whole crew';
-    final recipient = snapshot.memberById(ping.recipientIds.first);
-    return '$sender nudged ${recipient?.profile.firstName ?? 'the crew'}';
+  String _warmthMessage(NudgePing ping, String currentUserId) {
+    if (ping.fromUserId != currentUserId) return ping.message;
+    final target = ping.targetName ?? 'them';
+    return 'You sent $target a ${ping.warmth.label.toLowerCase()} ${ping.warmth.emoji}';
   }
 }
 
@@ -243,8 +297,8 @@ class _DashboardBody extends StatelessWidget {
     required this.onSharingTap,
     required this.onCare,
     required this.onOpenPet,
-    required this.onNudge,
-    required this.onCopyInvite,
+    required this.onWarmth,
+    required this.onWarmthOptions,
     required this.onAddMemory,
     required this.onAddMilestone,
     required this.onChat,
@@ -264,8 +318,8 @@ class _DashboardBody extends StatelessWidget {
   final VoidCallback onSharingTap;
   final ValueChanged<PetCareAction> onCare;
   final VoidCallback onOpenPet;
-  final VoidCallback onNudge;
-  final VoidCallback onCopyInvite;
+  final ValueChanged<CircleMember> onWarmth;
+  final ValueChanged<CircleMember> onWarmthOptions;
   final VoidCallback onAddMemory;
   final VoidCallback onAddMilestone;
   final VoidCallback onChat;
@@ -292,8 +346,6 @@ class _DashboardBody extends StatelessWidget {
             firstName: firstName,
             circleName: snapshot.circle.name,
             dateLine: formatDateLine(now),
-            inviteCode: snapshot.circle.inviteCode,
-            onCopyInvite: onCopyInvite,
             unreadCount: unreadChats,
             onChat: onChat,
             type: snapshot.circle.type,
@@ -311,7 +363,10 @@ class _DashboardBody extends StatelessWidget {
           members: snapshot.members,
           currentUserId: currentUserId,
           now: now,
+          groupType: snapshot.circle.type,
           onMemberTap: onMemberTap,
+          onWarmth: onWarmth,
+          onWarmthOptions: onWarmthOptions,
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(
@@ -407,22 +462,13 @@ class _DashboardBody extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
               SizedBox(
                 height: 124,
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: milestone == null
-                          ? _EmptyMilestoneCard(onTap: onAddMilestone)
-                          : CountdownCard(
-                              milestone: milestone!,
-                              now: now,
-                              onTap: onAddMilestone,
-                            ),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(flex: 2, child: NudgeTile(onSend: onNudge)),
-                  ],
-                ),
+                child: milestone == null
+                    ? _EmptyMilestoneCard(onTap: onAddMilestone)
+                    : CountdownCard(
+                        milestone: milestone!,
+                        now: now,
+                        onTap: onAddMilestone,
+                      ),
               ),
             ],
           ),
@@ -613,12 +659,4 @@ class _EmptyMilestoneCard extends StatelessWidget {
       ),
     );
   }
-}
-
-extension on NudgeKind {
-  String get label => switch (this) {
-    NudgeKind.thinkingOfYou => 'Thinking of you',
-    NudgeKind.onMyWay => 'On my way',
-    NudgeKind.needYou => 'Missing you',
-  };
 }
