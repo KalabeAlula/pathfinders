@@ -39,9 +39,18 @@ class _FakeCircleRepository implements CircleRepository {
   @override
   Stream<List<CircleSummary>> watchCircles() {
     scheduleMicrotask(() {
-      if (!_summaryController.isClosed) _summaryController.add(summaries);
+      if (!_summaryController.isClosed) {
+        _summaryController.add(List.of(summaries));
+      }
     });
     return _summaryController.stream;
+  }
+
+  /// Pushes the current [summaries] like a realtime membership change would.
+  void emitSummaries() {
+    if (!_summaryController.isClosed) {
+      _summaryController.add(List.of(summaries));
+    }
   }
 
   @override
@@ -229,8 +238,13 @@ void main() {
         circleSnapshotProvider('u'),
         (_, _) {},
       );
+      final notices = container.listen(
+        circleMembershipNoticeProvider,
+        (_, _) {},
+      );
       addTearDown(circles.close);
       addTearDown(snapshots.close);
+      addTearDown(notices.close);
 
       await container.read(circlesProvider('u').future);
       await Future<void>.delayed(Duration.zero);
@@ -245,6 +259,7 @@ void main() {
       expect(repository.left, ['c1']);
       expect(container.read(activeCircleControllerProvider('u')), 'c2');
       expect(ActiveCircleStore(preferences).read('u'), 'c2');
+      expect(container.read(circleMembershipNoticeProvider), isNull);
       expect(repository.watched, ['c1', 'c2']);
       expect(repository.cancelled, ['c1']);
     },
@@ -268,4 +283,121 @@ void main() {
     expect(container.read(activeCircleControllerProvider('u')), isNull);
     expect(ActiveCircleStore(preferences).read('u'), isNull);
   });
+
+  test(
+    'a remotely removed active group falls back and clears its caches',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'active.circle.u': 'c1',
+        'memories.cache.c1': 'cached',
+        'milestones.cache.c1': 'cached',
+        'chat.lastSeen.c1': '2026-01-01T00:00:00.000Z',
+        'memories.cache.c2': 'keep',
+      });
+      final repository = _FakeCircleRepository([
+        _summary('c1'),
+        _summary('c2'),
+      ]);
+      final container = await _start(repository);
+      final circles = container.listen(circlesProvider('u'), (_, _) {});
+      final snapshots = container.listen(
+        circleSnapshotProvider('u'),
+        (_, _) {},
+      );
+      final notices = container.listen(
+        circleMembershipNoticeProvider,
+        (_, _) {},
+      );
+      addTearDown(circles.close);
+      addTearDown(snapshots.close);
+      addTearDown(notices.close);
+
+      await container.read(circlesProvider('u').future);
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(activeCircleControllerProvider('u')), 'c1');
+
+      repository.summaries.removeWhere((circle) => circle.id == 'c1');
+      repository.emitSummaries();
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      final preferences = await SharedPreferences.getInstance();
+      expect(container.read(activeCircleControllerProvider('u')), 'c2');
+      expect(ActiveCircleStore(preferences).read('u'), 'c2');
+      expect(container.read(circleMembershipNoticeProvider), 'Group c1');
+      expect(preferences.getString('memories.cache.c1'), isNull);
+      expect(preferences.getString('milestones.cache.c1'), isNull);
+      expect(preferences.getString('chat.lastSeen.c1'), isNull);
+      expect(preferences.getString('memories.cache.c2'), 'keep');
+    },
+  );
+
+  test('a remotely removed last group clears the active id', () async {
+    SharedPreferences.setMockInitialValues({'active.circle.u': 'c1'});
+    final repository = _FakeCircleRepository([_summary('c1')]);
+    final container = await _start(repository);
+    final active = container.listen(
+      activeCircleControllerProvider('u'),
+      (_, _) {},
+    );
+    final circles = container.listen(circlesProvider('u'), (_, _) {});
+    final notices = container.listen(circleMembershipNoticeProvider, (_, _) {});
+    addTearDown(active.close);
+    addTearDown(circles.close);
+    addTearDown(notices.close);
+
+    await container.read(circlesProvider('u').future);
+    await Future<void>.delayed(Duration.zero);
+
+    repository.summaries.clear();
+    repository.emitSummaries();
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(container.read(activeCircleControllerProvider('u')), isNull);
+    expect(ActiveCircleStore(preferences).read('u'), isNull);
+    expect(container.read(circleMembershipNoticeProvider), 'Group c1');
+  });
+
+  test(
+    'a remotely removed inactive group keeps the active one and clears caches',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'active.circle.u': 'c1',
+        'memories.cache.c2': 'cached',
+      });
+      final repository = _FakeCircleRepository([
+        _summary('c1'),
+        _summary('c2'),
+      ]);
+      final container = await _start(repository);
+      final active = container.listen(
+        activeCircleControllerProvider('u'),
+        (_, _) {},
+      );
+      final circles = container.listen(circlesProvider('u'), (_, _) {});
+      final notices = container.listen(
+        circleMembershipNoticeProvider,
+        (_, _) {},
+      );
+      addTearDown(active.close);
+      addTearDown(circles.close);
+      addTearDown(notices.close);
+
+      await container.read(circlesProvider('u').future);
+      await Future<void>.delayed(Duration.zero);
+
+      repository.summaries.removeWhere((circle) => circle.id == 'c2');
+      repository.emitSummaries();
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      final preferences = await SharedPreferences.getInstance();
+      expect(container.read(activeCircleControllerProvider('u')), 'c1');
+      expect(ActiveCircleStore(preferences).read('u'), 'c1');
+      expect(container.read(circleMembershipNoticeProvider), isNull);
+      expect(preferences.getString('memories.cache.c2'), isNull);
+    },
+  );
 }

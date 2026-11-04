@@ -224,6 +224,69 @@ final class CirclesFamily extends $Family
   String toString() => r'circlesProvider';
 }
 
+/// The circle whose membership this device just lost, so the gate can explain
+/// why the screen changed. Cleared as soon as it is shown.
+
+@ProviderFor(CircleMembershipNotice)
+final circleMembershipNoticeProvider = CircleMembershipNoticeProvider._();
+
+/// The circle whose membership this device just lost, so the gate can explain
+/// why the screen changed. Cleared as soon as it is shown.
+final class CircleMembershipNoticeProvider
+    extends $NotifierProvider<CircleMembershipNotice, String?> {
+  /// The circle whose membership this device just lost, so the gate can explain
+  /// why the screen changed. Cleared as soon as it is shown.
+  CircleMembershipNoticeProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'circleMembershipNoticeProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$circleMembershipNoticeHash();
+
+  @$internal
+  @override
+  CircleMembershipNotice create() => CircleMembershipNotice();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String?>(value),
+    );
+  }
+}
+
+String _$circleMembershipNoticeHash() =>
+    r'88e965d74c2a810e93889483e6796afbf6ba361a';
+
+/// The circle whose membership this device just lost, so the gate can explain
+/// why the screen changed. Cleared as soon as it is shown.
+
+abstract class _$CircleMembershipNotice extends $Notifier<String?> {
+  String? build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<String?, String?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<String?, String?>,
+              String?,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
 /// The group currently on screen. A saved id wins only while it still matches
 /// a membership; otherwise the oldest group is used so a removed group cannot
 /// leave the app pointing at nothing.
@@ -285,7 +348,7 @@ final class ActiveCircleControllerProvider
 }
 
 String _$activeCircleControllerHash() =>
-    r'9bb86c8ceb4ccd44d7413172640249e0b546140e';
+    r'69e64c626f9278e4656faa4ba6e3e69976bbe352';
 
 /// The group currently on screen. A saved id wins only while it still matches
 /// a membership; otherwise the oldest group is used so a removed group cannot

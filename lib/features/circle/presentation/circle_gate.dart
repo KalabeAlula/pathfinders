@@ -22,6 +22,15 @@ class CircleGate extends ConsumerWidget {
     // mounted under pushed screens, whereas watching telemetry from individual
     // widgets would let auto-dispose stop the heartbeat on navigation.
     ref.listen(telemetryControllerProvider(userId), (_, _) {});
+    ref.listen(circleMembershipNoticeProvider, (_, notice) {
+      if (notice == null) return;
+      ref.read(circleMembershipNoticeProvider.notifier).clear();
+      // A removed member may have a detail screen or sheet on top.
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("You're no longer in $notice.")));
+    });
 
     if (circles.hasError && !circles.hasValue) {
       return _errorStatus(ref, circles.error!, () {

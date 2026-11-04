@@ -48,14 +48,26 @@ class _CircleSettingsSheetState extends ConsumerState<CircleSettingsSheet> {
 
   bool _busy = false;
   String? _error;
+  bool _hadMembership = false;
   late String _name = widget.snapshot.circle.name;
   late String _inviteCode = widget.snapshot.circle.inviteCode;
   late String? _creatorId = widget.snapshot.circle.createdBy;
-  late final List<CircleMember> _members = [...widget.snapshot.members];
+  late List<CircleMember> _members = [...widget.snapshot.members];
 
   String get _circleId => widget.snapshot.circle.id;
   String get _circleName => _name;
   bool get _isCreator => _creatorId == widget.userId;
+
+  @override
+  void initState() {
+    super.initState();
+    _hadMembership =
+        ref
+            .read(circlesProvider(widget.userId))
+            .value
+            ?.any((circle) => circle.id == _circleId) ??
+        false;
+  }
 
   @override
   void dispose() {
@@ -418,6 +430,36 @@ class _CircleSettingsSheetState extends ConsumerState<CircleSettingsSheet> {
 
   @override
   Widget build(BuildContext context) {
+    // If this member is removed (or the circle is deleted) while the sheet is
+    // open, leave the sheet so the gate can show what happened.
+    ref.listen(circlesProvider(widget.userId), (_, next) {
+      if (_busy) return;
+      final memberships = next.value;
+      if (memberships == null) return;
+      if (memberships.any((circle) => circle.id == _circleId)) {
+        _hadMembership = true;
+        return;
+      }
+      if (_hadMembership) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    });
+
+    // Ownership can change on another device. Keep the creator tools or the
+    // member view in step with the live snapshot instead of the one that was
+    // on screen when the sheet opened.
+    ref.listen(circleSnapshotProvider(widget.userId), (_, next) {
+      if (_busy) return;
+      final snapshot = next.value;
+      if (snapshot == null || snapshot.circle.id != _circleId) return;
+      setState(() {
+        _creatorId = snapshot.circle.createdBy;
+        _name = snapshot.circle.name;
+        _inviteCode = snapshot.circle.inviteCode;
+        _members = [...snapshot.members];
+      });
+    });
+
     final scheme = Theme.of(context).colorScheme;
     final circle = widget.snapshot.circle;
     final companion = EthiopianPet.byId(circle.petId);

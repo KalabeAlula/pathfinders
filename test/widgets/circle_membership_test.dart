@@ -64,21 +64,27 @@ class _FakeCircleRepository implements CircleRepository {
   final List<({String circleId, String memberId})> removedMembers = [];
   final List<({String circleId, String newOwnerId})> transfers = [];
   String rotatedCode = 'NEW234';
+  Stream<CircleSnapshot?>? snapshotStream;
   final _summaries = StreamController<List<CircleSummary>>.broadcast();
 
   void dispose() => _summaries.close();
 
+  /// Pushes the current [summaries] like a realtime membership change would.
+  void emitSummaries() {
+    if (!_summaries.isClosed) _summaries.add(List.of(summaries));
+  }
+
   @override
   Stream<List<CircleSummary>> watchCircles() {
     scheduleMicrotask(() {
-      if (!_summaries.isClosed) _summaries.add(summaries);
+      if (!_summaries.isClosed) _summaries.add(List.of(summaries));
     });
     return _summaries.stream;
   }
 
   @override
   Stream<CircleSnapshot?> watchCircle(String circleId) =>
-      Stream<CircleSnapshot?>.value(null);
+      snapshotStream ?? Stream<CircleSnapshot?>.value(null);
 
   @override
   Future<Circle> createCircle({
@@ -551,5 +557,120 @@ void main() {
     );
     expect(find.text('Transfer ownership'), findsNothing);
     expect(repository.transfers, isEmpty);
+  });
+
+  testWidgets(
+    'a transfer on another device swaps the open sheet to member view',
+    (tester) async {
+      final repository = _FakeCircleRepository(
+        summaries: [
+          CircleSummary(
+            id: 'c1',
+            name: 'Trail crew',
+            type: GroupType.friends,
+            memberCount: 2,
+            createdAt: DateTime(2026, 1, 1),
+          ),
+        ],
+      );
+      final live = StreamController<CircleSnapshot?>.broadcast();
+      repository.snapshotStream = live.stream;
+      addTearDown(live.close);
+      addTearDown(repository.dispose);
+
+      await _pump(
+        tester,
+        repository,
+        _SettingsHost(snapshot: _snapshot(createdBy: 'u')),
+      );
+      await tester.tap(find.text('Open details'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('delete-circle')), findsOneWidget);
+
+      live.add(_snapshot(createdBy: 'owner'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('delete-circle')), findsNothing);
+      expect(find.byKey(const ValueKey('transfer-ownership')), findsNothing);
+      expect(find.byKey(const ValueKey('rename-circle')), findsNothing);
+      expect(find.byKey(const ValueKey('rotate-invite-code')), findsNothing);
+      expect(find.byKey(const ValueKey('member-menu-owner')), findsNothing);
+      expect(find.byKey(const ValueKey('leave-circle')), findsOneWidget);
+      expect(find.text('Creator'), findsOneWidget);
+    },
+  );
+
+  testWidgets('being made creator brings the owner tools into the open sheet', (
+    tester,
+  ) async {
+    final repository = _FakeCircleRepository(
+      summaries: [
+        CircleSummary(
+          id: 'c1',
+          name: 'Trail crew',
+          type: GroupType.friends,
+          memberCount: 2,
+          createdAt: DateTime(2026, 1, 1),
+        ),
+      ],
+    );
+    final live = StreamController<CircleSnapshot?>.broadcast();
+    repository.snapshotStream = live.stream;
+    addTearDown(live.close);
+    addTearDown(repository.dispose);
+
+    await _pump(
+      tester,
+      repository,
+      _SettingsHost(snapshot: _snapshot(createdBy: 'owner')),
+    );
+    await tester.tap(find.text('Open details'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('leave-circle')), findsOneWidget);
+    expect(find.byKey(const ValueKey('delete-circle')), findsNothing);
+
+    live.add(_snapshot(createdBy: 'u'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('delete-circle')), findsOneWidget);
+    expect(find.byKey(const ValueKey('transfer-ownership')), findsOneWidget);
+    expect(find.byKey(const ValueKey('rename-circle')), findsOneWidget);
+    expect(find.byKey(const ValueKey('rotate-invite-code')), findsOneWidget);
+    expect(find.byKey(const ValueKey('leave-circle')), findsNothing);
+  });
+
+  testWidgets('losing this circle closes the open details sheet', (
+    tester,
+  ) async {
+    final repository = _FakeCircleRepository(
+      summaries: [
+        CircleSummary(
+          id: 'c1',
+          name: 'Trail crew',
+          type: GroupType.friends,
+          memberCount: 2,
+          createdAt: DateTime(2026, 1, 1),
+        ),
+      ],
+    );
+    addTearDown(repository.dispose);
+
+    await _pump(
+      tester,
+      repository,
+      _SettingsHost(snapshot: _snapshot(createdBy: 'owner')),
+    );
+    await tester.tap(find.text('Open details'));
+    await tester.pumpAndSettle();
+    expect(find.text('Circle details'), findsOneWidget);
+
+    repository.summaries.clear();
+    repository.emitSummaries();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Circle details'), findsNothing);
+    expect(find.text('Open details'), findsOneWidget);
   });
 }
