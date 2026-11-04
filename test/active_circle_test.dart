@@ -101,6 +101,18 @@ class _FakeCircleRepository implements CircleRepository {
 
   @override
   Future<String> rotateInviteCode({required String circleId}) async => 'NEW234';
+
+  @override
+  Future<void> removeMember({
+    required String circleId,
+    required String memberId,
+  }) async {}
+
+  @override
+  Future<void> transferOwnership({
+    required String circleId,
+    required String newOwnerId,
+  }) async {}
 }
 
 Future<ProviderContainer> _start(_FakeCircleRepository repository) async {

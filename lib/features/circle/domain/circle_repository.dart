@@ -30,4 +30,16 @@ abstract interface class CircleRepository {
 
   /// Issues a fresh invite code and returns it. Creator only.
   Future<String> rotateInviteCode({required String circleId});
+
+  /// Removes another member from the circle. Creator only.
+  Future<void> removeMember({
+    required String circleId,
+    required String memberId,
+  });
+
+  /// Hands circle ownership to another member. Creator only.
+  Future<void> transferOwnership({
+    required String circleId,
+    required String newOwnerId,
+  });
 }

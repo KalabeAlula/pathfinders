@@ -25,7 +25,10 @@ CircleMember _member(String id, String name) {
   );
 }
 
-CircleSnapshot _snapshot({required String createdBy}) {
+CircleSnapshot _snapshot({
+  required String createdBy,
+  List<CircleMember>? members,
+}) {
   return CircleSnapshot(
     circle: Circle(
       id: 'c1',
@@ -37,7 +40,9 @@ CircleSnapshot _snapshot({required String createdBy}) {
       petId: 'gelada',
       petName: 'Chele',
     ),
-    members: [_member('u', 'Kaleab Bekele'), _member('owner', 'Marta Alemu')],
+    members:
+        members ??
+        [_member('u', 'Kaleab Bekele'), _member('owner', 'Marta Alemu')],
   );
 }
 
@@ -56,6 +61,8 @@ class _FakeCircleRepository implements CircleRepository {
   final List<String> deleted = [];
   final List<({String circleId, String name})> renames = [];
   final List<String> rotations = [];
+  final List<({String circleId, String memberId})> removedMembers = [];
+  final List<({String circleId, String newOwnerId})> transfers = [];
   String rotatedCode = 'NEW234';
   final _summaries = StreamController<List<CircleSummary>>.broadcast();
 
@@ -123,6 +130,22 @@ class _FakeCircleRepository implements CircleRepository {
   Future<String> rotateInviteCode({required String circleId}) async {
     rotations.add(circleId);
     return rotatedCode;
+  }
+
+  @override
+  Future<void> removeMember({
+    required String circleId,
+    required String memberId,
+  }) async {
+    removedMembers.add((circleId: circleId, memberId: memberId));
+  }
+
+  @override
+  Future<void> transferOwnership({
+    required String circleId,
+    required String newOwnerId,
+  }) async {
+    transfers.add((circleId: circleId, newOwnerId: newOwnerId));
   }
 }
 
@@ -291,6 +314,8 @@ void main() {
     expect(find.byKey(const ValueKey('delete-circle')), findsNothing);
     expect(find.byKey(const ValueKey('rename-circle')), findsNothing);
     expect(find.byKey(const ValueKey('rotate-invite-code')), findsNothing);
+    expect(find.byKey(const ValueKey('transfer-ownership')), findsNothing);
+    expect(find.byKey(const ValueKey('member-menu-owner')), findsNothing);
 
     final leave = find.byKey(const ValueKey('leave-circle'));
     await tester.ensureVisible(leave);
@@ -417,5 +442,114 @@ void main() {
       find.text('New invite code ready. The old code no longer works.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('the creator removes another member after confirming', (
+    tester,
+  ) async {
+    final repository = _FakeCircleRepository();
+    addTearDown(repository.dispose);
+
+    await _pump(
+      tester,
+      repository,
+      _SettingsHost(snapshot: _snapshot(createdBy: 'u')),
+    );
+    await tester.tap(find.text('Open details'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 of 4 members'), findsOneWidget);
+    expect(find.byKey(const ValueKey('member-menu-u')), findsNothing);
+
+    final menu = find.byKey(const ValueKey('member-menu-owner'));
+    expect(menu, findsOneWidget);
+    await tester.ensureVisible(menu);
+    await tester.tap(menu);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Remove from circle'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Remove Marta?'), findsOneWidget);
+    await tester.tap(find.text('Remove'));
+    await tester.pumpAndSettle();
+
+    expect(repository.removedMembers, [(circleId: 'c1', memberId: 'owner')]);
+    expect(find.text('Marta Alemu'), findsNothing);
+    expect(find.text('1 of 4 members'), findsOneWidget);
+    expect(find.text('Marta was removed from Trail crew.'), findsOneWidget);
+  });
+
+  testWidgets('the creator transfers ownership and becomes a member', (
+    tester,
+  ) async {
+    final repository = _FakeCircleRepository();
+    addTearDown(repository.dispose);
+
+    await _pump(
+      tester,
+      repository,
+      _SettingsHost(snapshot: _snapshot(createdBy: 'u')),
+    );
+    await tester.tap(find.text('Open details'));
+    await tester.pumpAndSettle();
+
+    final transfer = find.byKey(const ValueKey('transfer-ownership'));
+    await tester.ensureVisible(transfer);
+    await tester.tap(transfer);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Transfer ownership'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('transfer-owner')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('confirm-transfer')));
+    await tester.pumpAndSettle();
+
+    expect(repository.transfers, [(circleId: 'c1', newOwnerId: 'owner')]);
+    expect(
+      find.text('Marta is now the creator of Trail crew.'),
+      findsOneWidget,
+    );
+    expect(find.text('Creator'), findsOneWidget);
+    expect(find.text('Marta Alemu'), findsOneWidget);
+
+    expect(find.byKey(const ValueKey('delete-circle')), findsNothing);
+    expect(find.byKey(const ValueKey('rename-circle')), findsNothing);
+    expect(find.byKey(const ValueKey('rotate-invite-code')), findsNothing);
+    expect(find.byKey(const ValueKey('transfer-ownership')), findsNothing);
+    expect(find.byKey(const ValueKey('member-menu-owner')), findsNothing);
+    expect(find.byKey(const ValueKey('leave-circle')), findsOneWidget);
+  });
+
+  testWidgets('transfer with no other members asks the creator to invite', (
+    tester,
+  ) async {
+    final repository = _FakeCircleRepository();
+    addTearDown(repository.dispose);
+
+    await _pump(
+      tester,
+      repository,
+      _SettingsHost(
+        snapshot: _snapshot(
+          createdBy: 'u',
+          members: [_member('u', 'Kaleab Bekele')],
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open details'));
+    await tester.pumpAndSettle();
+
+    final transfer = find.byKey(const ValueKey('transfer-ownership'));
+    await tester.ensureVisible(transfer);
+    await tester.tap(transfer);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Invite someone before transferring ownership.'),
+      findsOneWidget,
+    );
+    expect(find.text('Transfer ownership'), findsNothing);
+    expect(repository.transfers, isEmpty);
   });
 }

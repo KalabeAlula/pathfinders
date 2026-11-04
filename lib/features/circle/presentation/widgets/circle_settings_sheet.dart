@@ -8,6 +8,7 @@ import '../../../pet/domain/ethiopian_pet.dart';
 import '../../../pet/presentation/widgets/pet_avatar.dart';
 import '../../application/circle_providers.dart';
 import '../../domain/circle_failure.dart';
+import '../../domain/circle_member.dart';
 import '../../domain/circle_snapshot.dart';
 import 'group_type_badge.dart';
 
@@ -49,10 +50,12 @@ class _CircleSettingsSheetState extends ConsumerState<CircleSettingsSheet> {
   String? _error;
   late String _name = widget.snapshot.circle.name;
   late String _inviteCode = widget.snapshot.circle.inviteCode;
+  late String? _creatorId = widget.snapshot.circle.createdBy;
+  late final List<CircleMember> _members = [...widget.snapshot.members];
 
   String get _circleId => widget.snapshot.circle.id;
   String get _circleName => _name;
-  bool get _isCreator => widget.snapshot.circle.createdBy == widget.userId;
+  bool get _isCreator => _creatorId == widget.userId;
 
   @override
   void dispose() {
@@ -166,6 +169,151 @@ class _CircleSettingsSheetState extends ConsumerState<CircleSettingsSheet> {
         if (mounted) setState(() => _inviteCode = code);
       },
       successMessage: 'New invite code ready. The old code no longer works.',
+      closeSheet: false,
+    );
+  }
+
+  Future<void> _confirmRemove(CircleMember member) async {
+    final scheme = Theme.of(context).colorScheme;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Remove ${member.profile.firstName}?'),
+        content: const Text(
+          'They will lose access to shared routes, chat, and memories. '
+          'They can rejoin with the invite code.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: scheme.error,
+              foregroundColor: scheme.onError,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await _run(
+      () async {
+        await ref
+            .read(activeCircleControllerProvider(widget.userId).notifier)
+            .removeMember(_circleId, member.profile.id);
+        if (!mounted) return;
+        setState(() {
+          _members.removeWhere((item) => item.profile.id == member.profile.id);
+        });
+      },
+      successMessage: '${member.profile.firstName} was removed from $_name.',
+      closeSheet: false,
+    );
+  }
+
+  Future<void> _pickNewOwner() async {
+    final candidates = [
+      for (final member in _members)
+        if (member.profile.id != widget.userId) member,
+    ];
+    if (candidates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invite someone before transferring ownership.'),
+        ),
+      );
+      return;
+    }
+
+    final selectedId = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        String? choice;
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: const Text('Transfer ownership'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'They will become the creator and can rename, remove '
+                    'members, or delete this circle. You will stay a member.',
+                    style: Theme.of(dialogContext).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  for (final member in candidates)
+                    ListTile(
+                      key: ValueKey('transfer-${member.profile.id}'),
+                      contentPadding: EdgeInsets.zero,
+                      selected: choice == member.profile.id,
+                      leading: CircleAvatar(
+                        radius: 14,
+                        backgroundColor: Color(member.profile.avatarColor),
+                        child: Text(
+                          member.profile.firstName.characters.first
+                              .toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      title: Text(member.profile.displayName),
+                      trailing: choice == member.profile.id
+                          ? Icon(
+                              Icons.check_circle_rounded,
+                              size: 20,
+                              color: Theme.of(dialogContext)
+                                  .colorScheme
+                                  .primary,
+                            )
+                          : null,
+                      onTap: () =>
+                          setDialogState(() => choice = member.profile.id),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                key: const ValueKey('confirm-transfer'),
+                onPressed: choice == null
+                    ? null
+                    : () => Navigator.of(dialogContext).pop(choice),
+                child: const Text('Make creator'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (selectedId == null) return;
+
+    final newOwner = _members.firstWhere(
+      (member) => member.profile.id == selectedId,
+    );
+    await _run(
+      () async {
+        await ref
+            .read(activeCircleControllerProvider(widget.userId).notifier)
+            .transferOwnership(_circleId, selectedId);
+        if (mounted) setState(() => _creatorId = selectedId);
+      },
+      successMessage:
+          '${newOwner.profile.firstName} is now the creator of $_name.',
       closeSheet: false,
     );
   }
@@ -355,8 +503,7 @@ class _CircleSettingsSheetState extends ConsumerState<CircleSettingsSheet> {
               ),
               const SizedBox(height: 4),
               Text(
-                '${widget.snapshot.members.length} of ${circle.capacity} '
-                'members',
+                '${_members.length} of ${circle.capacity} members',
                 style: Theme.of(context).textTheme.bodySmall
                     ?.copyWith(color: scheme.onSurfaceVariant),
               ),
@@ -383,7 +530,7 @@ class _CircleSettingsSheetState extends ConsumerState<CircleSettingsSheet> {
                     ?.copyWith(color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: AppSpacing.sm),
-              for (final member in widget.snapshot.members)
+              for (final member in _members)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 5),
                   child: Row(
@@ -412,11 +559,25 @@ class _CircleSettingsSheetState extends ConsumerState<CircleSettingsSheet> {
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ),
-                      if (member.profile.id == circle.createdBy)
+                      if (member.profile.id == _creatorId)
                         Text(
                           'Creator',
                           style: Theme.of(context).textTheme.labelSmall
                               ?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                      if (_isCreator && member.profile.id != widget.userId)
+                        PopupMenuButton<String>(
+                          key: ValueKey('member-menu-${member.profile.id}'),
+                          tooltip: 'Member actions',
+                          iconSize: 18,
+                          padding: EdgeInsets.zero,
+                          onSelected: (_) => _confirmRemove(member),
+                          itemBuilder: (_) => const [
+                            PopupMenuItem<String>(
+                              value: 'remove',
+                              child: Text('Remove from circle'),
+                            ),
+                          ],
                         ),
                     ],
                   ),
@@ -473,7 +634,17 @@ class _CircleSettingsSheetState extends ConsumerState<CircleSettingsSheet> {
                 InlineError(message: _error!),
               ],
               const SizedBox(height: AppSpacing.lg),
-              if (_isCreator)
+              if (_isCreator) ...[
+                OutlinedButton.icon(
+                  key: const ValueKey('transfer-ownership'),
+                  onPressed: _busy ? null : _pickNewOwner,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50),
+                  ),
+                  icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                  label: const Text('Transfer Ownership'),
+                ),
+                const SizedBox(height: AppSpacing.sm),
                 FilledButton.icon(
                   key: const ValueKey('delete-circle'),
                   onPressed: _busy ? null : _confirmDelete,
@@ -484,8 +655,8 @@ class _CircleSettingsSheetState extends ConsumerState<CircleSettingsSheet> {
                   ),
                   icon: const Icon(Icons.delete_outline_rounded, size: 18),
                   label: const Text('Delete Circle'),
-                )
-              else
+                ),
+              ] else
                 OutlinedButton.icon(
                   key: const ValueKey('leave-circle'),
                   onPressed: _busy ? null : _confirmLeave,

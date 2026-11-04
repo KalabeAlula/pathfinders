@@ -160,6 +160,32 @@ class SupabaseCircleRepository implements CircleRepository {
     }
   }
 
+  @override
+  Future<void> removeMember({
+    required String circleId,
+    required String memberId,
+  }) {
+    return _runVoidRpc(
+      () => _client.rpc(
+        'remove_circle_member',
+        params: {'p_circle_id': circleId, 'p_user_id': memberId},
+      ),
+    );
+  }
+
+  @override
+  Future<void> transferOwnership({
+    required String circleId,
+    required String newOwnerId,
+  }) {
+    return _runVoidRpc(
+      () => _client.rpc(
+        'transfer_circle_ownership',
+        params: {'p_circle_id': circleId, 'p_new_owner': newOwnerId},
+      ),
+    );
+  }
+
   Future<void> _runVoidRpc(Future<Object?> Function() call) async {
     try {
       await call();

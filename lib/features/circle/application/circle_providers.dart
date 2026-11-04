@@ -81,6 +81,18 @@ class ActiveCircleController extends _$ActiveCircleController {
         .rotateInviteCode(circleId: circleId);
   }
 
+  Future<void> removeMember(String circleId, String memberId) {
+    return ref
+        .read(circleRepositoryProvider(userId))
+        .removeMember(circleId: circleId, memberId: memberId);
+  }
+
+  Future<void> transferOwnership(String circleId, String newOwnerId) {
+    return ref
+        .read(circleRepositoryProvider(userId))
+        .transferOwnership(circleId: circleId, newOwnerId: newOwnerId);
+  }
+
   /// Clears this device's cached view of the circle and moves the active id
   /// when the circle that just vanished was the one on screen.
   Future<void> _forgetMembership(String circleId) async {
