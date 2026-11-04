@@ -87,18 +87,69 @@ final class NudgeRepositoryFamily extends $Family
   String toString() => r'nudgeRepositoryProvider';
 }
 
+@ProviderFor(warmthNotifications)
+final warmthNotificationsProvider = WarmthNotificationsProvider._();
+
+final class WarmthNotificationsProvider
+    extends $FunctionalProvider<WarmthNotifier, WarmthNotifier, WarmthNotifier>
+    with $Provider<WarmthNotifier> {
+  WarmthNotificationsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'warmthNotificationsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$warmthNotificationsHash();
+
+  @$internal
+  @override
+  $ProviderElement<WarmthNotifier> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  WarmthNotifier create(Ref ref) {
+    return warmthNotifications(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(WarmthNotifier value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<WarmthNotifier>(value),
+    );
+  }
+}
+
+String _$warmthNotificationsHash() =>
+    r'fd21146222ab088067bf3cac829df2125f0d9953';
+
 /// Shows the most recent warmth action, then clears itself so the banner
 /// disappears without the caller managing a timer.
+///
+/// While the app is backgrounded the same ping is also handed to the system
+/// notification service; in the foreground the in-app banner is the only cue.
 
 @ProviderFor(NudgeController)
 final nudgeControllerProvider = NudgeControllerFamily._();
 
 /// Shows the most recent warmth action, then clears itself so the banner
 /// disappears without the caller managing a timer.
+///
+/// While the app is backgrounded the same ping is also handed to the system
+/// notification service; in the foreground the in-app banner is the only cue.
 final class NudgeControllerProvider
     extends $NotifierProvider<NudgeController, NudgePing?> {
   /// Shows the most recent warmth action, then clears itself so the banner
   /// disappears without the caller managing a timer.
+  ///
+  /// While the app is backgrounded the same ping is also handed to the system
+  /// notification service; in the foreground the in-app banner is the only cue.
   NudgeControllerProvider._({
     required NudgeControllerFamily super.from,
     required (String, String) super.argument,
@@ -143,10 +194,13 @@ final class NudgeControllerProvider
   }
 }
 
-String _$nudgeControllerHash() => r'a039bc9cfefcabbdddc2daae3ee4f6557017602e';
+String _$nudgeControllerHash() => r'9bed8055a4874483ee57908867642ef187f4ffaf';
 
 /// Shows the most recent warmth action, then clears itself so the banner
 /// disappears without the caller managing a timer.
+///
+/// While the app is backgrounded the same ping is also handed to the system
+/// notification service; in the foreground the in-app banner is the only cue.
 
 final class NudgeControllerFamily extends $Family
     with
@@ -168,6 +222,9 @@ final class NudgeControllerFamily extends $Family
 
   /// Shows the most recent warmth action, then clears itself so the banner
   /// disappears without the caller managing a timer.
+  ///
+  /// While the app is backgrounded the same ping is also handed to the system
+  /// notification service; in the foreground the in-app banner is the only cue.
 
   NudgeControllerProvider call(String circleId, String userId) =>
       NudgeControllerProvider._(argument: (circleId, userId), from: this);
@@ -178,6 +235,9 @@ final class NudgeControllerFamily extends $Family
 
 /// Shows the most recent warmth action, then clears itself so the banner
 /// disappears without the caller managing a timer.
+///
+/// While the app is backgrounded the same ping is also handed to the system
+/// notification service; in the foreground the in-app banner is the only cue.
 
 abstract class _$NudgeController extends $Notifier<NudgePing?> {
   late final _$args = ref.$arg as (String, String);

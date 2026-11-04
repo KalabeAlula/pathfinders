@@ -1,10 +1,14 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pathfinders/core/application/app_visibility.dart';
 import 'package:pathfinders/features/nudges/application/nudge_providers.dart';
 import 'package:pathfinders/features/nudges/domain/nudge.dart';
 import 'package:pathfinders/features/nudges/domain/nudge_repository.dart';
+import 'package:pathfinders/features/nudges/domain/warmth_notification.dart';
+import 'package:pathfinders/features/nudges/domain/warmth_notifier.dart';
 
 class _FakeNudgeRepository implements NudgeRepository {
   final incoming = StreamController<NudgePing>.broadcast();
@@ -32,6 +36,21 @@ class _FakeNudgeRepository implements NudgeRepository {
   Stream<NudgePing> watchIncoming(String userId) => incoming.stream;
 }
 
+class _FakeWarmthNotifier implements WarmthNotifier {
+  int permissionRequests = 0;
+  final shown = <WarmthNotification>[];
+
+  @override
+  Future<void> ensurePermission() async {
+    permissionRequests++;
+  }
+
+  @override
+  Future<void> show(WarmthNotification notification) async {
+    shown.add(notification);
+  }
+}
+
 NudgePing _incoming({
   required String targetId,
   String message = 'Alex sent you a sweet kiss!',
@@ -50,12 +69,20 @@ NudgePing _incoming({
 
 void main() {
   late _FakeNudgeRepository repository;
+  late _FakeWarmthNotifier notifier;
+  late AppVisibility visibility;
   late ProviderContainer container;
 
   setUp(() {
     repository = _FakeNudgeRepository();
+    notifier = _FakeWarmthNotifier();
+    visibility = AppVisibility();
     container = ProviderContainer(
-      overrides: [nudgeRepositoryProvider('c1').overrideWithValue(repository)],
+      overrides: [
+        nudgeRepositoryProvider('c1').overrideWithValue(repository),
+        warmthNotificationsProvider.overrideWithValue(notifier),
+        appVisibilityProvider.overrideWithValue(visibility),
+      ],
     );
     container.listen(nudgeControllerProvider('c1', 'u'), (_, _) {});
   });
@@ -103,5 +130,48 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(container.read(nudgeControllerProvider('c1', 'u')), isNull);
+    expect(notifier.shown, isEmpty);
   });
+
+  test('permission is requested when the controller starts', () {
+    expect(notifier.permissionRequests, 1);
+  });
+
+  test('a backgrounded app gets a system notification', () async {
+    visibility.update(AppLifecycleState.paused);
+
+    repository.incoming.add(_incoming(targetId: 'u'));
+    await Future<void>.delayed(Duration.zero);
+
+    final shown = notifier.shown.single;
+    expect(shown.title, '😘 Kiss');
+    expect(shown.body, 'Alex sent you a sweet kiss!');
+  });
+
+  test('a foregrounded app shows only the in-app banner', () async {
+    repository.incoming.add(_incoming(targetId: 'u'));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(container.read(nudgeControllerProvider('c1', 'u')), isNotNull);
+    expect(notifier.shown, isEmpty);
+  });
+
+  test(
+    'the sender never gets a system notification for their own send',
+    () async {
+      visibility.update(AppLifecycleState.paused);
+
+      await container
+          .read(nudgeControllerProvider('c1', 'u').notifier)
+          .send(
+            senderId: 'u',
+            senderName: 'Kaleab',
+            targetId: 'hana',
+            targetName: 'Hana',
+            warmth: NudgeWarmth.kiss,
+          );
+
+      expect(notifier.shown, isEmpty);
+    },
+  );
 }
