@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/navigation/glass_dock.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../app/widgets/member_avatar.dart';
 import '../../../core/utils/time_format.dart';
@@ -232,12 +233,17 @@ class _ChatTabState extends ConsumerState<ChatTab> {
                   ),
                 ),
               ),
-            _Composer(
-              controller: _text,
-              sending: _sending,
-              sharing: _sharing,
-              onSend: _send,
-              onShareLocation: _shareLocation,
+            Padding(
+              padding: EdgeInsets.only(
+                bottom: ShellDock.contentInset(context),
+              ),
+              child: _Composer(
+                controller: _text,
+                sending: _sending,
+                sharing: _sharing,
+                onSend: _send,
+                onShareLocation: _shareLocation,
+              ),
             ),
           ],
         ),

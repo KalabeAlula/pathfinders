@@ -86,6 +86,53 @@ final class MemoriesCacheFamily extends $Family
   String toString() => r'memoriesCacheProvider';
 }
 
+@ProviderFor(memoriesSeenStore)
+final memoriesSeenStoreProvider = MemoriesSeenStoreProvider._();
+
+final class MemoriesSeenStoreProvider
+    extends
+        $FunctionalProvider<
+          MemoriesSeenStore,
+          MemoriesSeenStore,
+          MemoriesSeenStore
+        >
+    with $Provider<MemoriesSeenStore> {
+  MemoriesSeenStoreProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'memoriesSeenStoreProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$memoriesSeenStoreHash();
+
+  @$internal
+  @override
+  $ProviderElement<MemoriesSeenStore> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  MemoriesSeenStore create(Ref ref) {
+    return memoriesSeenStore(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(MemoriesSeenStore value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<MemoriesSeenStore>(value),
+    );
+  }
+}
+
+String _$memoriesSeenStoreHash() => r'6f7a351fb383ee0fbb4393bb12049626c7ced93b';
+
 @ProviderFor(memoryPhotoUrls)
 final memoryPhotoUrlsProvider = MemoryPhotoUrlsProvider._();
 
@@ -285,4 +332,197 @@ final class RecentMemoriesFamily extends $Family
 
   @override
   String toString() => r'recentMemoriesProvider';
+}
+
+/// The moment this device last opened the circle's memories gallery, restored
+/// after restarts so the dock badge only counts moments not yet seen.
+
+@ProviderFor(MemoriesSeenController)
+final memoriesSeenControllerProvider = MemoriesSeenControllerFamily._();
+
+/// The moment this device last opened the circle's memories gallery, restored
+/// after restarts so the dock badge only counts moments not yet seen.
+final class MemoriesSeenControllerProvider
+    extends $NotifierProvider<MemoriesSeenController, DateTime> {
+  /// The moment this device last opened the circle's memories gallery, restored
+  /// after restarts so the dock badge only counts moments not yet seen.
+  MemoriesSeenControllerProvider._({
+    required MemoriesSeenControllerFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'memoriesSeenControllerProvider',
+         isAutoDispose: false,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$memoriesSeenControllerHash();
+
+  @override
+  String toString() {
+    return r'memoriesSeenControllerProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  MemoriesSeenController create() => MemoriesSeenController();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(DateTime value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<DateTime>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MemoriesSeenControllerProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$memoriesSeenControllerHash() =>
+    r'dc42256a6a65b1328e5ecb2cfb345b9f56f89007';
+
+/// The moment this device last opened the circle's memories gallery, restored
+/// after restarts so the dock badge only counts moments not yet seen.
+
+final class MemoriesSeenControllerFamily extends $Family
+    with
+        $ClassFamilyOverride<
+          MemoriesSeenController,
+          DateTime,
+          DateTime,
+          DateTime,
+          String
+        > {
+  MemoriesSeenControllerFamily._()
+    : super(
+        retry: null,
+        name: r'memoriesSeenControllerProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: false,
+      );
+
+  /// The moment this device last opened the circle's memories gallery, restored
+  /// after restarts so the dock badge only counts moments not yet seen.
+
+  MemoriesSeenControllerProvider call(String circleId) =>
+      MemoriesSeenControllerProvider._(argument: circleId, from: this);
+
+  @override
+  String toString() => r'memoriesSeenControllerProvider';
+}
+
+/// The moment this device last opened the circle's memories gallery, restored
+/// after restarts so the dock badge only counts moments not yet seen.
+
+abstract class _$MemoriesSeenController extends $Notifier<DateTime> {
+  late final _$args = ref.$arg as String;
+  String get circleId => _$args;
+
+  DateTime build(String circleId);
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<DateTime, DateTime>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<DateTime, DateTime>,
+              DateTime,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, () => build(_$args));
+  }
+}
+
+@ProviderFor(memoriesUnreadCount)
+final memoriesUnreadCountProvider = MemoriesUnreadCountFamily._();
+
+final class MemoriesUnreadCountProvider
+    extends $FunctionalProvider<int, int, int>
+    with $Provider<int> {
+  MemoriesUnreadCountProvider._({
+    required MemoriesUnreadCountFamily super.from,
+    required MemoriesUnreadQuery super.argument,
+  }) : super(
+         retry: null,
+         name: r'memoriesUnreadCountProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$memoriesUnreadCountHash();
+
+  @override
+  String toString() {
+    return r'memoriesUnreadCountProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<int> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  int create(Ref ref) {
+    final argument = this.argument as MemoriesUnreadQuery;
+    return memoriesUnreadCount(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(int value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<int>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MemoriesUnreadCountProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$memoriesUnreadCountHash() =>
+    r'17481a245aa8f222c34dc2b91f3e295deb6d7721';
+
+final class MemoriesUnreadCountFamily extends $Family
+    with $FunctionalFamilyOverride<int, MemoriesUnreadQuery> {
+  MemoriesUnreadCountFamily._()
+    : super(
+        retry: null,
+        name: r'memoriesUnreadCountProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  MemoriesUnreadCountProvider call(MemoriesUnreadQuery query) =>
+      MemoriesUnreadCountProvider._(argument: query, from: this);
+
+  @override
+  String toString() => r'memoriesUnreadCountProvider';
 }

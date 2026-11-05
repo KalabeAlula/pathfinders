@@ -101,6 +101,14 @@ flutter:
     - assets/pets/
     - assets/avatars/
 
+  fonts:
+    - family: PhosphorDuotone
+      fonts:
+        - asset: assets/fonts/Phosphor-Duotone.ttf
+    - family: PhosphorFill
+      fonts:
+        - asset: assets/fonts/Phosphor-Fill.ttf
+
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

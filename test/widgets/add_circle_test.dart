@@ -12,7 +12,7 @@ import 'package:pathfinders/features/circle/domain/circle_snapshot.dart';
 import 'package:pathfinders/features/circle/domain/circle_summary.dart';
 import 'package:pathfinders/features/circle/domain/group_type.dart';
 import 'package:pathfinders/features/circle/presentation/create_group_screen.dart';
-import 'package:pathfinders/features/circle/presentation/widgets/group_switcher_sheet.dart';
+import 'package:pathfinders/features/circle/presentation/widgets/add_circle_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 CircleSummary _summary(
@@ -118,8 +118,8 @@ class _Host extends StatelessWidget {
       body: Center(
         child: Builder(
           builder: (context) => FilledButton(
-            onPressed: () => showGroupSwitcher(context, userId: 'u'),
-            child: const Text('Open groups'),
+            onPressed: () => showAddCircleSheet(context, userId: 'u'),
+            child: const Text('Add circle'),
           ),
         ),
       ),
@@ -151,55 +151,45 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('shows every group and switches the active one', (tester) async {
-    final repository = _FakeCircleRepository([
-      _summary('c1', name: 'Bole Crew', members: 3),
-      _summary(
-        'c2',
-        name: 'Family Table',
-        type: GroupType.family,
-        members: 5,
-        petId: 'lion',
-        petName: 'Anbessa',
-      ),
-    ]);
-    addTearDown(repository.dispose);
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-
-    await _pump(tester, repository, const _Host());
-    await tester.tap(find.text('Open groups'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Your groups'), findsOneWidget);
-    expect(find.text('Bole Crew'), findsOneWidget);
-    expect(find.text('FRIENDS'), findsOneWidget);
-    expect(find.text('3 of 4 members · Gelada Momo'), findsOneWidget);
-    expect(find.text('FAMILY'), findsOneWidget);
-    expect(
-      find.text('5 of 6 members · Black-maned Ethiopian Lion Anbessa'),
-      findsOneWidget,
-    );
-    expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
-
-    await tester.tap(find.text('Family Table'));
-    await tester.pumpAndSettle();
-
-    final preferences = await SharedPreferences.getInstance();
-    expect(ActiveCircleStore(preferences).read('u'), 'c2');
-    expect(find.text('Your groups'), findsNothing);
-  });
-
-  testWidgets('Create Circle opens the four-step flow', (tester) async {
+  testWidgets('the + action offers creating and joining a circle', (
+    tester,
+  ) async {
     final repository = _FakeCircleRepository([
       _summary('c1', name: 'Bole Crew'),
     ]);
     addTearDown(repository.dispose);
 
     await _pump(tester, repository, const _Host());
-    await tester.tap(find.text('Open groups'));
+    await tester.tap(find.text('Add circle'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Create Circle'));
+    expect(find.text('Add a circle'), findsOneWidget);
+    expect(find.text('Create a Circle'), findsOneWidget);
+    expect(find.text('Join a Circle'), findsOneWidget);
+    expect(find.byIcon(Icons.group_add_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.vpn_key_outlined), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('add-join-circle')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('join-code')), findsOneWidget);
+    expect(
+      find.text('Enter the invite code shared by your circle creator.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Create a Circle opens the four-step flow', (tester) async {
+    final repository = _FakeCircleRepository([
+      _summary('c1', name: 'Bole Crew'),
+    ]);
+    addTearDown(repository.dispose);
+
+    await _pump(tester, repository, const _Host());
+    await tester.tap(find.text('Add circle'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('add-create-circle')));
     await tester.pumpAndSettle();
 
     expect(find.byType(CreateGroupScreen), findsOneWidget);

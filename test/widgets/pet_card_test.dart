@@ -95,7 +95,7 @@ void main() {
 
     expect(find.text('Walia'), findsOneWidget);
     expect(find.text('Walia Ibex'), findsOneWidget);
-    expect(find.text('ዋልያ · Happy'), findsOneWidget);
+    expect(find.text('ዋልያ · Resting · Happy'), findsOneWidget);
     expect(find.text('Native to Simien Mountains cliffs'), findsOneWidget);
     expect(find.text('FAMILY'), findsOneWidget);
     expect(find.text('Level 2'), findsOneWidget);

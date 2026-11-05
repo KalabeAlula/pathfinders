@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/app_tokens.dart';
 import '../../../circle/domain/group_type.dart';
 import '../../domain/ethiopian_pet.dart';
+import '../../domain/pet_mood.dart';
 import '../../domain/shared_pet.dart';
+import '../pet_mood_visuals.dart';
 import '../pet_visuals.dart';
-import 'pet_avatar.dart';
+import 'animated_pet_sticker.dart';
 
 Future<void> showCompanionCard(
   BuildContext context, {
@@ -13,14 +15,20 @@ Future<void> showCompanionCard(
   required SharedPet state,
   required GroupType groupType,
   required DateTime now,
+  PetMood mood = PetMood.idle,
 }) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (_) =>
-        CompanionCard(pet: pet, state: state, groupType: groupType, now: now),
+    builder: (_) => CompanionCard(
+      pet: pet,
+      state: state,
+      groupType: groupType,
+      now: now,
+      mood: mood,
+    ),
   );
 }
 
@@ -32,17 +40,19 @@ class CompanionCard extends StatelessWidget {
     required this.state,
     required this.groupType,
     required this.now,
+    this.mood = PetMood.idle,
   });
 
   final EthiopianPet pet;
   final SharedPet state;
   final GroupType groupType;
   final DateTime now;
+  final PetMood mood;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final mood = state.moodAt(now);
+    final careMood = state.careMoodAt(now);
     final xpLeft = SharedPet.experiencePerLevel - state.xpIntoLevel;
 
     return Container(
@@ -77,7 +87,7 @@ class CompanionCard extends StatelessWidget {
               const SizedBox(height: AppSpacing.lg),
               Row(
                 children: [
-                  PetAvatar(pet: pet, size: 76),
+                  AnimatedPetSticker(pet: pet, mood: mood, size: 84),
                   const SizedBox(width: AppSpacing.lg),
                   Expanded(
                     child: Column(
@@ -115,7 +125,8 @@ class CompanionCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${pet.amharicName} · ${mood.label}',
+                          '${pet.amharicName} · ${mood.label} · '
+                          '${careMood.label}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodySmall

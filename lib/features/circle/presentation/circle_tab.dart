@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/navigation/glass_dock.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../app/widgets/battery_badge.dart';
 import '../../../app/widgets/bento_card.dart';
@@ -12,18 +13,21 @@ import '../../location/application/telemetry_providers.dart';
 import '../../location/presentation/widgets/sharing_notice_banner.dart';
 import '../../nudges/domain/nudge.dart';
 import '../../nudges/presentation/warmth_actions.dart';
+import '../../pet/application/pet_mood_providers.dart';
 import '../../pet/domain/ethiopian_pet.dart';
 import '../../pet/domain/pet_care_action.dart';
 import '../../pet/domain/shared_pet.dart';
-import '../../pet/presentation/pet_visuals.dart';
+import '../../pet/presentation/pet_mood_visuals.dart';
+import '../../pet/presentation/widgets/animated_pet_sticker.dart';
 import '../../pet/presentation/widgets/companion_sheet.dart';
-import '../../pet/presentation/widgets/pet_avatar.dart';
 import '../../pet/presentation/widgets/pet_card.dart';
+import '../application/circle_providers.dart';
 import '../domain/circle_member.dart';
 import '../domain/circle_snapshot.dart';
 import 'member_status_label.dart';
+import 'widgets/add_circle_sheet.dart';
+import 'widgets/circle_hub_carousel.dart';
 import 'widgets/circle_settings_sheet.dart';
-import 'widgets/group_switcher_sheet.dart';
 import 'widgets/group_type_badge.dart';
 import 'widgets/member_detail_sheet.dart';
 
@@ -90,16 +94,21 @@ class CircleTab extends ConsumerWidget {
     );
     final quickEmoji = NudgeWarmth.defaultFor(circle.type).emoji;
     final openSeats = circle.capacity - snapshot.members.length;
+    final mood = ref.watch(petMoodProvider(circle.id));
+    final circles = ref.watch(circlesProvider(currentUserId)).value;
 
     void openCompanion() {
       showCompanionCard(
         context,
         pet: species,
         state: pet,
+        mood: mood,
         groupType: circle.type,
         now: now,
       );
     }
+
+    void addCircle() => showAddCircleSheet(context, userId: currentUserId);
 
     void quickWarmth(CircleMember member) => sendWarmth(
       context,
@@ -121,7 +130,10 @@ class CircleTab extends ConsumerWidget {
     return SafeArea(
       bottom: false,
       child: ListView(
-        padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.xxl),
+        padding: EdgeInsets.only(
+          top: AppSpacing.md,
+          bottom: AppSpacing.xxl + ShellDock.contentInset(context),
+        ),
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
@@ -132,31 +144,30 @@ class CircleTab extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Your circle',
+                        'Your circles',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
                       ),
                       const SizedBox(height: 1),
-                      Text(circle.name, style: theme.textTheme.headlineSmall),
-                      const SizedBox(height: 2),
                       Text(
-                        '${snapshot.members.length} of ${circle.capacity} '
-                        '${snapshot.members.length == 1 ? 'member' : 'members'}'
-                        ' · ${circle.type.label}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
+                        circles == null
+                            ? 'Shared with ${circle.name}'
+                            : '${circles.length} '
+                                  '${circles.length == 1 ? 'circle' : 'circles'}'
+                                  ' · sharing with ${circle.name}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium,
                       ),
                     ],
                   ),
                 ),
                 _RoundAction(
-                  key: const ValueKey('circle-switcher'),
-                  icon: Icons.swap_horiz_rounded,
-                  tooltip: 'Switch circle',
-                  onTap: () =>
-                      showGroupSwitcher(context, userId: currentUserId),
+                  key: const ValueKey('circle-add'),
+                  icon: Icons.add_rounded,
+                  tooltip: 'Create or join a circle',
+                  onTap: addCircle,
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 _RoundAction(
@@ -172,7 +183,39 @@ class CircleTab extends ConsumerWidget {
               ],
             ),
           ),
+          const SizedBox(height: 12),
+          CircleHubCarousel(
+            userId: currentUserId,
+            activeMood: mood,
+            onAdd: addCircle,
+          ),
           const SizedBox(height: 18),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your circle',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(circle.name, style: theme.textTheme.headlineSmall),
+                const SizedBox(height: 2),
+                Text(
+                  '${snapshot.members.length} of ${circle.capacity} '
+                  '${snapshot.members.length == 1 ? 'member' : 'members'}'
+                  ' · ${circle.type.label}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
             child: Column(
@@ -196,7 +239,11 @@ class CircleTab extends ConsumerWidget {
                         onTap: openCompanion,
                         child: Tooltip(
                           message: 'Meet ${pet.name}',
-                          child: PetAvatar(pet: species, size: 62),
+                          child: AnimatedPetSticker(
+                            pet: species,
+                            mood: mood,
+                            size: 72,
+                          ),
                         ),
                       ),
                       const SizedBox(width: AppSpacing.md),
@@ -231,8 +278,7 @@ class CircleTab extends ConsumerWidget {
                             ),
                             const SizedBox(height: 1),
                             Text(
-                              '${pet.moodAt(now).label} · '
-                              'Level ${pet.level}',
+                              '${mood.label} · Level ${pet.level}',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: scheme.onSurfaceVariant,
                               ),

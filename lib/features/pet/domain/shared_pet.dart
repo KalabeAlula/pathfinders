@@ -1,7 +1,9 @@
 import '../../circle/domain/circle.dart';
 import 'pet_care_action.dart';
 
-enum PetMood { happy, content, hungry, sleepy, dirty, playing }
+/// How the companion is doing on the care stats. Distinct from PetMood,
+/// which describes what the circle is up to.
+enum PetCareMood { happy, content, hungry, sleepy, dirty, playing }
 
 /// The circle's shared companion. Stats are doubles so slow decay is not lost
 /// to rounding between render ticks; screens round for display.
@@ -65,18 +67,18 @@ class SharedPet {
 
   double get levelProgress => xpIntoLevel / experiencePerLevel;
 
-  PetMood moodAt(DateTime now) {
+  PetCareMood careMoodAt(DateTime now) {
     final actionAt = lastActionAt;
     if (lastAction == PetCareAction.play &&
         actionAt != null &&
         now.difference(actionAt) < playingWindow) {
-      return PetMood.playing;
+      return PetCareMood.playing;
     }
-    if (energy < 25) return PetMood.sleepy;
-    if (hunger < 30) return PetMood.hungry;
-    if (hygiene < 30) return PetMood.dirty;
-    if (happiness >= 70) return PetMood.happy;
-    return PetMood.content;
+    if (energy < 25) return PetCareMood.sleepy;
+    if (hunger < 30) return PetCareMood.hungry;
+    if (hygiene < 30) return PetCareMood.dirty;
+    if (happiness >= 70) return PetCareMood.happy;
+    return PetCareMood.content;
   }
 
   SharedPet caredFor(PetCareAction action, DateTime at) {

@@ -4,9 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pathfinders/app/theme/app_theme.dart';
 import 'package:pathfinders/core/application/clock_provider.dart';
+import 'package:pathfinders/core/storage/storage_providers.dart';
+import 'package:pathfinders/features/circle/application/circle_providers.dart';
 import 'package:pathfinders/features/circle/domain/circle.dart';
 import 'package:pathfinders/features/circle/domain/circle_member.dart';
 import 'package:pathfinders/features/circle/domain/circle_snapshot.dart';
+import 'package:pathfinders/features/circle/domain/circle_summary.dart';
 import 'package:pathfinders/features/circle/domain/group_type.dart';
 import 'package:pathfinders/features/circle/domain/user_profile.dart';
 import 'package:pathfinders/features/circle/presentation/circle_tab.dart';
@@ -15,6 +18,9 @@ import 'package:pathfinders/features/location/domain/device_telemetry.dart';
 import 'package:pathfinders/features/location/domain/geo_point.dart';
 import 'package:pathfinders/features/location/domain/member_status.dart';
 import 'package:pathfinders/features/location/domain/privacy_mode.dart';
+import 'package:pathfinders/features/pet/application/pet_mood_providers.dart';
+import 'package:pathfinders/features/pet/domain/pet_mood.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   final now = DateTime(2026, 11, 5, 18);
@@ -68,15 +74,32 @@ void main() {
     ],
   );
 
+  final summaries = [
+    CircleSummary(
+      id: 'c1',
+      name: 'Trail Crew',
+      type: GroupType.friends,
+      memberCount: 2,
+      createdAt: now,
+      petId: 'gelada',
+      petName: 'Desta',
+    ),
+  ];
+
   Future<void> pumpTab(WidgetTester tester) async {
-    tester.view.physicalSize = const Size(900, 1600);
+    tester.view.physicalSize = const Size(900, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
           appClockProvider.overrideWith((_) => Stream.value(now)),
+          circlesProvider('u1').overrideWith((_) => Stream.value(summaries)),
+          petMoodProvider('c1').overrideWithValue(PetMood.idle),
           telemetryControllerProvider('u1').overrideWithValue(
             const TelemetryState(permission: TelemetryPermission.granted),
           ),
@@ -90,6 +113,7 @@ void main() {
       ),
     );
     await tester.pump();
+    await tester.pump();
   }
 
   testWidgets('shows the circle, companion, and member telemetry', (
@@ -97,10 +121,14 @@ void main() {
   ) async {
     await pumpTab(tester);
 
+    expect(find.text('Your circles'), findsOneWidget);
+    expect(find.text('1 circle · sharing with Trail Crew'), findsOneWidget);
     expect(find.text('Your circle'), findsOneWidget);
-    expect(find.text('Trail Crew'), findsOneWidget);
+    // The hub card and the detail header both name the active circle.
+    expect(find.text('Trail Crew'), findsNWidgets(2));
     expect(find.text('2 of 4 members · Friends'), findsOneWidget);
-    expect(find.text('FRIENDS'), findsOneWidget);
+    // The carousel badge and the companion card badge.
+    expect(find.text('FRIENDS'), findsNWidgets(2));
 
     expect(find.text('Desta the Gelada'), findsOneWidget);
     expect(find.textContaining('Level 1'), findsOneWidget);

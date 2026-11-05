@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_tokens.dart';
+import '../../../circle/application/circle_providers.dart';
 import '../../../memories/presentation/widgets/memory_composer_sheet.dart';
+import '../../../pet/domain/ethiopian_pet.dart';
+import '../../../pet/domain/pet_mood.dart';
+import '../../../pet/presentation/widgets/animated_pet_sticker.dart';
 import '../../application/arrival_controller.dart';
 import '../../application/navigation_providers.dart';
 import '../../domain/arrival.dart';
@@ -82,6 +86,12 @@ class _ArrivalCardState extends ConsumerState<ArrivalCard> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final compact = widget.compact;
+    final companion = ref.watch(
+      circleSnapshotProvider(widget.currentUserId).select((snapshot) {
+        final circle = snapshot.value?.circle;
+        return circle == null ? null : EthiopianPet.byId(circle.petId);
+      }),
+    );
 
     return RepaintBoundary(
       child: Padding(
@@ -109,20 +119,27 @@ class _ArrivalCardState extends ConsumerState<ArrivalCard> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: scheme.tertiaryContainer,
+                  if (companion != null)
+                    AnimatedPetSticker(
+                      pet: companion,
+                      mood: PetMood.celebrating,
+                      size: 40,
+                    )
+                  else
+                    Container(
+                      width: 34,
+                      height: 34,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: scheme.tertiaryContainer,
+                      ),
+                      child: Icon(
+                        Icons.celebration_rounded,
+                        size: 18,
+                        color: scheme.onTertiaryContainer,
+                      ),
                     ),
-                    child: Icon(
-                      Icons.celebration_rounded,
-                      size: 18,
-                      color: scheme.onTertiaryContainer,
-                    ),
-                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(

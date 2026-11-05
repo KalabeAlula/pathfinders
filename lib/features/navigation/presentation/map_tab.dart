@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart'
     hide Size, Visibility;
 
+import '../../../app/navigation/glass_dock.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../core/application/app_visibility.dart';
 import '../../../core/config/mapbox_config.dart';
@@ -765,7 +766,6 @@ class _MapTabState extends ConsumerState<MapTab> {
       );
     }
 
-    final safeBottom = MediaQuery.paddingOf(context).bottom;
     final configured = MapboxConfig.isConfigured;
     // Offstage native views still own a window surface on Android, and it can
     // reappear above the active tab after the app resumes. Only keep the
@@ -832,7 +832,7 @@ class _MapTabState extends ConsumerState<MapTab> {
               Positioned(
                 left: 12,
                 right: 12,
-                bottom: safeBottom + 12,
+                bottom: ShellDock.contentInset(context),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,

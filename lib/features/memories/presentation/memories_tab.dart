@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/navigation/glass_dock.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../app/widgets/bento_card.dart';
 import '../../../core/utils/time_format.dart';
@@ -118,7 +119,7 @@ class _MemoriesTabState extends ConsumerState<MemoriesTab> {
           ),
           Positioned(
             right: AppSpacing.xl,
-            bottom: AppSpacing.xl,
+            bottom: AppSpacing.xl + ShellDock.contentInset(context),
             child: FloatingActionButton.extended(
               key: const ValueKey('new-memory-fab'),
               onPressed: _addMemory,
@@ -271,11 +272,11 @@ class _Gallery extends StatelessWidget {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
+            padding: EdgeInsets.fromLTRB(
               AppSpacing.xl,
               AppSpacing.md,
               AppSpacing.xl,
-              104,
+              104 + ShellDock.contentInset(context),
             ),
             sliver: SliverGrid(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

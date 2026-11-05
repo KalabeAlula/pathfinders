@@ -97,10 +97,10 @@ void main() {
         lastActionAt: createdAt,
       );
 
-      expect(played.moodAt(createdAt), PetMood.playing);
+      expect(played.careMoodAt(createdAt), PetCareMood.playing);
       expect(
-        played.moodAt(createdAt.add(const Duration(minutes: 5))),
-        PetMood.happy,
+        played.careMoodAt(createdAt.add(const Duration(minutes: 5))),
+        PetCareMood.happy,
       );
     });
 
@@ -116,7 +116,7 @@ void main() {
         happiness: 90,
         updatedAt: createdAt,
       );
-      expect(hungry.moodAt(createdAt), PetMood.hungry);
+      expect(hungry.careMoodAt(createdAt), PetCareMood.hungry);
 
       final sleepy = SharedPet(
         name: 'Momo',
@@ -129,7 +129,7 @@ void main() {
         happiness: 80,
         updatedAt: createdAt,
       );
-      expect(sleepy.moodAt(createdAt), PetMood.sleepy);
+      expect(sleepy.careMoodAt(createdAt), PetCareMood.sleepy);
     });
   });
 
@@ -167,7 +167,7 @@ void main() {
       expect(mapped.updatedAt, createdAt);
       expect(mapped.lastAction, PetCareAction.clean);
       expect(mapped.lastActionAt, createdAt);
-      expect(mapped.moodAt(createdAt), PetMood.happy);
+      expect(mapped.careMoodAt(createdAt), PetCareMood.happy);
     });
 
     test('falls back to creation time when a circle has no pet timestamp', () {

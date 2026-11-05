@@ -9,6 +9,7 @@ import '../../features/circle/presentation/circle_tab.dart';
 import '../../features/circle/presentation/widgets/member_detail_sheet.dart';
 import '../../features/location/application/telemetry_providers.dart';
 import '../../features/location/domain/geo_point.dart';
+import '../../features/memories/application/memories_providers.dart';
 import '../../features/memories/presentation/memories_tab.dart';
 import '../../features/navigation/application/map_focus_providers.dart';
 import '../../features/navigation/presentation/map_tab.dart';
@@ -38,9 +39,22 @@ class MainShellScreen extends ConsumerWidget {
     final unreadChats = ref.watch(
       chatUnreadCountProvider((circleId: circleId, userId: currentUserId)),
     );
+    final newMemories = ref.watch(
+      memoriesUnreadCountProvider((circleId: circleId, userId: currentUserId)),
+    );
     final activeNudge = ref.watch(
       nudgeControllerProvider(circleId, currentUserId),
     );
+
+    // Opening the gallery clears its badge, and moments that land while the
+    // member is already watching the gallery are marked seen as they arrive.
+    if (tab == AppTab.memories && newMemories > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref
+            .read(memoriesSeenControllerProvider(circleId).notifier)
+            .markSeen();
+      });
+    }
 
     // The shell stays mounted for the whole signed-in session, so watching the
     // heartbeat here keeps sharing alive across every tab.
@@ -68,6 +82,7 @@ class MainShellScreen extends ConsumerWidget {
       index: tab.index,
       onSelect: (index) => select(AppTab.values[index]),
       unreadChats: unreadChats,
+      newMemories: newMemories,
       overlay: activeNudge == null
           ? null
           : WarmthBanner(

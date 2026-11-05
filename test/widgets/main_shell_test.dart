@@ -94,6 +94,32 @@ void main() {
     expect(find.text('3'), findsNothing);
   });
 
+  testWidgets('shows a memories badge until the new moments are opened', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const _ShellHarness(newMemories: 2));
+
+    expect(find.text('2'), findsWidgets);
+    expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, isTrue);
+  });
+
+  testWidgets('floats the dock above the system inset with glass blur', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const _ShellHarness());
+
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+    expect(scaffold.extendBody, isTrue);
+    expect(find.byType(BackdropFilter), findsOneWidget);
+
+    // The dock keeps a 24dp minimum gap above a three-button bar.
+    final dockBottom = tester.getBottomLeft(find.byType(NavigationBar)).dy;
+    final viewBottom = tester
+        .getBottomLeft(find.byType(IndexedStack))
+        .dy;
+    expect(viewBottom - dockBottom, greaterThanOrEqualTo(24));
+  });
+
   testWidgets('draws the overlay banner above the shell', (tester) async {
     await tester.pumpWidget(const _ShellHarness(overlay: Text('Warmth!')));
 
@@ -107,9 +133,10 @@ void main() {
 }
 
 class _ShellHarness extends StatefulWidget {
-  const _ShellHarness({this.unreadChats = 0, this.overlay});
+  const _ShellHarness({this.unreadChats = 0, this.newMemories = 0, this.overlay});
 
   final int unreadChats;
+  final int newMemories;
   final Widget? overlay;
 
   @override
@@ -127,6 +154,7 @@ class _ShellHarnessState extends State<_ShellHarness> {
         index: _index,
         onSelect: (index) => setState(() => _index = index),
         unreadChats: widget.unreadChats,
+        newMemories: widget.newMemories,
         overlay: widget.overlay,
         children: const [
           Center(child: Text('Circle page')),

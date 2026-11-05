@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../app/navigation/glass_dock.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../app/widgets/bento_card.dart';
 import '../../auth/application/auth_providers.dart';
@@ -175,11 +176,11 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
     return SafeArea(
       bottom: false,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(
+        padding: EdgeInsets.fromLTRB(
           AppSpacing.xl,
           AppSpacing.md,
           AppSpacing.xl,
-          AppSpacing.xxl,
+          AppSpacing.xxl + ShellDock.contentInset(context),
         ),
         children: [
           Row(

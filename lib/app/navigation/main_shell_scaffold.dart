@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_tokens.dart';
+import 'glass_dock.dart';
 
-/// The persistent shell chrome: an [IndexedStack] of tabs above a warm
-/// Material 3 navigation bar.
+/// The persistent shell chrome: an [IndexedStack] of tabs behind a floating
+/// frosted dock.
 ///
 /// Keeping every tab mounted is deliberate. Tabs that hold native surfaces
 /// (the Mapbox view) or in-flight streams must not be rebuilt when the member
@@ -14,6 +15,7 @@ class MainShellScaffold extends StatelessWidget {
     required this.index,
     required this.onSelect,
     required this.unreadChats,
+    required this.newMemories,
     required this.children,
     this.overlay,
   });
@@ -21,6 +23,7 @@ class MainShellScaffold extends StatelessWidget {
   final int index;
   final ValueChanged<int> onSelect;
   final int unreadChats;
+  final int newMemories;
   final List<Widget> children;
 
   /// Drawn above every tab, e.g. the warmth banner.
@@ -28,92 +31,18 @@ class MainShellScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final scheme = Theme.of(context).colorScheme;
 
     final scaffold = Scaffold(
       backgroundColor: scheme.surface,
+      // The dock floats over the tabs so the frosted glass has content to blur.
+      extendBody: true,
       body: IndexedStack(index: index, children: children),
-      bottomNavigationBar: DecoratedBox(
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerLowest,
-          border: Border(top: BorderSide(color: scheme.outlineVariant)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 18,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: NavigationBarTheme(
-          data: NavigationBarThemeData(
-            backgroundColor: scheme.surfaceContainerLowest,
-            surfaceTintColor: Colors.transparent,
-            indicatorColor: scheme.primaryContainer,
-            elevation: 0,
-            height: 68,
-            labelTextStyle: WidgetStateProperty.resolveWith((states) {
-              final selected = states.contains(WidgetState.selected);
-              return theme.textTheme.labelSmall?.copyWith(
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                color: selected ? scheme.primary : scheme.onSurfaceVariant,
-              );
-            }),
-            iconTheme: WidgetStateProperty.resolveWith((states) {
-              final selected = states.contains(WidgetState.selected);
-              return IconThemeData(
-                size: 24,
-                color: selected
-                    ? scheme.onPrimaryContainer
-                    : scheme.onSurfaceVariant,
-              );
-            }),
-          ),
-          child: NavigationBar(
-            selectedIndex: index,
-            onDestinationSelected: onSelect,
-            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-            destinations: [
-              const NavigationDestination(
-                key: ValueKey('tab-circle'),
-                icon: Icon(Icons.group_outlined),
-                selectedIcon: Icon(Icons.group_rounded),
-                label: 'Circle',
-              ),
-              NavigationDestination(
-                key: const ValueKey('tab-chat'),
-                icon: _ChatIcon(
-                  unread: unreadChats,
-                  icon: Icons.chat_bubble_outline_rounded,
-                ),
-                selectedIcon: _ChatIcon(
-                  unread: unreadChats,
-                  icon: Icons.chat_bubble_rounded,
-                ),
-                label: 'Chat',
-              ),
-              const NavigationDestination(
-                key: ValueKey('tab-map'),
-                icon: Icon(Icons.map_outlined),
-                selectedIcon: Icon(Icons.map_rounded),
-                label: 'Map',
-              ),
-              const NavigationDestination(
-                key: ValueKey('tab-memories'),
-                icon: Icon(Icons.photo_library_outlined),
-                selectedIcon: Icon(Icons.photo_library_rounded),
-                label: 'Memories',
-              ),
-              const NavigationDestination(
-                key: ValueKey('tab-profile'),
-                icon: Icon(Icons.person_outline_rounded),
-                selectedIcon: Icon(Icons.person_rounded),
-                label: 'Profile',
-              ),
-            ],
-          ),
-        ),
+      bottomNavigationBar: GlassDock(
+        index: index,
+        onSelect: onSelect,
+        unreadChats: unreadChats,
+        newMemories: newMemories,
       ),
     );
 
@@ -130,24 +59,6 @@ class MainShellScaffold extends StatelessWidget {
           child: banner,
         ),
       ],
-    );
-  }
-}
-
-class _ChatIcon extends StatelessWidget {
-  const _ChatIcon({required this.unread, required this.icon});
-
-  final int unread;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    if (unread <= 0) return Icon(icon);
-    return Badge.count(
-      count: unread,
-      backgroundColor: Theme.of(context).colorScheme.primary,
-      textColor: Theme.of(context).colorScheme.onPrimary,
-      child: Icon(icon),
     );
   }
 }

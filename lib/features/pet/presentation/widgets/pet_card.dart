@@ -25,7 +25,7 @@ class PetCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final mood = pet.moodAt(now);
+    final mood = pet.careMoodAt(now);
     final badgeIcon = mood.badgeIcon ?? Icons.pets_rounded;
     final companion = EthiopianPet.byId(pet.species);
 
