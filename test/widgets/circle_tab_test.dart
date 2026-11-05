@@ -20,6 +20,7 @@ import 'package:pathfinders/features/location/domain/member_status.dart';
 import 'package:pathfinders/features/location/domain/privacy_mode.dart';
 import 'package:pathfinders/features/pet/application/pet_mood_providers.dart';
 import 'package:pathfinders/features/pet/domain/pet_mood.dart';
+import 'package:pathfinders/features/pet/presentation/widgets/animated_pet_sticker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -86,8 +87,11 @@ void main() {
     ),
   ];
 
-  Future<void> pumpTab(WidgetTester tester) async {
-    tester.view.physicalSize = const Size(900, 2400);
+  Future<void> pumpTab(
+    WidgetTester tester, {
+    Size size = const Size(900, 2400),
+  }) async {
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     SharedPreferences.setMockInitialValues({});
@@ -121,33 +125,42 @@ void main() {
   ) async {
     await pumpTab(tester);
 
-    expect(find.text('Your groups'), findsOneWidget);
-    expect(find.text('1 group · sharing with Trail Crew'), findsOneWidget);
-    expect(find.text('Your group'), findsOneWidget);
-    // The hub card and the detail header both name the active circle.
+    expect(find.text('ACTIVE CIRCLE'), findsOneWidget);
+    expect(find.text('Switch circle'), findsOneWidget);
+    // The hero names the active circle; the switcher offers it back as a pill.
     expect(find.text('Trail Crew'), findsNWidgets(2));
-    expect(find.text('2 of 4 members · Friends'), findsOneWidget);
-    // The carousel badge and the companion card badge.
-    expect(find.text('FRIENDS'), findsNWidgets(2));
+    expect(find.text('FRIENDS'), findsOneWidget);
+    expect(find.text('2 of 4 members • 2 active now'), findsOneWidget);
 
-    expect(find.text('Desta the Gelada'), findsOneWidget);
+    expect(find.text('Desta'), findsOneWidget);
     expect(find.textContaining('Level 1'), findsOneWidget);
-    expect(find.text('2 open seats'), findsOneWidget);
-
-    expect(find.text('PF-9K2Q'), findsOneWidget);
-    expect(
-      find.text('Anyone with this code can join Trail Crew.'),
-      findsOneWidget,
-    );
+    expect(find.byTooltip('Meet Desta'), findsOneWidget);
 
     expect(find.text('Members'), findsOneWidget);
     expect(find.text('Kaleab'), findsOneWidget);
     expect(find.text('you'), findsOneWidget);
     expect(find.byIcon(Icons.workspace_premium_rounded), findsOneWidget);
     expect(find.text('Liya'), findsOneWidget);
+    expect(find.byKey(const ValueKey('circle-settings')), findsOneWidget);
 
     expect(find.text('84%'), findsOneWidget);
     expect(find.text('12%'), findsOneWidget);
+  });
+
+  testWidgets('holds one mascot and fits a 720p phone', (tester) async {
+    await pumpTab(tester, size: const Size(360, 640));
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(AnimatedPetSticker), findsOneWidget);
+
+    await tester.drag(
+      find.byType(ListView).first,
+      const Offset(0, -600),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('circle-hub-add')), findsOneWidget);
   });
 
   testWidgets('copying the invite code confirms with a snackbar', (
