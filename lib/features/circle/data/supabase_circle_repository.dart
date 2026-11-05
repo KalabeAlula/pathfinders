@@ -38,7 +38,12 @@ class SupabaseCircleRepository implements CircleRepository {
   Stream<CircleSnapshot?> watchCircle(String circleId) {
     return _liveStream(
       channelName: 'circle-$circleId-$userId-${_channelSequence++}',
-      tables: const ['circle_members', 'circles', 'member_status'],
+      tables: const [
+        'circle_members',
+        'circles',
+        'member_status',
+        'profiles',
+      ],
       fetch: () => _fetch(circleId),
     );
   }
@@ -277,7 +282,7 @@ class SupabaseCircleRepository implements CircleRepository {
           ? const <Map<String, dynamic>>[]
           : await _client
                 .from('profiles')
-                .select('id, display_name, avatar_color')
+                .select('id, display_name, avatar_color, avatar_id')
                 .inFilter('id', orderedIds);
 
       final profiles = {
@@ -286,6 +291,7 @@ class SupabaseCircleRepository implements CircleRepository {
             id: row['id'] as String,
             displayName: _displayName(row['display_name']),
             avatarColor: (row['avatar_color'] as num?)?.toInt() ?? 0xFFB86B4F,
+            avatarId: _optionalText(row['avatar_id']),
           ),
       };
 
@@ -327,6 +333,11 @@ class SupabaseCircleRepository implements CircleRepository {
   static String _displayName(Object? value) {
     final name = value is String ? value.trim() : '';
     return name.isEmpty ? 'Pathfinder' : name;
+  }
+
+  static String? _optionalText(Object? value) {
+    final text = value is String ? value.trim() : '';
+    return text.isEmpty ? null : text;
   }
 
   static CircleFailure _mapFailure(sb.PostgrestException error) {

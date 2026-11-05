@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../circle/domain/circle_member.dart';
 import '../../../navigation/application/navigation_state.dart';
+import '../../../profile/domain/animal_avatar.dart';
 import 'mapbox_live_annotations.dart';
 
 const _peerRouteColors = <Color>[
@@ -89,11 +90,13 @@ class MapCircleView {
           MapMemberPin(
             id: member.profile.id,
             initials: member.profile.initials,
+            avatarId: AnimalAvatar.byId(member.profile.avatarId).id,
             latitude: member.status!.location!.latitude,
             longitude: member.status!.location!.longitude,
             accent: colors[member.profile.id]!,
             background: scheme.surfaceContainerLowest,
             approximate: member.status!.isApproximate,
+            isCurrentUser: member.profile.id == currentUserId,
           ),
       ],
       lines: [

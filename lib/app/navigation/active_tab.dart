@@ -2,8 +2,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'active_tab.g.dart';
 
-/// The four persistent destinations of the main shell.
-enum AppTab { map, chat, memories, circle }
+/// The five persistent destinations of the main shell, in bar order.
+enum AppTab { circle, chat, map, memories, profile }
 
 /// Remembers the selected destination so it survives rebuilds triggered by
 /// circle data, nudges, or telemetry.

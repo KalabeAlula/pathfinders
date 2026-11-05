@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../features/circle/domain/user_profile.dart';
+import '../../features/profile/domain/animal_avatar.dart';
+import '../../features/profile/presentation/widgets/animal_avatar_view.dart';
 
 /// Generated initials avatar. Keeping avatars offline-first means the circle
 /// still looks like itself before photos load or when a member is paused.
@@ -31,6 +33,7 @@ class MemberAvatar extends StatelessWidget {
     final highlight = Color.lerp(base, Colors.white, 0.28) ?? base;
     final badgeBorder = badgeBorderColor ?? scheme.surfaceContainerLow;
     final badgeSize = size * 0.3;
+    final animal = AnimalAvatar.tryById(profile.avatarId);
 
     return SizedBox(
       width: size,
@@ -61,21 +64,27 @@ class MemberAvatar extends StatelessWidget {
                 ),
               ],
             ),
-            child: Text(
-              profile.initials,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: size * 0.34,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.4,
-                shadows: [
-                  Shadow(
-                    color: Colors.black.withValues(alpha: 0.18),
-                    blurRadius: 2,
+            child: animal == null
+                ? Text(
+                    profile.initials,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: size * 0.34,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black.withValues(alpha: 0.18),
+                          blurRadius: 2,
+                        ),
+                      ],
+                    ),
+                  )
+                : AnimalAvatarView(
+                    avatarId: animal.id,
+                    size: size,
+                    fallbackInitials: profile.initials,
                   ),
-                ],
-              ),
-            ),
           ),
           if (showStatusBadge)
             Positioned(

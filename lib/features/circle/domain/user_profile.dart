@@ -7,12 +7,16 @@ class UserProfile {
     required this.id,
     required this.displayName,
     required this.avatarColor,
+    this.avatarId,
     this.statusLine,
   });
 
   final String id;
   final String displayName;
   final int avatarColor;
+
+  /// Catalog id such as `avatar_wolf`; null for rows that predate avatars.
+  final String? avatarId;
   final String? statusLine;
 
   String get initials {

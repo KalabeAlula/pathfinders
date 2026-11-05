@@ -4,24 +4,28 @@ import 'package:pathfinders/app/navigation/main_shell_scaffold.dart';
 import 'package:pathfinders/app/theme/app_theme.dart';
 
 void main() {
-  testWidgets('renders the four destinations above the tab content', (
+  testWidgets('renders the five destinations in order above the tabs', (
     tester,
   ) async {
     await tester.pumpWidget(const _ShellHarness());
 
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(IndexedStack), findsOneWidget);
-    expect(find.byKey(const ValueKey('tab-map')), findsOneWidget);
-    expect(find.byKey(const ValueKey('tab-chat')), findsOneWidget);
-    expect(find.byKey(const ValueKey('tab-memories')), findsOneWidget);
-    expect(find.byKey(const ValueKey('tab-circle')), findsOneWidget);
 
-    expect(find.text('Map'), findsOneWidget);
-    expect(find.text('Chat'), findsOneWidget);
-    expect(find.text('Memories'), findsOneWidget);
-    expect(find.text('Circle'), findsOneWidget);
+    final destinations = tester
+        .widget<NavigationBar>(find.byType(NavigationBar))
+        .destinations
+        .map((destination) => (destination as NavigationDestination).label)
+        .toList();
+    expect(destinations, ['Circle', 'Chat', 'Map', 'Memories', 'Profile']);
 
-    expect(find.text('Map page'), findsOneWidget);
+    for (final key in ['circle', 'chat', 'map', 'memories', 'profile']) {
+      expect(find.byKey(ValueKey('tab-$key')), findsOneWidget);
+    }
+
+    // Circle is the first tab and the starting index.
+    expect(find.text('Circle page'), findsOneWidget);
+    expect(find.text('Map page'), findsNothing);
   });
 
   testWidgets('tapping a destination switches tabs and preserves state', (
@@ -29,6 +33,8 @@ void main() {
   ) async {
     await tester.pumpWidget(const _ShellHarness());
 
+    await tester.tap(find.byKey(const ValueKey('tab-map')));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Increment'));
     await tester.tap(find.text('Increment'));
     await tester.pump();
@@ -48,11 +54,27 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('tab-memories')));
     await tester.pumpAndSettle();
+    expect(
+      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      3,
+    );
     expect(find.text('Memories page'), findsOneWidget);
     expect(find.text('Chat page'), findsNothing);
 
+    await tester.tap(find.byKey(const ValueKey('tab-profile')));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      4,
+    );
+    expect(find.text('Profile page'), findsOneWidget);
+
     await tester.tap(find.byKey(const ValueKey('tab-map')));
     await tester.pumpAndSettle();
+    expect(
+      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      2,
+    );
     expect(find.text('Map page'), findsOneWidget);
     expect(find.text('Map count 2'), findsOneWidget);
   });
@@ -107,10 +129,11 @@ class _ShellHarnessState extends State<_ShellHarness> {
         unreadChats: widget.unreadChats,
         overlay: widget.overlay,
         children: const [
-          _MapPage(),
-          Center(child: Text('Chat page')),
-          Center(child: Text('Memories page')),
           Center(child: Text('Circle page')),
+          Center(child: Text('Chat page')),
+          _MapPage(),
+          Center(child: Text('Memories page')),
+          Center(child: Text('Profile page')),
         ],
       ),
     );

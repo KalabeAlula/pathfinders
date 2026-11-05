@@ -15,10 +15,11 @@ import '../../features/navigation/presentation/map_tab.dart';
 import '../../features/nudges/application/nudge_providers.dart';
 import '../../features/nudges/presentation/warmth_actions.dart';
 import '../../features/nudges/presentation/widgets/warmth_banner.dart';
+import '../../features/profile/presentation/profile_tab.dart';
 import 'active_tab.dart';
 import 'main_shell_scaffold.dart';
 
-/// The signed-in experience: four persistent tabs over one navigation bar.
+/// The signed-in experience: five persistent tabs over one navigation bar.
 class MainShellScreen extends ConsumerWidget {
   const MainShellScreen({
     super.key,
@@ -75,13 +76,10 @@ class MainShellScreen extends ConsumerWidget {
               isIncoming: activeNudge.fromUserId != currentUserId,
             ),
       children: [
-        MapTab(
-          key: ValueKey('map-$circleId'),
-          circleId: circleId,
+        CircleTab(
+          key: ValueKey('circle-$circleId'),
+          snapshot: snapshot,
           currentUserId: currentUserId,
-          members: snapshot.members,
-          onMemberTap: openMember,
-          onChat: () => select(AppTab.chat),
         ),
         ChatTab(
           key: ValueKey('chat-$circleId'),
@@ -89,6 +87,14 @@ class MainShellScreen extends ConsumerWidget {
           currentUserId: currentUserId,
           active: tab == AppTab.chat,
           onShowLocation: showSharedLocation,
+        ),
+        MapTab(
+          key: ValueKey('map-$circleId'),
+          circleId: circleId,
+          currentUserId: currentUserId,
+          members: snapshot.members,
+          onMemberTap: openMember,
+          onChat: () => select(AppTab.chat),
         ),
         MemoriesTab(
           key: ValueKey('memories-$circleId'),
@@ -100,9 +106,8 @@ class MainShellScreen extends ConsumerWidget {
               member.profile.id: member.profile,
           },
         ),
-        CircleTab(
-          key: ValueKey('circle-$circleId'),
-          snapshot: snapshot,
+        ProfileTab(
+          key: const ValueKey('profile'),
           currentUserId: currentUserId,
         ),
       ],

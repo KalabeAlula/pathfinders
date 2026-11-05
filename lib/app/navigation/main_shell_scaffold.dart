@@ -76,10 +76,10 @@ class MainShellScaffold extends StatelessWidget {
             labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
             destinations: [
               const NavigationDestination(
-                key: ValueKey('tab-map'),
-                icon: Icon(Icons.map_outlined),
-                selectedIcon: Icon(Icons.map_rounded),
-                label: 'Map',
+                key: ValueKey('tab-circle'),
+                icon: Icon(Icons.group_outlined),
+                selectedIcon: Icon(Icons.group_rounded),
+                label: 'Circle',
               ),
               NavigationDestination(
                 key: const ValueKey('tab-chat'),
@@ -94,16 +94,22 @@ class MainShellScaffold extends StatelessWidget {
                 label: 'Chat',
               ),
               const NavigationDestination(
+                key: ValueKey('tab-map'),
+                icon: Icon(Icons.map_outlined),
+                selectedIcon: Icon(Icons.map_rounded),
+                label: 'Map',
+              ),
+              const NavigationDestination(
                 key: ValueKey('tab-memories'),
                 icon: Icon(Icons.photo_library_outlined),
                 selectedIcon: Icon(Icons.photo_library_rounded),
                 label: 'Memories',
               ),
               const NavigationDestination(
-                key: ValueKey('tab-circle'),
-                icon: Icon(Icons.group_outlined),
-                selectedIcon: Icon(Icons.group_rounded),
-                label: 'Circle',
+                key: ValueKey('tab-profile'),
+                icon: Icon(Icons.person_outline_rounded),
+                selectedIcon: Icon(Icons.person_rounded),
+                label: 'Profile',
               ),
             ],
           ),

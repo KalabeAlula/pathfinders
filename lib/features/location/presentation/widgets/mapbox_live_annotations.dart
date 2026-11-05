@@ -11,15 +11,20 @@ class MapMemberPin {
   const MapMemberPin({
     required this.id,
     required this.initials,
+    required this.avatarId,
     required this.latitude,
     required this.longitude,
     required this.accent,
     required this.background,
     required this.approximate,
+    required this.isCurrentUser,
   });
 
   final String id;
   final String initials;
+
+  /// Catalog id resolved to artwork by [MapMarkerImages.memberAvatar].
+  final String avatarId;
   final double latitude;
   final double longitude;
   final Color accent;
@@ -29,9 +34,13 @@ class MapMemberPin {
   /// never mistaken for an exact fix.
   final bool approximate;
 
+  /// The local member gets a wider ring, making "You" easy to find.
+  final bool isCurrentUser;
+
   String get signature =>
-      '$id:${latitude.toStringAsFixed(5)}:${longitude.toStringAsFixed(5)}:'
-      '${accent.toARGB32()}:$approximate';
+      '$id:$avatarId:${latitude.toStringAsFixed(5)}:'
+      '${longitude.toStringAsFixed(5)}:'
+      '${accent.toARGB32()}:$approximate:$isCurrentUser';
 }
 
 class MapRouteLine {
@@ -165,19 +174,22 @@ class MapboxLiveAnnotations {
       final members = snapshot.members;
       final memberOptions = await Future.wait([
         for (final pin in members)
-          MapMarkerImages.member(
+          MapMarkerImages.memberAvatar(
+            avatarId: pin.avatarId,
             initials: pin.initials,
             accent: pin.accent,
             background: pin.background,
             approximate: pin.approximate,
+            isCurrentUser: pin.isCurrentUser,
           ).then(
             (image) => PointAnnotationOptions(
               geometry: Point(
                 coordinates: Position(pin.longitude, pin.latitude),
               ),
               image: image,
-              iconSize: iconScale,
-              iconAnchor: IconAnchor.CENTER,
+              iconSize: pin.isCurrentUser ? iconScale * 1.08 : iconScale,
+              // The triangle tip marks the fix, not the circle centre.
+              iconAnchor: IconAnchor.BOTTOM,
               customData: {'memberId': pin.id},
             ),
           ),
@@ -254,11 +266,11 @@ class MapboxLiveAnnotations {
     final buffer = StringBuffer();
     for (final pin in snapshot.members) {
       buffer
-        ..write('m|${pin.id}|${pin.initials}|')
+        ..write('m|${pin.id}|${pin.avatarId}|${pin.initials}|')
         ..write('${pin.latitude.toStringAsFixed(5)},')
         ..write('${pin.longitude.toStringAsFixed(5)}|')
         ..write('${pin.accent.toARGB32()}|${pin.background.toARGB32()}|')
-        ..write('${pin.approximate};');
+        ..write('${pin.approximate}|${pin.isCurrentUser};');
     }
     for (final route in snapshot.routes) {
       buffer
