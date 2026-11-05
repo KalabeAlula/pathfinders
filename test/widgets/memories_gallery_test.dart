@@ -7,7 +7,9 @@ import 'package:pathfinders/features/memories/domain/memories_failure.dart';
 import 'package:pathfinders/features/memories/domain/memories_repository.dart';
 import 'package:pathfinders/features/memories/domain/memory_photo.dart';
 import 'package:pathfinders/features/memories/domain/memory_post.dart';
-import 'package:pathfinders/features/memories/presentation/memories_gallery_screen.dart';
+import 'package:pathfinders/features/memories/presentation/memories_tab.dart';
+import 'package:pathfinders/features/milestones/application/milestones_providers.dart';
+import 'package:pathfinders/features/milestones/domain/shared_milestone.dart';
 
 const _alex = UserProfile(
   id: 'alex',
@@ -82,13 +84,20 @@ class _FakeMemoriesRepository implements MemoriesRepository {
 
 Widget _host(_FakeMemoriesRepository repository) {
   return ProviderScope(
-    overrides: [memoriesRepositoryProvider('c1').overrideWithValue(repository)],
+    overrides: [
+      memoriesRepositoryProvider('c1').overrideWithValue(repository),
+      milestonesProvider('c1').overrideWith(
+        (_) => Stream.value(const <SharedMilestone>[]),
+      ),
+    ],
     child: MaterialApp(
-      home: MemoriesGalleryScreen(
-        circleId: 'c1',
-        currentUserId: 'alex',
-        authors: const {'alex': _alex, 'sam': _sam, 'nadia': _nadia},
-        now: DateTime(2026, 11, 2, 10),
+      home: Scaffold(
+        body: MemoriesTab(
+          circleId: 'c1',
+          currentUserId: 'alex',
+          authors: const {'alex': _alex, 'sam': _sam, 'nadia': _nadia},
+          now: DateTime(2026, 11, 2, 10),
+        ),
       ),
     ),
   );
@@ -100,8 +109,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Memories'), findsOneWidget);
-    expect(find.text('2 moments'), findsOneWidget);
-    expect(find.text('Newest first'), findsOneWidget);
+    expect(find.text('2 memories'), findsOneWidget);
+    expect(find.text('New memory'), findsOneWidget);
     expect(find.text('Golden hour on Entoto'), findsOneWidget);
     expect(find.text('Flat white and a card game'), findsOneWidget);
     expect(find.text('Alex · 1h ago'), findsOneWidget);
@@ -114,7 +123,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('1 moment'), findsOneWidget);
+    expect(find.text('1 memory'), findsOneWidget);
   });
 
   testWidgets('shows filters only for authors in the feed', (tester) async {
@@ -136,14 +145,14 @@ void main() {
     await tester.tap(find.text('Sam'));
     await tester.pumpAndSettle();
 
-    expect(find.text('1 moment'), findsOneWidget);
+    expect(find.text('1 memory'), findsOneWidget);
     expect(find.text('Flat white and a card game'), findsOneWidget);
     expect(find.text('Golden hour on Entoto'), findsNothing);
 
     await tester.tap(find.text('Everyone'));
     await tester.pumpAndSettle();
 
-    expect(find.text('2 moments'), findsOneWidget);
+    expect(find.text('2 memories'), findsOneWidget);
     expect(find.text('Golden hour on Entoto'), findsOneWidget);
     expect(find.text('Flat white and a card game'), findsOneWidget);
   });
@@ -156,12 +165,12 @@ void main() {
 
     await tester.tap(find.text('Alex'));
     await tester.pumpAndSettle();
-    expect(find.text('1 moment'), findsOneWidget);
+    expect(find.text('1 memory'), findsOneWidget);
 
     await tester.tap(find.text('Alex'));
     await tester.pumpAndSettle();
 
-    expect(find.text('2 moments'), findsOneWidget);
+    expect(find.text('2 memories'), findsOneWidget);
     expect(find.text('Flat white and a card game'), findsOneWidget);
   });
 

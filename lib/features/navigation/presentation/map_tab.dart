@@ -8,7 +8,6 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
 import '../../../app/theme/app_tokens.dart';
 import '../../../core/config/mapbox_config.dart';
 import '../../chat/application/chat_providers.dart';
-import '../../chat/presentation/widgets/group_chat_sheet.dart';
 import '../../circle/application/circle_providers.dart';
 import '../../circle/domain/circle_member.dart';
 import '../../location/application/telemetry_providers.dart';
@@ -18,6 +17,7 @@ import '../../location/presentation/widgets/map_marker_images.dart';
 import '../../location/presentation/widgets/mapbox_live_annotations.dart';
 import '../../location/presentation/widgets/mapbox_standard_style.dart';
 import '../application/destination_draft_providers.dart';
+import '../application/map_focus_providers.dart';
 import '../application/map_search_providers.dart';
 import '../application/navigation_providers.dart';
 import '../domain/navigation_destination.dart';
@@ -31,21 +31,24 @@ import 'widgets/route_eta_card.dart';
 
 const _fallbackCenter = GeoPoint(latitude: 8.999, longitude: 38.775);
 
-/// Full-screen Mapbox picker for the circle's shared destination.
+/// The live Mapbox tab: member pins, routes, destination picking and the
+/// arrival HUD.
 ///
 /// A tap first looks for a named POI or extruded building under the finger.
 /// When one is found the camera tilts onto it and the card shows the venue's
 /// name, category and address. Taps on empty map drop a plain pin that stays
 /// glued to the middle of the map, so dragging is how you fine-tune it.
-class DestinationPickerScreen extends ConsumerStatefulWidget {
-  const DestinationPickerScreen({
+///
+/// The shell keeps this widget mounted across tab switches, so the native map
+/// surface, its camera and annotation managers are never torn down.
+class MapTab extends ConsumerStatefulWidget {
+  const MapTab({
     super.key,
     required this.circleId,
     required this.currentUserId,
     required this.members,
     required this.onMemberTap,
-    this.initialSharedLocation,
-    this.initialSharedLabel,
+    required this.onChat,
   });
 
   final String circleId;
@@ -53,18 +56,14 @@ class DestinationPickerScreen extends ConsumerStatefulWidget {
   final List<CircleMember> members;
   final ValueChanged<CircleMember> onMemberTap;
 
-  /// A place tapped in the chat before this screen opened. The camera lands on
-  /// it and its venue card is ready to set as the destination.
-  final GeoPoint? initialSharedLocation;
-  final String? initialSharedLabel;
+  /// Opens the chat tab, which owns shared locations now.
+  final VoidCallback onChat;
 
   @override
-  ConsumerState<DestinationPickerScreen> createState() =>
-      _DestinationPickerScreenState();
+  ConsumerState<MapTab> createState() => _MapTabState();
 }
 
-class _DestinationPickerScreenState
-    extends ConsumerState<DestinationPickerScreen> {
+class _MapTabState extends ConsumerState<MapTab> {
   late final GeoPoint _initialCenter;
   late final ViewportState _viewport;
 
@@ -82,7 +81,8 @@ class _DestinationPickerScreenState
   bool _querying = false;
   bool _venueFlight = false;
   bool _searchSelection = false;
-  bool _sharedLocationApplied = false;
+  MapFocusRequest? _pendingFocus;
+  int _appliedFocusRevision = 0;
   String? _error;
   double _zoom = 15.2;
   int _idleRun = 0;
@@ -102,12 +102,11 @@ class _DestinationPickerScreenState
       zoom: _zoom,
       pitch: MapboxStandardStyle.pickerPitch,
     );
+    // A request raised before this tab existed is stale.
+    _appliedFocusRevision = ref.read(mapFocusControllerProvider)?.revision ?? 0;
   }
 
   GeoPoint _resolveInitialCenter() {
-    final shared = widget.initialSharedLocation;
-    if (shared != null) return shared;
-
     final destination = ref
         .read(navigationControllerProvider(widget.circleId))
         .destination;
@@ -264,14 +263,22 @@ class _DestinationPickerScreenState
     ref
         .read(mapSearchControllerProvider(widget.currentUserId).notifier)
         .dismiss();
-    unawaited(
-      showGroupChat(
-        context,
-        circleId: widget.circleId,
-        currentUserId: widget.currentUserId,
-        onShowLocation: _showSharedLocation,
-      ),
-    );
+    widget.onChat();
+  }
+
+  void _onFocusRequested(MapFocusRequest? request) {
+    if (request == null) return;
+    _pendingFocus = request;
+    _applyPendingFocus();
+  }
+
+  void _applyPendingFocus() {
+    final focus = _pendingFocus;
+    if (focus == null || !_styleReady) return;
+    _pendingFocus = null;
+    if (focus.revision <= _appliedFocusRevision) return;
+    _appliedFocusRevision = focus.revision;
+    _showSharedLocation(focus.point, focus.label);
   }
 
   void _clearVenueSelection() {
@@ -395,12 +402,7 @@ class _DestinationPickerScreenState
 
     _selectedBuilding = null;
     unawaited(_restoreVenueHighlight(map));
-
-    final shared = widget.initialSharedLocation;
-    if (shared != null && !_sharedLocationApplied) {
-      _sharedLocationApplied = true;
-      _showSharedLocation(shared, widget.initialSharedLabel);
-    }
+    _applyPendingFocus();
   }
 
   Future<void> _restoreVenueHighlight(MapboxMap map) async {
@@ -589,7 +591,6 @@ class _DestinationPickerScreenState
     });
 
     final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
     try {
       await ref
           .read(navigationRepositoryProvider(widget.circleId))
@@ -600,7 +601,7 @@ class _DestinationPickerScreenState
             setBy: widget.currentUserId,
           );
       if (!mounted) return;
-      navigator.pop(true);
+      setState(() => _saving = false);
       messenger.showSnackBar(
         SnackBar(content: Text('Everyone is heading to $label.')),
       );
@@ -621,13 +622,12 @@ class _DestinationPickerScreenState
     });
 
     final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
     try {
       await ref
           .read(navigationRepositoryProvider(widget.circleId))
           .clearDestination();
       if (!mounted) return;
-      navigator.pop(true);
+      setState(() => _saving = false);
       messenger.showSnackBar(
         const SnackBar(content: Text('Navigation ended.')),
       );
@@ -660,6 +660,7 @@ class _DestinationPickerScreenState
       circleSnapshotProvider(widget.currentUserId),
       (_, _) => _scheduleSync(),
     );
+    ref.listen(mapFocusControllerProvider, (_, next) => _onFocusRequested(next));
 
     final draft = ref.watch(
       destinationDraftControllerProvider(widget.circleId),
@@ -681,9 +682,9 @@ class _DestinationPickerScreenState
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     final configured = MapboxConfig.isConfigured;
 
-    return Scaffold(
-      backgroundColor: scheme.surface,
-      body: Stack(
+    return ColoredBox(
+      color: scheme.surface,
+      child: Stack(
         children: [
           Positioned.fill(
             child: configured
@@ -705,27 +706,11 @@ class _DestinationPickerScreenState
             top: MediaQuery.paddingOf(context).top + 8,
             left: 12,
             right: 12,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: _MapRoundButton(
-                    icon: Icons.close_rounded,
-                    tooltip: 'Close map',
-                    onTap: () => Navigator.of(context).pop(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: MapSearchBar(
-                    userId: widget.currentUserId,
-                    unreadCount: unread,
-                    onChat: _openChat,
-                    onPlaceSelected: _selectSuggestion,
-                  ),
-                ),
-              ],
+            child: MapSearchBar(
+              userId: widget.currentUserId,
+              unreadCount: unread,
+              onChat: _openChat,
+              onPlaceSelected: _selectSuggestion,
             ),
           ),
           Positioned(

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/navigation/main_shell_screen.dart';
 import '../../../app/widgets/onboarding_shell.dart';
 import '../../auth/application/auth_providers.dart';
-import '../../dashboard/presentation/dashboard_screen.dart';
 import '../../location/application/telemetry_providers.dart';
 import '../application/circle_providers.dart';
 import '../domain/circle_failure.dart';
@@ -51,7 +51,7 @@ class CircleGate extends ConsumerWidget {
     return snapshot.when(
       data: (value) => value == null
           ? const GateStatus(title: 'Opening your group', showSpinner: true)
-          : DashboardScreen(snapshot: value, currentUserId: userId),
+          : MainShellScreen(snapshot: value, currentUserId: userId),
       loading: () =>
           const GateStatus(title: 'Opening your group', showSpinner: true),
       error: (error, stack) => _errorStatus(ref, error, () {

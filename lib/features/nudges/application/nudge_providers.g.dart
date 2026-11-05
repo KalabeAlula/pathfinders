@@ -194,7 +194,7 @@ final class NudgeControllerProvider
   }
 }
 
-String _$nudgeControllerHash() => r'9bed8055a4874483ee57908867642ef187f4ffaf';
+String _$nudgeControllerHash() => r'078a08770d5ac5518020aaa87e659a71119dd0cb';
 
 /// Shows the most recent warmth action, then clears itself so the banner
 /// disappears without the caller managing a timer.

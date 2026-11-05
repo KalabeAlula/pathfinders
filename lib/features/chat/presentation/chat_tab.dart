@@ -1,60 +1,45 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../app/theme/app_tokens.dart';
-import '../../../../app/widgets/member_avatar.dart';
-import '../../../../core/utils/time_format.dart';
-import '../../../circle/domain/user_profile.dart';
-import '../../../location/application/telemetry_providers.dart';
-import '../../../location/domain/geo_point.dart';
-import '../../../navigation/application/navigation_providers.dart';
-import '../../../navigation/domain/navigation_failure.dart';
-import '../../application/chat_providers.dart';
-import '../../domain/chat_failure.dart';
-import '../../domain/chat_message.dart';
-import 'chat_map_preview.dart';
-
-Future<void> showGroupChat(
-  BuildContext context, {
-  required String circleId,
-  required String currentUserId,
-  required void Function(GeoPoint point, String? label) onShowLocation,
-}) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => GroupChatSheet(
-      circleId: circleId,
-      currentUserId: currentUserId,
-      onShowLocation: onShowLocation,
-    ),
-  );
-}
+import '../../../app/theme/app_tokens.dart';
+import '../../../app/widgets/member_avatar.dart';
+import '../../../core/utils/time_format.dart';
+import '../../circle/domain/user_profile.dart';
+import '../../location/application/telemetry_providers.dart';
+import '../../location/domain/geo_point.dart';
+import '../../navigation/application/navigation_providers.dart';
+import '../../navigation/domain/navigation_failure.dart';
+import '../application/chat_providers.dart';
+import '../domain/chat_failure.dart';
+import '../domain/chat_message.dart';
+import 'widgets/chat_map_preview.dart';
 
 /// The circle's thread: text, shared locations and destination updates.
-class GroupChatSheet extends ConsumerStatefulWidget {
-  const GroupChatSheet({
+///
+/// Lives as a full tab now. [active] tells it whether the member is actually
+/// looking at the thread; only then does a new message clear the unread badge.
+class ChatTab extends ConsumerStatefulWidget {
+  const ChatTab({
     super.key,
     required this.circleId,
     required this.currentUserId,
     required this.onShowLocation,
+    this.active = true,
   });
 
   final String circleId;
   final String currentUserId;
 
-  /// Closes the sheet and points the map at the shared place.
+  /// Hands the place to the map tab, which flies there.
   final void Function(GeoPoint point, String? label) onShowLocation;
 
+  final bool active;
+
   @override
-  ConsumerState<GroupChatSheet> createState() => _GroupChatSheetState();
+  ConsumerState<ChatTab> createState() => _ChatTabState();
 }
 
-class _GroupChatSheetState extends ConsumerState<GroupChatSheet> {
+class _ChatTabState extends ConsumerState<ChatTab> {
   final _text = TextEditingController();
   final _scroll = ScrollController();
   bool _sending = false;
@@ -64,8 +49,18 @@ class _GroupChatSheetState extends ConsumerState<GroupChatSheet> {
   @override
   void initState() {
     super.initState();
+    if (widget.active) _markSeenAfterFrame();
+  }
+
+  @override
+  void didUpdateWidget(ChatTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !oldWidget.active) _markSeenAfterFrame();
+  }
+
+  void _markSeenAfterFrame() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted || !widget.active) return;
       ref.read(chatSeenControllerProvider(widget.circleId).notifier).markSeen();
     });
   }
@@ -160,7 +155,6 @@ class _GroupChatSheetState extends ConsumerState<GroupChatSheet> {
   void _showOnMap(ChatMessage message) {
     final point = message.point;
     if (point == null) return;
-    Navigator.of(context).pop();
     widget.onShowLocation(point, message.placeLabel);
   }
 
@@ -168,106 +162,84 @@ class _GroupChatSheetState extends ConsumerState<GroupChatSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final media = MediaQuery.of(context);
-    final keyboard = media.viewInsets.bottom;
-    final height = math.min(
-      media.size.height * 0.88,
-      math.max(280.0, media.size.height * 0.88 - keyboard),
-    );
     final messages = ref.watch(circleMessagesProvider(widget.circleId));
 
     ref.listen(circleMessagesProvider(widget.circleId), (_, _) {
+      if (!widget.active) return;
       ref.read(chatSeenControllerProvider(widget.circleId).notifier).markSeen();
     });
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: keyboard),
-      child: SizedBox(
-        height: height,
-        child: Container(
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerLowest,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(AppRadius.sheet),
+    return ColoredBox(
+      color: scheme.surface,
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            _ChatHeader(
+              subtitle: messages.value?.isEmpty ?? true
+                  ? 'Say hi or share where you are'
+                  : '${messages.value!.length} message'
+                        '${messages.value!.length == 1 ? '' : 's'} in the thread',
             ),
-            border: Border.all(color: scheme.outlineVariant),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                blurRadius: 30,
-                offset: const Offset(0, -8),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              _ChatHeader(
-                onClose: () => Navigator.of(context).pop(),
-                subtitle: messages.value?.isEmpty ?? true
-                    ? 'Say hi or share where you are'
-                    : '${messages.value!.length} message'
-                          '${messages.value!.length == 1 ? '' : 's'} in the thread',
-              ),
-              Expanded(
-                child: messages.when(
-                  data: (items) => items.isEmpty
-                      ? const _EmptyThread()
-                      : ListView.builder(
-                          controller: _scroll,
-                          reverse: true,
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                          itemCount: items.length,
-                          itemBuilder: (context, index) {
-                            final message = items[items.length - 1 - index];
-                            if (message.isDestinationUpdate) {
-                              return _DestinationUpdateRow(
-                                message: message,
-                                onTap: message.hasLocation
-                                    ? () => _showOnMap(message)
-                                    : null,
-                              );
-                            }
-                            return _MessageRow(
+            Expanded(
+              child: messages.when(
+                data: (items) => items.isEmpty
+                    ? const _EmptyThread()
+                    : ListView.builder(
+                        controller: _scroll,
+                        reverse: true,
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                        itemCount: items.length,
+                        itemBuilder: (context, index) {
+                          final message = items[items.length - 1 - index];
+                          if (message.isDestinationUpdate) {
+                            return _DestinationUpdateRow(
                               message: message,
-                              isMine: message.senderId == widget.currentUserId,
-                              onShowLocation: message.hasLocation
+                              onTap: message.hasLocation
                                   ? () => _showOnMap(message)
                                   : null,
                             );
-                          },
-                        ),
-                  loading: () => const Center(
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
+                          }
+                          return _MessageRow(
+                            message: message,
+                            isMine: message.senderId == widget.currentUserId,
+                            onShowLocation: message.hasLocation
+                                ? () => _showOnMap(message)
+                                : null,
+                          );
+                        },
+                      ),
+                loading: () => const Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  error: (_, _) => _ThreadError(
-                    onRetry: () =>
-                        ref.invalidate(circleMessagesProvider(widget.circleId)),
+                ),
+                error: (_, _) => _ThreadError(
+                  onRetry: () =>
+                      ref.invalidate(circleMessagesProvider(widget.circleId)),
+                ),
+              ),
+            ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+                child: Text(
+                  _error!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.error,
                   ),
                 ),
               ),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
-                  child: Text(
-                    _error!,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.error,
-                    ),
-                  ),
-                ),
-              _Composer(
-                controller: _text,
-                sending: _sending,
-                sharing: _sharing,
-                onSend: _send,
-                onShareLocation: _shareLocation,
-              ),
-            ],
-          ),
+            _Composer(
+              controller: _text,
+              sending: _sending,
+              sharing: _sharing,
+              onSend: _send,
+              onShareLocation: _shareLocation,
+            ),
+          ],
         ),
       ),
     );
@@ -275,9 +247,8 @@ class _GroupChatSheetState extends ConsumerState<GroupChatSheet> {
 }
 
 class _ChatHeader extends StatelessWidget {
-  const _ChatHeader({required this.onClose, required this.subtitle});
+  const _ChatHeader({required this.subtitle});
 
-  final VoidCallback onClose;
   final String subtitle;
 
   @override
@@ -286,58 +257,45 @@ class _ChatHeader extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 10, 8),
-      child: Column(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.md,
+        AppSpacing.xl,
+        AppSpacing.sm,
+      ),
+      child: Row(
         children: [
           Container(
             width: 40,
-            height: 4,
+            height: 40,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: scheme.outlineVariant,
-              borderRadius: BorderRadius.circular(2),
+              shape: BoxShape.circle,
+              color: scheme.tertiaryContainer,
+            ),
+            child: Icon(
+              Icons.forum_rounded,
+              size: 20,
+              color: scheme.onTertiaryContainer,
             ),
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: scheme.tertiaryContainer,
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Crew chat', style: theme.textTheme.titleLarge),
+                const SizedBox(height: 1),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
-                child: Icon(
-                  Icons.forum_rounded,
-                  size: 19,
-                  color: scheme.onTertiaryContainer,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Crew chat', style: theme.textTheme.titleMedium),
-                    const SizedBox(height: 1),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                onPressed: onClose,
-                tooltip: 'Close chat',
-                icon: const Icon(Icons.close_rounded, size: 20),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
