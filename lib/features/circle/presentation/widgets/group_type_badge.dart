@@ -54,7 +54,7 @@ class GroupTypeBadge extends StatelessWidget {
 
     if (onTap == null) return pill;
     return Tooltip(
-      message: 'Circle details',
+      message: 'Group details',
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(

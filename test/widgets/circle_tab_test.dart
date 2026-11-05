@@ -121,9 +121,9 @@ void main() {
   ) async {
     await pumpTab(tester);
 
-    expect(find.text('Your circles'), findsOneWidget);
-    expect(find.text('1 circle · sharing with Trail Crew'), findsOneWidget);
-    expect(find.text('Your circle'), findsOneWidget);
+    expect(find.text('Your groups'), findsOneWidget);
+    expect(find.text('1 group · sharing with Trail Crew'), findsOneWidget);
+    expect(find.text('Your group'), findsOneWidget);
     // The hub card and the detail header both name the active circle.
     expect(find.text('Trail Crew'), findsNWidgets(2));
     expect(find.text('2 of 4 members · Friends'), findsOneWidget);

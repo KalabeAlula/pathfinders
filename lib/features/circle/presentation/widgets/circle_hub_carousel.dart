@@ -33,7 +33,7 @@ class CircleHubCarousel extends ConsumerWidget {
     final activeId = ref.watch(activeCircleControllerProvider(userId));
 
     return SizedBox(
-      height: 122,
+      height: 104,
       child: circles.when(
         data: (items) => ListView.separated(
           scrollDirection: Axis.horizontal,
@@ -65,7 +65,7 @@ class CircleHubCarousel extends ConsumerWidget {
           children: [
             for (var i = 0; i < 2; i++)
               Container(
-                width: 168,
+                width: 148,
                 margin: const EdgeInsets.only(right: AppSpacing.sm),
                 decoration: BoxDecoration(
                   color: scheme.surfaceContainerLow,
@@ -83,7 +83,7 @@ class CircleHubCarousel extends ConsumerWidget {
                 child: Text(
                   error is CircleFailure
                       ? error.message
-                      : 'Could not load your circles.',
+                      : 'Could not load your groups.',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -136,8 +136,8 @@ class _CircleCard extends StatelessWidget {
           onTap: onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            width: 172,
-            padding: const EdgeInsets.fromLTRB(12, 11, 12, 10),
+            width: 148,
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
             decoration: BoxDecoration(
               color: active
                   ? scheme.primaryContainer.withValues(alpha: 0.42)
@@ -159,7 +159,7 @@ class _CircleCard extends StatelessWidget {
                       child: AnimatedPetSticker(
                         pet: companion,
                         mood: mood,
-                        size: 40,
+                        size: 28,
                         showParticles: false,
                       ),
                     ),
@@ -167,25 +167,26 @@ class _CircleCard extends StatelessWidget {
                     if (active)
                       Icon(
                         Icons.check_circle_rounded,
-                        size: 16,
+                        size: 14,
                         color: scheme.primary,
                       ),
                   ],
                 ),
-                const SizedBox(height: 7),
+                const SizedBox(height: 4),
                 Text(
                   circle.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleSmall?.copyWith(
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 2),
                 Row(
                   children: [
                     GroupTypeBadge(type: circle.type, showIcon: false),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     Flexible(
                       child: Text(
                         '${circle.memberCount} of '
@@ -193,6 +194,7 @@ class _CircleCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelSmall?.copyWith(
+                          fontSize: 10,
                           color: scheme.onSurfaceVariant,
                         ),
                       ),
@@ -221,7 +223,7 @@ class _AddCard extends StatelessWidget {
 
     return Semantics(
       button: true,
-      label: 'Create or join a circle',
+      label: 'Create or join a group',
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
@@ -229,7 +231,7 @@ class _AddCard extends StatelessWidget {
           borderRadius: radius,
           onTap: onTap,
           child: Container(
-            width: 96,
+            width: 82,
             decoration: BoxDecoration(
               color: scheme.surfaceContainerLow.withValues(alpha: 0.6),
               borderRadius: radius,
@@ -243,8 +245,8 @@ class _AddCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: 28,
+                  height: 28,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: scheme.primaryContainer,
@@ -252,14 +254,15 @@ class _AddCard extends StatelessWidget {
                   ),
                   child: Icon(
                     Icons.add_rounded,
-                    size: 22,
+                    size: 18,
                     color: scheme.onPrimaryContainer,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
                   'Add or join',
                   style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 10,
                     color: scheme.onSurfaceVariant,
                   ),
                 ),

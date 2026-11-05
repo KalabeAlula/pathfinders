@@ -17,7 +17,7 @@ void main() {
         .destinations
         .map((destination) => (destination as NavigationDestination).label)
         .toList();
-    expect(destinations, ['Circle', 'Chat', 'Map', 'Memories', 'Profile']);
+    expect(destinations, ['Group', 'Chat', 'Map', 'Memories', 'Profile']);
 
     for (final key in ['circle', 'chat', 'map', 'memories', 'profile']) {
       expect(find.byKey(ValueKey('tab-$key')), findsOneWidget);

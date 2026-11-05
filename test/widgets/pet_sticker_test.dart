@@ -116,7 +116,10 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      _app(lottieAsset: _stickerPath, bundle: _FakeBundle(const {})),
+      _app(
+        lottieAsset: _stickerPath,
+        bundle: _FakeBundle(const {_stickerPath: '{"v": "5.7.4",'}),
+      ),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));

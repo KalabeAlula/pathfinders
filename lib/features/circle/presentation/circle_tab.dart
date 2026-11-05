@@ -144,7 +144,7 @@ class CircleTab extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Your circles',
+                        'Your groups',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
@@ -154,7 +154,7 @@ class CircleTab extends ConsumerWidget {
                         circles == null
                             ? 'Shared with ${circle.name}'
                             : '${circles.length} '
-                                  '${circles.length == 1 ? 'circle' : 'circles'}'
+                                  '${circles.length == 1 ? 'group' : 'groups'}'
                                   ' · sharing with ${circle.name}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -166,14 +166,14 @@ class CircleTab extends ConsumerWidget {
                 _RoundAction(
                   key: const ValueKey('circle-add'),
                   icon: Icons.add_rounded,
-                  tooltip: 'Create or join a circle',
+                  tooltip: 'Create or join a group',
                   onTap: addCircle,
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 _RoundAction(
                   key: const ValueKey('circle-settings'),
                   icon: Icons.settings_outlined,
-                  tooltip: 'Circle settings',
+                  tooltip: 'Group settings',
                   onTap: () => showCircleSettings(
                     context,
                     userId: currentUserId,
@@ -196,7 +196,7 @@ class CircleTab extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Your circle',
+                  'Your group',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: scheme.onSurfaceVariant,
                   ),
@@ -568,7 +568,7 @@ class _MemberRow extends StatelessWidget {
                         if (isCreator) ...[
                           const SizedBox(width: 5),
                           Tooltip(
-                            message: 'Circle creator',
+                            message: 'Group creator',
                             child: Icon(
                               Icons.workspace_premium_rounded,
                               size: 14,

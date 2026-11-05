@@ -8,23 +8,40 @@ import 'package:lottie/lottie.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  const pets = [
+    'gelada',
+    'ethiopian_wolf',
+    'walia_ibex',
+    'lovebird',
+    'lion',
+    'bale_monkey',
+  ];
   const moods = ['idle', 'traveling', 'celebrating', 'sleeping'];
 
-  for (final mood in moods) {
-    testWidgets('gelada $mood sticker parses and renders', (tester) async {
-      final path = 'assets/pets/gelada/$mood.json';
-      final composition = await LottieComposition.fromByteData(
-        await rootBundle.load(path),
-      );
+  for (final pet in pets) {
+    for (final mood in moods) {
+      testWidgets('$pet $mood sticker parses', (tester) async {
+        final composition = await LottieComposition.fromByteData(
+          await rootBundle.load('assets/pets/$pet/$mood.json'),
+        );
 
-      expect(composition.warnings, isEmpty);
-      expect(composition.layers, isNotEmpty);
-      expect(composition.frameRate, 30);
-      expect(composition.images['image_0']?.fileName, 'sticker.png');
+        expect(composition.warnings, isEmpty);
+        expect(composition.layers, isNotEmpty);
+        expect(composition.frameRate, 30);
+        expect(composition.images['image_0']?.fileName, 'sticker.png');
+      });
+    }
 
+    testWidgets('$pet idle sticker renders', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: Center(child: Lottie.asset(path, width: 84, height: 84)),
+          home: Center(
+            child: Lottie.asset(
+              'assets/pets/$pet/idle.json',
+              width: 84,
+              height: 84,
+            ),
+          ),
         ),
       );
       await tester.pump(const Duration(milliseconds: 50));

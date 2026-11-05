@@ -123,7 +123,7 @@ class GlassDock extends StatelessWidget {
                     destinations: [
                       _destination(
                         key: 'tab-circle',
-                        label: 'Circle',
+                        label: 'Group',
                         icon: _glyph(
                           ShellGlyphs.circle,
                           accent: scheme.tertiary,
