@@ -1,11 +1,14 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart' hide NavigationDestination;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart'
+    hide Size, Visibility;
 
 import '../../../app/theme/app_tokens.dart';
+import '../../../core/application/app_visibility.dart';
 import '../../../core/config/mapbox_config.dart';
 import '../../chat/application/chat_providers.dart';
 import '../../circle/application/circle_providers.dart';
@@ -31,6 +34,18 @@ import 'widgets/route_eta_card.dart';
 
 const _fallbackCenter = GeoPoint(latitude: 8.999, longitude: 38.775);
 
+/// Whether the native Mapbox widget may be mounted.
+///
+/// Mapbox renders into a native surface on Android. Keeping that surface alive
+/// while its tab is offstage lets it reappear above the active tab after the
+/// app resumes, so it is only mounted while it can actually be seen.
+@visibleForTesting
+bool shouldMountNativeMap({
+  required bool tabActive,
+  required bool foreground,
+  required bool configured,
+}) => configured && tabActive && foreground;
+
 /// The live Mapbox tab: member pins, routes, destination picking and the
 /// arrival HUD.
 ///
@@ -39,8 +54,10 @@ const _fallbackCenter = GeoPoint(latitude: 8.999, longitude: 38.775);
 /// name, category and address. Taps on empty map drop a plain pin that stays
 /// glued to the middle of the map, so dragging is how you fine-tune it.
 ///
-/// The shell keeps this widget mounted across tab switches, so the native map
-/// surface, its camera and annotation managers are never torn down.
+/// The shell keeps this widget mounted across tab switches so the draft, camera
+/// and search state survive. The native surface is a different matter: SurfaceView
+/// punches through Flutter's canvas on Android resume, so the Mapbox widget is
+/// mounted only while this tab is active and the app is in the foreground.
 class MapTab extends ConsumerStatefulWidget {
   const MapTab({
     super.key,
@@ -49,6 +66,7 @@ class MapTab extends ConsumerStatefulWidget {
     required this.members,
     required this.onMemberTap,
     required this.onChat,
+    required this.active,
   });
 
   final String circleId;
@@ -59,13 +77,18 @@ class MapTab extends ConsumerStatefulWidget {
   /// Opens the chat tab, which owns shared locations now.
   final VoidCallback onChat;
 
+  /// Whether the map is the selected tab. When false the native view is
+  /// detached so it cannot render over the active tab after a resume.
+  final bool active;
+
   @override
   ConsumerState<MapTab> createState() => _MapTabState();
 }
 
 class _MapTabState extends ConsumerState<MapTab> {
   late final GeoPoint _initialCenter;
-  late final ViewportState _viewport;
+  late CameraViewportState _viewport;
+  late AppVisibility _appVisibility;
 
   MapboxMap? _map;
   MapboxLiveAnnotations? _annotations;
@@ -75,6 +98,8 @@ class _MapTabState extends ConsumerState<MapTab> {
   List<CircleMember>? _mapMembers;
   Timer? _annotationTimer;
   bool _styleReady = false;
+  bool _mapAttached = false;
+  bool _foreground = true;
   bool _moving = false;
   bool _seeded = false;
   bool _saving = false;
@@ -84,7 +109,15 @@ class _MapTabState extends ConsumerState<MapTab> {
   MapFocusRequest? _pendingFocus;
   int _appliedFocusRevision = 0;
   String? _error;
-  double _zoom = 15.2;
+
+  /// The last camera the member saw. It is restored when the native map is
+  /// remounted, so switching tabs does not lose their place.
+  Point _cameraCenter = Point(
+    coordinates: Position(_fallbackCenter.longitude, _fallbackCenter.latitude),
+  );
+  double _cameraZoom = 15.2;
+  double _cameraBearing = 0;
+  double _cameraPitch = MapboxStandardStyle.pickerPitch;
   int _idleRun = 0;
   int _styleGeneration = 0;
 
@@ -92,16 +125,13 @@ class _MapTabState extends ConsumerState<MapTab> {
   void initState() {
     super.initState();
     _initialCenter = _resolveInitialCenter();
-    _viewport = CameraViewportState(
-      center: Point(
-        coordinates: Position(
-          _initialCenter.longitude,
-          _initialCenter.latitude,
-        ),
-      ),
-      zoom: _zoom,
-      pitch: MapboxStandardStyle.pickerPitch,
+    _cameraCenter = Point(
+      coordinates: Position(_initialCenter.longitude, _initialCenter.latitude),
     );
+    _viewport = _buildViewport();
+    _appVisibility = ref.read(appVisibilityProvider);
+    _foreground = _appVisibility.isForeground;
+    _appVisibility.addListener(_onVisibilityChanged);
     // A request raised before this tab existed is stale.
     _appliedFocusRevision = ref.read(mapFocusControllerProvider)?.revision ?? 0;
   }
@@ -118,8 +148,48 @@ class _MapTabState extends ConsumerState<MapTab> {
     return reading?.point ?? _fallbackCenter;
   }
 
+  CameraViewportState _buildViewport() => CameraViewportState(
+    center: _cameraCenter,
+    zoom: _cameraZoom,
+    bearing: _cameraBearing,
+    pitch: _cameraPitch,
+  );
+
+  void _onVisibilityChanged() {
+    if (!mounted) return;
+    final foreground = _appVisibility.isForeground;
+    if (foreground == _foreground) return;
+    setState(() => _foreground = foreground);
+  }
+
+  /// Attaches the native view at the camera position the member last saw.
+  void _attachNativeMap() {
+    _mapAttached = true;
+    _viewport = _buildViewport();
+  }
+
+  /// Drops every handle into the native map before Flutter removes the view.
+  ///
+  /// Leaving those handles behind would let a disused MapboxMap receive
+  /// annotation or camera calls while a new one is being created.
+  void _detachNativeMap() {
+    _mapAttached = false;
+    _styleReady = false;
+    _styleGeneration++;
+    _annotationTimer?.cancel();
+    _annotationTimer = null;
+    _annotations?.dispose();
+    _annotations = null;
+    _venueHighlights = null;
+    _selectedBuilding = null;
+    _venueFlight = false;
+    _map = null;
+    _moving = false;
+  }
+
   @override
   void dispose() {
+    _appVisibility.removeListener(_onVisibilityChanged);
     _annotationTimer?.cancel();
     _annotations?.dispose();
     super.dispose();
@@ -145,6 +215,7 @@ class _MapTabState extends ConsumerState<MapTab> {
   }
 
   void _onMapCreated(MapboxMap map) {
+    if (!mounted || !_mapAttached) return;
     _map = map;
     map.addInteraction(
       TapInteraction.onMap(_handleMapTap),
@@ -355,7 +426,7 @@ class _MapTabState extends ConsumerState<MapTab> {
       await map.flyTo(
         CameraOptions(
           center: Point(coordinates: Position(point.longitude, point.latitude)),
-          zoom: _zoom < 16.2 ? 16.2 : _zoom,
+          zoom: _cameraZoom < 16.2 ? 16.2 : _cameraZoom,
           pitch: MapboxStandardStyle.venuePitch,
         ),
         MapAnimationOptions(duration: 1100),
@@ -374,7 +445,17 @@ class _MapTabState extends ConsumerState<MapTab> {
         .select(latitude, longitude, label: label);
   }
 
+  void _onCameraChanged(CameraChangedEventData event) {
+    final camera = event.cameraState;
+    _cameraCenter = camera.center;
+    _cameraZoom = camera.zoom;
+    _cameraBearing = camera.bearing;
+    _cameraPitch = camera.pitch;
+    _setMoving(true);
+  }
+
   void _onStyleLoaded(StyleLoadedEventData event) {
+    if (!mounted || !_mapAttached) return;
     _styleReady = true;
     _annotations?.dispose();
     final map = _map;
@@ -412,7 +493,7 @@ class _MapTabState extends ConsumerState<MapTab> {
         id: 'venue-highlight-$generation',
       );
       await manager.setIconAllowOverlap(true);
-      if (!mounted) return;
+      if (!mounted || !_mapAttached || generation != _styleGeneration) return;
       _venueHighlights = manager;
 
       final venue = _selectedVenue;
@@ -427,7 +508,9 @@ class _MapTabState extends ConsumerState<MapTab> {
 
   void _syncAnnotations() {
     final annotations = _annotations;
-    if (!_styleReady || annotations == null || !mounted) return;
+    if (!_styleReady || !_mapAttached || annotations == null || !mounted) {
+      return;
+    }
 
     final navigation = ref.read(navigationControllerProvider(widget.circleId));
     final destination = navigation.destination;
@@ -453,7 +536,7 @@ class _MapTabState extends ConsumerState<MapTab> {
   /// Routes and peer fixes arrive while the picker is open, so redraw the
   /// annotations rather than only painting them once per style load.
   void _scheduleSync() {
-    if (!_styleReady) return;
+    if (!_styleReady || !_mapAttached) return;
     _annotationTimer?.cancel();
     _annotationTimer = Timer(
       const Duration(milliseconds: 350),
@@ -475,7 +558,7 @@ class _MapTabState extends ConsumerState<MapTab> {
       await map.easeTo(
         CameraOptions(
           center: Point(coordinates: Position(longitude, latitude)),
-          zoom: _zoom,
+          zoom: _cameraZoom,
           pitch: MapboxStandardStyle.pickerPitch,
         ),
         MapAnimationOptions(duration: 450),
@@ -488,14 +571,17 @@ class _MapTabState extends ConsumerState<MapTab> {
 
   Future<void> _handleIdle() async {
     final map = _map;
-    if (map == null || !mounted) return;
+    if (map == null || !mounted || !_mapAttached) return;
 
     final run = ++_idleRun;
     try {
       final camera = await map.getCameraState();
-      if (!mounted || run != _idleRun) return;
+      if (!mounted || !_mapAttached || run != _idleRun) return;
 
-      _zoom = camera.zoom;
+      _cameraCenter = camera.center;
+      _cameraZoom = camera.zoom;
+      _cameraBearing = camera.bearing;
+      _cameraPitch = camera.pitch;
       _setMoving(false);
 
       // The first idle after a venue flight is the camera arriving at a point
@@ -681,75 +767,107 @@ class _MapTabState extends ConsumerState<MapTab> {
 
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     final configured = MapboxConfig.isConfigured;
+    // Offstage native views still own a window surface on Android, and it can
+    // reappear above the active tab after the app resumes. Only keep the
+    // Mapbox widget mounted while the map is actually on screen.
+    final showNativeMap = shouldMountNativeMap(
+      tabActive: widget.active,
+      foreground: _foreground,
+      configured: configured,
+    );
+    if (showNativeMap && !_mapAttached) {
+      _attachNativeMap();
+    } else if (!showNativeMap && _mapAttached) {
+      _detachNativeMap();
+    }
 
-    return ColoredBox(
-      color: scheme.surface,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: configured
-                ? MapWidget(
-                    styleUri: MapboxStandardStyle.uri,
-                    viewport: _viewport,
-                    onMapCreated: _onMapCreated,
-                    onStyleLoadedListener: _onStyleLoaded,
-                    onCameraChangeListener: (_) => _setMoving(true),
-                    onMapIdleListener: (_) => unawaited(_handleIdle()),
-                  )
-                : const _MissingMapToken(),
-          ),
-          if (configured && draft.hasPoint && !draft.isVenue)
-            Positioned.fill(
-              child: _CenterPin(moving: _moving, color: scheme.tertiary),
-            ),
-          Positioned(
-            top: MediaQuery.paddingOf(context).top + 8,
-            left: 12,
-            right: 12,
-            child: MapSearchBar(
-              userId: widget.currentUserId,
-              unreadCount: unread,
-              onChat: _openChat,
-              onPlaceSelected: _selectSuggestion,
-            ),
-          ),
-          Positioned(
-            left: 12,
-            right: 12,
-            bottom: safeBottom + 12,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (navigation.destination != null) ...[
-                  ArrivalCard(
-                    circleId: widget.circleId,
-                    currentUserId: widget.currentUserId,
-                    compact: true,
-                  ),
-                  RouteEtaCard(
-                    circleId: widget.circleId,
-                    currentUserId: widget.currentUserId,
-                    members: members,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                ],
-                if (configured)
-                  _LocateButton(onTap: () => unawaited(_goToMyLocation())),
-                const SizedBox(height: AppSpacing.sm),
-                _SelectionSheet(
-                  draft: draft,
-                  configured: configured,
-                  saving: _saving,
-                  error: _error,
-                  hasActiveDestination: navigation.destination != null,
-                  onConfirm: _confirm,
-                  onEnd: _endNavigation,
+    return TickerMode(
+      enabled: widget.active,
+      child: Visibility(
+        visible: widget.active,
+        maintainState: true,
+        maintainAnimation: false,
+        maintainSize: false,
+        child: ColoredBox(
+          color: scheme.surface,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: !configured
+                    ? const _MissingMapToken()
+                    : showNativeMap
+                    ? MapWidget(
+                        styleUri: MapboxStandardStyle.uri,
+                        viewport: _viewport,
+                        // A TextureView is composited inside the Flutter view,
+                        // so it respects tab and route z-order. SurfaceView
+                        // punches through Flutter's canvas on Android.
+                        textureView:
+                            !kIsWeb &&
+                            defaultTargetPlatform == TargetPlatform.android,
+                        onMapCreated: _onMapCreated,
+                        onStyleLoadedListener: _onStyleLoaded,
+                        onCameraChangeListener: _onCameraChanged,
+                        onMapIdleListener: (_) => unawaited(_handleIdle()),
+                      )
+                    // Mounted while the tab is hidden or the app is in the
+                    // background; never painted because the tab is offstage.
+                    : const ColoredBox(color: Colors.transparent),
+              ),
+              if (configured && draft.hasPoint && !draft.isVenue)
+                Positioned.fill(
+                  child: _CenterPin(moving: _moving, color: scheme.tertiary),
                 ),
-              ],
-            ),
+              Positioned(
+                top: MediaQuery.paddingOf(context).top + 8,
+                left: 12,
+                right: 12,
+                child: MapSearchBar(
+                  userId: widget.currentUserId,
+                  unreadCount: unread,
+                  onChat: _openChat,
+                  onPlaceSelected: _selectSuggestion,
+                ),
+              ),
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: safeBottom + 12,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (navigation.destination != null) ...[
+                      ArrivalCard(
+                        circleId: widget.circleId,
+                        currentUserId: widget.currentUserId,
+                        compact: true,
+                      ),
+                      RouteEtaCard(
+                        circleId: widget.circleId,
+                        currentUserId: widget.currentUserId,
+                        members: members,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                    if (configured)
+                      _LocateButton(onTap: () => unawaited(_goToMyLocation())),
+                    const SizedBox(height: AppSpacing.sm),
+                    _SelectionSheet(
+                      draft: draft,
+                      configured: configured,
+                      saving: _saving,
+                      error: _error,
+                      hasActiveDestination: navigation.destination != null,
+                      onConfirm: _confirm,
+                      onEnd: _endNavigation,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

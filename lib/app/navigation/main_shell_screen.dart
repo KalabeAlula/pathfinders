@@ -95,6 +95,7 @@ class MainShellScreen extends ConsumerWidget {
           members: snapshot.members,
           onMemberTap: openMember,
           onChat: () => select(AppTab.chat),
+          active: tab == AppTab.map,
         ),
         MemoriesTab(
           key: ValueKey('memories-$circleId'),
