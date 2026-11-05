@@ -43,17 +43,27 @@ class _PathfindersAppState extends ConsumerState<PathfindersApp>
       builder: (context, child) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final iconBrightness = isDark ? Brightness.light : Brightness.dark;
-        return AnnotatedRegion<SystemUiOverlayStyle>(
-          value: SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: iconBrightness,
-            statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
-            systemNavigationBarColor: Colors.transparent,
-            systemNavigationBarDividerColor: Colors.transparent,
-            systemNavigationBarIconBrightness: iconBrightness,
-            systemNavigationBarContrastEnforced: false,
+        final visibility = ref.watch(appVisibilityProvider);
+        return AnimatedBuilder(
+          animation: visibility,
+          // A minimized app keeps no ticker running, so animations cost nothing
+          // in the background.
+          builder: (context, overlay) => TickerMode(
+            enabled: visibility.isForeground,
+            child: overlay!,
           ),
-          child: child!,
+          child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: iconBrightness,
+              statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+              systemNavigationBarColor: Colors.transparent,
+              systemNavigationBarDividerColor: Colors.transparent,
+              systemNavigationBarIconBrightness: iconBrightness,
+              systemNavigationBarContrastEnforced: false,
+            ),
+            child: child!,
+          ),
         );
       },
       home: const SessionGate(),

@@ -1,17 +1,20 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:lottie/lottie.dart';
 
 import '../../domain/ethiopian_pet.dart';
 import '../../domain/pet_mood.dart';
 import '../pet_mood_visuals.dart';
+import '../sticker_assets.dart';
 import 'pet_avatar.dart';
 
 /// A companion portrait that moves with the circle's mood.
 ///
-/// One looping controller drives every state; the portrait is passed as the
-/// [AnimatedBuilder] child so frames only transform it, never rebuild it. The
-/// whole sticker sits in a [RepaintBoundary] so a busy tab does not repaint it.
+/// A shipped sticker file (`assets/pets/<id>/<mood>.json`) wins when one
+/// exists. Otherwise the portrait animates procedurally, so a pet without art
+/// still breathes, hops or naps instead of going blank.
 class AnimatedPetSticker extends StatefulWidget {
   const AnimatedPetSticker({
     super.key,
@@ -19,6 +22,9 @@ class AnimatedPetSticker extends StatefulWidget {
     this.mood = PetMood.idle,
     this.size = 84,
     this.showParticles = true,
+    this.interactive = true,
+    this.onTap,
+    this.lottieAsset,
   });
 
   final EthiopianPet pet;
@@ -28,11 +34,225 @@ class AnimatedPetSticker extends StatefulWidget {
   /// Celebration sparkles and sleeping z's. Off for dense rows and carousels.
   final bool showParticles;
 
+  /// Whether a tap reacts like a Telegram sticker.
+  final bool interactive;
+
+  final VoidCallback? onTap;
+
+  /// Pins one sticker file instead of resolving it from the bundle.
+  final String? lottieAsset;
+
   @override
   State<AnimatedPetSticker> createState() => _AnimatedPetStickerState();
 }
 
 class _AnimatedPetStickerState extends State<AnimatedPetSticker>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _reaction;
+  Future<Set<String>>? _assets;
+
+  @override
+  void initState() {
+    super.initState();
+    _reaction = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 620),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _assets ??= PetStickerAssets.of(DefaultAssetBundle.of(context));
+  }
+
+  @override
+  void dispose() {
+    _reaction.dispose();
+    super.dispose();
+  }
+
+  void _react() {
+    HapticFeedback.lightImpact();
+    if (!MediaQuery.disableAnimationsOf(context)) {
+      _reaction.forward(from: 0);
+    }
+    widget.onTap?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final accent = widget.mood.accent(scheme);
+
+    Widget body = AnimatedBuilder(
+      animation: _reaction,
+      child: _switcher(accent),
+      builder: (context, child) {
+        final reaction = _Reaction.of(_reaction.value);
+        return Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            Transform.translate(
+              offset: Offset(0, -widget.size * reaction.lift),
+              child: Transform.scale(
+                scaleX: reaction.scaleX,
+                scaleY: reaction.scaleY,
+                child: child,
+              ),
+            ),
+            if (reaction.burst > 0)
+              _HeartBurst(
+                progress: reaction.burst,
+                size: widget.size,
+                color: accent,
+              ),
+          ],
+        );
+      },
+    );
+
+    body = Semantics(
+      image: true,
+      button: widget.interactive,
+      hint: widget.onTap == null ? null : 'Opens the companion card',
+      label: '${widget.pet.commonName}, ${widget.mood.label}',
+      child: ExcludeSemantics(
+        child: SizedBox(width: widget.size, height: widget.size, child: body),
+      ),
+    );
+
+    if (widget.interactive) {
+      body = GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _react,
+        child: body,
+      );
+    }
+
+    return RepaintBoundary(child: body);
+  }
+
+  Widget _switcher(Color accent) {
+    final pet = widget.pet;
+    final bundle = DefaultAssetBundle.of(context);
+    final fallback = _ProceduralSticker(
+      key: ValueKey('${pet.id}-${widget.mood.name}-fallback'),
+      pet: pet,
+      mood: widget.mood,
+      size: widget.size,
+      showParticles: widget.showParticles,
+      accent: accent,
+    );
+
+    final pinned = widget.lottieAsset;
+    if (pinned != null) {
+      return _crossFade(
+        _LottieSticker(
+          key: ValueKey('$pinned-lottie'),
+          asset: pinned,
+          size: widget.size,
+          bundle: bundle,
+          fallback: fallback,
+        ),
+      );
+    }
+
+    return FutureBuilder<Set<String>>(
+      future: _assets,
+      builder: (context, snapshot) {
+        final path = petStickerAssetPath(pet.id, widget.mood);
+        final bundled = snapshot.data?.contains(path) ?? false;
+        // When the manifest resolves without a sticker the same keyed fallback
+        // stays mounted, so nothing re-runs as the future completes.
+        return _crossFade(
+          bundled
+              ? _LottieSticker(
+                  key: ValueKey('${pet.id}-${widget.mood.name}-lottie'),
+                  asset: path,
+                  size: widget.size,
+                  bundle: bundle,
+                  fallback: fallback,
+                )
+              : fallback,
+        );
+      },
+    );
+  }
+
+  Widget _crossFade(Widget child) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 320),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.92, end: 1).animate(animation),
+          child: child,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _LottieSticker extends StatelessWidget {
+  const _LottieSticker({
+    super.key,
+    required this.asset,
+    required this.size,
+    required this.fallback,
+    this.bundle,
+  });
+
+  final String asset;
+  final double size;
+  final Widget fallback;
+  final AssetBundle? bundle;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Lottie.asset(
+        asset,
+        bundle: bundle,
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        repeat: true,
+        animate: !MediaQuery.disableAnimationsOf(context),
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (context, error, stackTrace) => fallback,
+      ),
+    );
+  }
+}
+
+class _ProceduralSticker extends StatefulWidget {
+  const _ProceduralSticker({
+    super.key,
+    required this.pet,
+    required this.mood,
+    required this.size,
+    required this.showParticles,
+    required this.accent,
+  });
+
+  final EthiopianPet pet;
+  final PetMood mood;
+  final double size;
+  final bool showParticles;
+  final Color accent;
+
+  @override
+  State<_ProceduralSticker> createState() => _ProceduralStickerState();
+}
+
+class _ProceduralStickerState extends State<_ProceduralSticker>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
@@ -41,7 +261,7 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3200),
+      duration: _Motion.durationFor(widget.mood),
     )..repeat();
   }
 
@@ -56,6 +276,15 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
   }
 
   @override
+  void didUpdateWidget(covariant _ProceduralSticker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.mood != widget.mood) {
+      _controller.duration = _Motion.durationFor(widget.mood);
+      _controller.repeat();
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -63,20 +292,17 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final size = widget.size;
-    final accent = widget.mood.accent(scheme);
-
-    // The portrait is built once and reused by every frame.
+    // The portrait is built once and only transformed on every frame.
     final portrait = Container(
       width: size,
       height: size,
       padding: EdgeInsets.all(size * 0.035),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: accent.withValues(alpha: 0.16),
+        color: widget.accent.withValues(alpha: 0.16),
         border: Border.all(
-          color: accent.withValues(alpha: 0.35),
+          color: widget.accent.withValues(alpha: 0.35),
           width: size * 0.02,
         ),
         boxShadow: [
@@ -90,62 +316,124 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
       child: PetAvatar(pet: widget.pet, size: size * 0.86),
     );
 
-    final body = MediaQuery.disableAnimationsOf(context)
-        ? portrait
-        : AnimatedBuilder(
-            animation: _controller,
-            child: portrait,
-            builder: (context, child) => _frame(
-              child!,
-              _Motion.of(widget.mood, _controller.value, size),
-              size,
-              accent,
-              scheme,
-            ),
-          );
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return SizedBox(width: size, height: size, child: portrait);
+    }
 
-    return RepaintBoundary(
-      child: Semantics(
-        image: true,
-        label: '${widget.pet.commonName}, ${widget.mood.label}',
-        child: ExcludeSemantics(
-          child: SizedBox(width: size, height: size, child: body),
-        ),
+    return SizedBox(
+      width: size,
+      height: size,
+      child: AnimatedBuilder(
+        animation: _controller,
+        child: portrait,
+        builder: (context, child) {
+          final t = _controller.value;
+          final motion = _Motion.of(widget.mood, t, size);
+          return Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              if (widget.showParticles)
+                _Particles(
+                  mood: widget.mood,
+                  t: t,
+                  size: size,
+                  color: widget.accent,
+                ),
+              Transform.translate(
+                offset: Offset(0, motion.lift),
+                child: Transform.rotate(
+                  angle: motion.tilt,
+                  child: Transform.scale(
+                    scaleX: motion.scale,
+                    scaleY: motion.scale * motion.squash,
+                    child: child,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// The tap answer: a quick squash-and-stretch bounce, then settle.
+class _Reaction {
+  const _Reaction({
+    required this.scaleX,
+    required this.scaleY,
+    required this.lift,
+    required this.burst,
+  });
+
+  final double scaleX;
+  final double scaleY;
+  final double lift;
+  final double burst;
+
+  static _Reaction of(double t) {
+    if (t <= 0 || t >= 1) {
+      return const _Reaction(scaleX: 1, scaleY: 1, lift: 0, burst: 0);
+    }
+    final wave = math.sin(t * math.pi * 2.4) * math.exp(-3.2 * t);
+    return _Reaction(
+      scaleX: 1 + wave * 0.12,
+      scaleY: 1 - wave * 0.12,
+      lift: math.sin(t * math.pi) * 0.06,
+      burst: t < 0.8 ? t / 0.8 : 0,
+    );
+  }
+}
+
+class _HeartBurst extends StatelessWidget {
+  const _HeartBurst({
+    required this.progress,
+    required this.size,
+    required this.color,
+  });
+
+  final double progress;
+  final double size;
+  final Color color;
+
+  static const _angles = [-2.15, -1.57, -0.99];
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          for (var i = 0; i < _angles.length; i++) _heart(i),
+        ],
       ),
     );
   }
 
-  Widget _frame(
-    Widget portrait,
-    _Motion motion,
-    double size,
-    Color accent,
-    ColorScheme scheme,
-  ) {
-    return Stack(
-      alignment: Alignment.center,
-      clipBehavior: Clip.none,
-      children: [
-        if (widget.showParticles) ...[
-          _Particles(
-            mood: widget.mood,
-            t: _controller.value,
-            size: size,
-            color: accent,
-          ),
-        ],
-        Transform.translate(
-          offset: Offset(0, motion.lift),
-          child: Transform.rotate(
-            angle: motion.tilt,
-            child: Transform.scale(
-              scaleX: motion.scale,
-              scaleY: motion.scale * motion.squash,
-              child: portrait,
-            ),
+  Widget _heart(int index) {
+    final t = ((progress - index * 0.10) / 0.75).clamp(0.0, 1.0);
+    if (t <= 0) return const SizedBox.shrink();
+    final angle = _angles[index];
+    final distance = size * 0.48 * t;
+    return Transform.translate(
+      offset: Offset(
+        math.cos(angle) * distance,
+        math.sin(angle) * distance - size * 0.08 * t,
+      ),
+      child: Opacity(
+        opacity: math.sin(t * math.pi).clamp(0.0, 1.0),
+        child: Transform.scale(
+          scale: 0.5 + t * 0.7,
+          child: Icon(
+            Icons.favorite_rounded,
+            size: size * (0.15 - index * 0.015),
+            color: color,
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -163,12 +451,20 @@ class _Motion {
   final double squash;
   final double tilt;
 
+  static Duration durationFor(PetMood mood) => switch (mood) {
+    PetMood.idle => const Duration(milliseconds: 3200),
+    PetMood.traveling => const Duration(milliseconds: 1100),
+    PetMood.celebrating => const Duration(milliseconds: 1500),
+    PetMood.sleeping => const Duration(milliseconds: 4200),
+  };
+
   static _Motion of(PetMood mood, double t, double size) {
     final turn = t * 2 * math.pi;
     return switch (mood) {
       PetMood.idle => _Motion(
-        lift: math.sin(turn) * size * 0.012,
-        scale: 1 + math.sin(turn) * 0.01,
+        lift: math.sin(turn) * size * 0.008,
+        // A slow 1.0 → 1.05 breath, with a quick blink late in the cycle.
+        scale: 1 + (0.5 + 0.5 * math.sin(turn)) * 0.05,
         tilt: math.sin(turn) * 0.012,
         squash: _blink(t),
       ),

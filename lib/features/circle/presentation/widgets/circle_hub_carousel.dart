@@ -153,11 +153,15 @@ class _CircleCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    AnimatedPetSticker(
-                      pet: companion,
-                      mood: mood,
-                      size: 40,
-                      showParticles: false,
+                    // The whole card switches circles; the sticker must not
+                    // swallow that tap with its own reaction.
+                    IgnorePointer(
+                      child: AnimatedPetSticker(
+                        pet: companion,
+                        mood: mood,
+                        size: 40,
+                        showParticles: false,
+                      ),
                     ),
                     const Spacer(),
                     if (active)

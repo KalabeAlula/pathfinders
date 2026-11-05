@@ -235,15 +235,13 @@ class CircleTab extends ConsumerWidget {
                   padding: const EdgeInsets.all(AppSpacing.lg),
                   child: Row(
                     children: [
-                      GestureDetector(
-                        onTap: openCompanion,
-                        child: Tooltip(
-                          message: 'Meet ${pet.name}',
-                          child: AnimatedPetSticker(
-                            pet: species,
-                            mood: mood,
-                            size: 72,
-                          ),
+                      Tooltip(
+                        message: 'Meet ${pet.name}',
+                        child: AnimatedPetSticker(
+                          pet: species,
+                          mood: mood,
+                          size: 72,
+                          onTap: openCompanion,
                         ),
                       ),
                       const SizedBox(width: AppSpacing.md),

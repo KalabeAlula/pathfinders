@@ -37,7 +37,14 @@ class MainShellScaffold extends StatelessWidget {
       backgroundColor: scheme.surface,
       // The dock floats over the tabs so the frosted glass has content to blur.
       extendBody: true,
-      body: IndexedStack(index: index, children: children),
+      body: IndexedStack(
+        index: index,
+        children: [
+          // Muted tickers mean a hidden tab never schedules animation frames.
+          for (var i = 0; i < children.length; i++)
+            TickerMode(enabled: i == index, child: children[i]),
+        ],
+      ),
       bottomNavigationBar: GlassDock(
         index: index,
         onSelect: onSelect,

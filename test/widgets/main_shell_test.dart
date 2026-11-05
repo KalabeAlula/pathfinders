@@ -120,6 +120,27 @@ void main() {
     expect(viewBottom - dockBottom, greaterThanOrEqualTo(24));
   });
 
+  testWidgets('mutes the tickers of every hidden tab', (tester) async {
+    List<bool> tickerStates() => tester
+        .widgetList<TickerMode>(
+          find.descendant(
+            of: find.byType(IndexedStack),
+            matching: find.byType(TickerMode, skipOffstage: false),
+            skipOffstage: false,
+          ),
+        )
+        .map((mode) => mode.enabled)
+        .toList();
+
+    await tester.pumpWidget(const _ShellHarness());
+    expect(tickerStates(), [true, false, false, false, false]);
+
+    await tester.tap(find.byKey(const ValueKey('tab-map')));
+    await tester.pumpAndSettle();
+
+    expect(tickerStates(), [false, false, true, false, false]);
+  });
+
   testWidgets('draws the overlay banner above the shell', (tester) async {
     await tester.pumpWidget(const _ShellHarness(overlay: Text('Warmth!')));
 
