@@ -23,6 +23,7 @@ Widget _app({
   String? lottieAsset,
   AssetBundle? bundle,
   bool ticker = true,
+  bool particles = true,
 }) {
   return MaterialApp(
     home: DefaultAssetBundle(
@@ -36,6 +37,7 @@ Widget _app({
               mood: mood,
               onTap: onTap,
               lottieAsset: lottieAsset,
+              showParticles: particles,
             ),
           ),
         ),
@@ -98,6 +100,55 @@ void main() {
     expect(find.byIcon(Icons.favorite_rounded), findsWidgets);
 
     await tester.pump(const Duration(milliseconds: 800));
+    expect(find.byIcon(Icons.favorite_rounded), findsNothing);
+  });
+
+  testWidgets('arriving in a trip bursts hearts without a tap', (
+    tester,
+  ) async {
+    final haptics = <Object?>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'HapticFeedback.vibrate') {
+          haptics.add(call.arguments);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
+    await tester.pumpWidget(_app(mood: PetMood.traveling, particles: false));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byIcon(Icons.favorite_rounded), findsNothing);
+
+    await tester.pumpWidget(_app(mood: PetMood.celebrating, particles: false));
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(find.byIcon(Icons.favorite_rounded), findsWidgets);
+    expect(haptics, isEmpty);
+
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(find.byIcon(Icons.favorite_rounded), findsNothing);
+  });
+
+  testWidgets('a sticker born in a celebration bursts once, then settles', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_app(mood: PetMood.celebrating, particles: false));
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(find.byIcon(Icons.favorite_rounded), findsWidgets);
+
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(find.byIcon(Icons.favorite_rounded), findsNothing);
+
+    // A rebuild while still celebrating is not a new arrival.
+    await tester.pumpWidget(_app(mood: PetMood.celebrating, particles: false));
+    await tester.pump(const Duration(milliseconds: 120));
     expect(find.byIcon(Icons.favorite_rounded), findsNothing);
   });
 

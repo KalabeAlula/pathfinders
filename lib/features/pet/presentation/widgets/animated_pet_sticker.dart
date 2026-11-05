@@ -50,6 +50,7 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
     with SingleTickerProviderStateMixin {
   late final AnimationController _reaction;
   Future<Set<String>>? _assets;
+  bool _celebrated = false;
 
   @override
   void initState() {
@@ -64,6 +65,19 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _assets ??= PetStickerAssets.of(DefaultAssetBundle.of(context));
+    if (!_celebrated && widget.mood == PetMood.celebrating) {
+      _celebrated = true;
+      _celebrate();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AnimatedPetSticker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.mood != widget.mood &&
+        widget.mood == PetMood.celebrating) {
+      _celebrate();
+    }
   }
 
   @override
@@ -74,10 +88,14 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
 
   void _react() {
     HapticFeedback.lightImpact();
-    if (!MediaQuery.disableAnimationsOf(context)) {
-      _reaction.forward(from: 0);
-    }
+    _celebrate();
     widget.onTap?.call();
+  }
+
+  /// The arrival payoff: hearts lift before the user touches anything.
+  void _celebrate() {
+    if (MediaQuery.disableAnimationsOf(context)) return;
+    _reaction.forward(from: 0);
   }
 
   @override
