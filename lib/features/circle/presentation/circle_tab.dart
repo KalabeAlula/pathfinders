@@ -212,8 +212,7 @@ class CircleTab extends ConsumerWidget {
                           Expanded(
                             child: Text(
                               '${snapshot.members.length} of '
-                              '${circle.capacity} '
-                              '${snapshot.members.length == 1 ? 'member' : 'members'}'
+                              '${circle.capacity} members'
                               ' • ${snapshot.onlineCount} active now',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
