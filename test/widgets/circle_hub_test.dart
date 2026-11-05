@@ -61,6 +61,7 @@ void main() {
       createdAt: now,
       petId: 'lion',
       petName: 'Anbessa',
+      hasDestination: true,
     ),
   ];
 
@@ -118,6 +119,10 @@ void main() {
 
     expect(isSelected(tester, 'c1'), isTrue);
     expect(isSelected(tester, 'c2'), isFalse);
+
+    // The active pill uses the live mood; the rest read the summary.
+    expect(find.byTooltip('Desta is resting'), findsOneWidget);
+    expect(find.byTooltip('Anbessa is on the move'), findsOneWidget);
   });
 
   testWidgets('switching circles from the hub updates the active circle', (

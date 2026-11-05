@@ -305,7 +305,11 @@ class CircleTab extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          CircleSwitcher(userId: currentUserId, onAdd: addCircle),
+          CircleSwitcher(
+            userId: currentUserId,
+            onAdd: addCircle,
+            activeMood: mood,
+          ),
         ],
       ),
     );

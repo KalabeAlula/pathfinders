@@ -2,28 +2,37 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_tokens.dart';
+import '../../../../core/application/clock_provider.dart';
+import '../../../pet/domain/pet_mood.dart';
+import '../../../pet/presentation/pet_mood_visuals.dart';
 import '../../application/circle_providers.dart';
 import '../../domain/circle_failure.dart';
 import '../../domain/circle_summary.dart';
 import 'group_type_badge.dart';
 
 /// The bottom strip of circles: compact pills that switch the active circle,
-/// with a trailing button to create or join another one.
+/// with a trailing button to create or join another one. Each pill carries the
+/// companion's mood dot so a crew on the move stands out without switching.
 class CircleSwitcher extends ConsumerWidget {
   const CircleSwitcher({
     super.key,
     required this.userId,
     required this.onAdd,
+    required this.activeMood,
   });
 
   final String userId;
   final VoidCallback onAdd;
+
+  /// Live mood for the active circle; the tab already derives it.
+  final PetMood activeMood;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final circles = ref.watch(circlesProvider(userId));
     final activeId = ref.watch(activeCircleControllerProvider(userId));
+    final now = ref.watch(appClockProvider).value ?? DateTime.now();
 
     return SizedBox(
       height: 48,
@@ -43,6 +52,7 @@ class CircleSwitcher extends ConsumerWidget {
               key: ValueKey('circle-card-${circle.id}'),
               circle: circle,
               active: active,
+              mood: active ? activeMood : _summaryMood(circle, now),
               onTap: active
                   ? null
                   : () => ref
@@ -94,6 +104,20 @@ class CircleSwitcher extends ConsumerWidget {
       ),
     );
   }
+
+  /// Without a per-circle snapshot stream, the summary's care stats and trip
+  /// flag are enough for the dot. Arrivals still read as moving here; the
+  /// active pill uses the full live mood.
+  static PetMood _summaryMood(CircleSummary circle, DateTime now) {
+    return derivePetMood(
+      hasDestination: circle.hasDestination,
+      arrived: false,
+      everyoneArrived: false,
+      now: now,
+      energy: circle.petEnergy,
+      lastActivityAt: circle.petUpdatedAt,
+    );
+  }
 }
 
 class _CirclePill extends StatelessWidget {
@@ -101,11 +125,13 @@ class _CirclePill extends StatelessWidget {
     super.key,
     required this.circle,
     required this.active,
+    required this.mood,
     required this.onTap,
   });
 
   final CircleSummary circle;
   final bool active;
+  final PetMood mood;
   final VoidCallback? onTap;
 
   @override
@@ -117,7 +143,9 @@ class _CirclePill extends StatelessWidget {
     return Semantics(
       button: true,
       selected: active,
-      label: 'Switch to ${circle.name}',
+      label:
+          'Switch to ${circle.name}. '
+          '${circle.petName} is ${mood.label.toLowerCase()}.',
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
@@ -145,7 +173,13 @@ class _CirclePill extends StatelessWidget {
                   size: 15,
                   color: active ? scheme.primary : scheme.onSurfaceVariant,
                 ),
-                const SizedBox(width: 7),
+                const SizedBox(width: 6),
+                _MoodDot(
+                  key: ValueKey('circle-mood-${circle.id}'),
+                  mood: mood,
+                  petName: circle.petName,
+                ),
+                const SizedBox(width: 6),
                 Flexible(
                   child: Text(
                     circle.name,
@@ -180,6 +214,32 @@ class _CirclePill extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _MoodDot extends StatelessWidget {
+  const _MoodDot({super.key, required this.mood, required this.petName});
+
+  final PetMood mood;
+  final String petName;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final color = switch (mood) {
+      PetMood.traveling => scheme.primary,
+      PetMood.celebrating => scheme.tertiary,
+      PetMood.sleeping => const Color(0xFF7B83B8),
+      PetMood.idle => scheme.outlineVariant,
+    };
+    return Tooltip(
+      message: '$petName is ${mood.label.toLowerCase()}',
+      child: Container(
+        width: 7,
+        height: 7,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
       ),
     );
   }

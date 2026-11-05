@@ -29,7 +29,7 @@ class SupabaseCircleRepository implements CircleRepository {
   Stream<List<CircleSummary>> watchCircles() {
     return _liveStream(
       channelName: 'circle-list-$userId-${_channelSequence++}',
-      tables: const ['circle_members', 'circles'],
+      tables: const ['circle_members', 'circles', 'circle_destinations'],
       fetch: _fetchSummaries,
     );
   }
@@ -226,12 +226,17 @@ class SupabaseCircleRepository implements CircleRepository {
           .from('circles')
           .select(
             'id, name, group_type, pet_id, pet_species, pet_name, pet_level, '
-            'created_at',
+            'pet_energy, pet_updated_at, created_at',
           )
           .inFilter('id', orderedIds);
 
       final memberRows = await _client
           .from('circle_members')
+          .select('circle_id')
+          .inFilter('circle_id', orderedIds);
+
+      final destinationRows = await _client
+          .from('circle_destinations')
           .select('circle_id')
           .inFilter('circle_id', orderedIds);
 
@@ -241,12 +246,20 @@ class SupabaseCircleRepository implements CircleRepository {
         counts[id] = (counts[id] ?? 0) + 1;
       }
 
+      final traveling = {
+        for (final row in destinationRows) row['circle_id'] as String,
+      };
+
       final rowsById = {for (final row in circleRows) row['id'] as String: row};
 
       return [
         for (final id in orderedIds)
           if (rowsById[id] case final row?)
-            CircleSummary.fromRow(row, memberCount: counts[id] ?? 1),
+            CircleSummary.fromRow(
+              row,
+              memberCount: counts[id] ?? 1,
+              hasDestination: traveling.contains(id),
+            ),
       ];
     } on sb.PostgrestException catch (error) {
       throw _mapFailure(error);
