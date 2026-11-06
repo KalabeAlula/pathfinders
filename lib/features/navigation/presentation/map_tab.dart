@@ -214,9 +214,7 @@ class _MapTabState extends ConsumerState<MapTab> {
         null;
     return CameraViewportState(
       center: _cameraCenter,
-      padding: trip
-          ? const EdgeInsets.only(top: 128, bottom: 210)
-          : null,
+      padding: trip ? const EdgeInsets.only(top: 128, bottom: 210) : null,
       zoom: _cameraZoom,
       bearing: _cameraBearing,
       pitch: _cameraPitch,
@@ -327,9 +325,7 @@ class _MapTabState extends ConsumerState<MapTab> {
 
     if (_initialCameraFlightDone) return;
 
-    if (ref
-        .read(destinationDraftControllerProvider(widget.circleId))
-        .isVenue) {
+    if (ref.read(destinationDraftControllerProvider(widget.circleId)).isVenue) {
       // A place chosen before the fix landed already owns the camera.
       _initialCameraFlightDone = true;
       return;
@@ -427,9 +423,7 @@ class _MapTabState extends ConsumerState<MapTab> {
     final hasDestination = ref
         .read(navigationControllerProvider(widget.circleId))
         .destination;
-    final draft = ref.read(
-      destinationDraftControllerProvider(widget.circleId),
-    );
+    final draft = ref.read(destinationDraftControllerProvider(widget.circleId));
     // The camera now sits on the fix, so an empty picker should start there.
     if (hasDestination == null && !draft.hasPoint) {
       _select(point.longitude, point.latitude);
@@ -454,14 +448,12 @@ class _MapTabState extends ConsumerState<MapTab> {
     final bearing = distanceMeters(point, lead) > 2
         ? bearingBetween(point, lead)
         : (_trackBearing ?? 0.0);
-    final now = DateTime.now();
 
     _trackBearing = bearing;
     _trackedPoint = point;
-    _lastTrackedAt = now;
+    _lastTrackedAt = DateTime.now();
     _centerFlight = true;
     _programmaticCamera = true;
-    _cameraIgnoreUntil = now.add(_tripSettleGrace);
     _setMoving(true);
     try {
       await map.flyTo(
@@ -477,6 +469,9 @@ class _MapTabState extends ConsumerState<MapTab> {
     } catch (_) {
       // A style swap can reject the camera mid-flight.
     } finally {
+      // The grace starts when the animation ends: Mapbox can emit trailing
+      // change events afterwards that must not read as a member gesture.
+      _cameraIgnoreUntil = DateTime.now().add(_tripSettleGrace);
       _programmaticCamera = false;
       _setMoving(false);
     }
@@ -529,7 +524,6 @@ class _MapTabState extends ConsumerState<MapTab> {
     _trackBearing = bearing;
     _trackedPoint = point;
     _lastTrackedAt = now;
-    _cameraIgnoreUntil = now.add(_tripSettleGrace);
     _programmaticCamera = true;
     try {
       await map.easeTo(
@@ -545,13 +539,18 @@ class _MapTabState extends ConsumerState<MapTab> {
     } catch (_) {
       // Best effort; the next fix retries.
     } finally {
+      _cameraIgnoreUntil = DateTime.now().add(_tripSettleGrace);
       _programmaticCamera = false;
     }
   }
 
   /// GPS heading while moving; otherwise the direction the member actually
   /// travelled, then the route itself. Standing still must not spin the map.
-  double _tripBearingFor(DeviceReading? reading, GeoPoint point, GeoPoint lead) {
+  double _tripBearingFor(
+    DeviceReading? reading,
+    GeoPoint point,
+    GeoPoint lead,
+  ) {
     final heading = reading?.headingDegrees;
     if (heading != null && (reading?.speedKph ?? 0) >= 2) return heading;
 
@@ -1236,25 +1235,24 @@ class _MapTabState extends ConsumerState<MapTab> {
     final members = snapshotMembers ?? widget.members;
     _mapMembers = members;
 
-    ref.listen(
-      navigationControllerProvider(widget.circleId),
-      (previous, next) {
-        _onDestinationChanged(previous?.destination, next.destination);
-        _scheduleSync();
-        if (next.destination != null) unawaited(_updateTripCamera());
-      },
-    );
+    ref.listen(navigationControllerProvider(widget.circleId), (previous, next) {
+      _onDestinationChanged(previous?.destination, next.destination);
+      _scheduleSync();
+      if (next.destination != null) unawaited(_updateTripCamera());
+    });
     ref.listen(
       circleSnapshotProvider(widget.currentUserId),
       (_, _) => _scheduleSync(),
     );
     ref.listen(
-      telemetryControllerProvider(
-        widget.currentUserId,
-      ).select((state) => state.lastReading),
+      telemetryControllerProvider(widget.currentUserId)
+          .select((state) => state.lastReading),
       (_, next) => _onUserReading(next),
     );
-    ref.listen(mapFocusControllerProvider, (_, next) => _onFocusRequested(next));
+    ref.listen(
+      mapFocusControllerProvider,
+      (_, next) => _onFocusRequested(next),
+    );
 
     final draft = ref.watch(
       destinationDraftControllerProvider(widget.circleId),
@@ -1373,7 +1371,9 @@ class _MapTabState extends ConsumerState<MapTab> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       if (configured)
-                        _LocateButton(onTap: () => unawaited(_goToMyLocation())),
+                        _LocateButton(
+                          onTap: () => unawaited(_goToMyLocation()),
+                        ),
                       const SizedBox(height: AppSpacing.sm),
                       _SelectionSheet(
                         draft: draft,

@@ -28,57 +28,61 @@ void main() {
                 'distance': 1200.5,
                 'duration': 300.4,
                 'geometry': r'_p~iF~ps|U_ulLnnqC_mqNvxq`@',
-                'steps': [
+                'legs': [
                   {
-                    'maneuver': {
-                      'type': 'depart',
-                      'modifier': 'right',
-                      'location': [38.74, 9.01],
-                    },
-                    'name': 'Bole Road',
-                    'distance': 200,
-                    'duration': 40.2,
-                  },
-                  {
-                    'maneuver': {
-                      'type': 'turn',
-                      'modifier': 'left',
-                      'location': [38.741, 9.011],
-                    },
-                    'name': 'Africa Ave',
-                    'distance': 300,
-                    'duration': 60,
-                  },
-                  {
-                    'maneuver': {
-                      'type': 'roundabout',
-                      'modifier': 'right',
-                      'exit': 2,
-                      'location': [38.742, 9.012],
-                    },
-                    'name': '',
-                    'ref': 'Ring Road',
-                    'distance': 500,
-                    'duration': 100,
-                  },
-                  {
-                    'maneuver': {
-                      'type': 'fork',
-                      'modifier': 'slight left',
-                      'location': [38.743, 9.013],
-                    },
-                    'name': 'Meskel Flower',
-                    'distance': 200,
-                    'duration': 100,
-                  },
-                  {
-                    'maneuver': {
-                      'type': 'arrive',
-                      'location': [38.744, 9.014],
-                    },
-                    'name': 'Century Mall',
-                    'distance': 0,
-                    'duration': 0,
+                    'steps': [
+                      {
+                        'maneuver': {
+                          'type': 'depart',
+                          'modifier': 'right',
+                          'location': [38.74, 9.01],
+                        },
+                        'name': 'Bole Road',
+                        'distance': 200,
+                        'duration': 40.2,
+                      },
+                      {
+                        'maneuver': {
+                          'type': 'turn',
+                          'modifier': 'left',
+                          'location': [38.741, 9.011],
+                        },
+                        'name': 'Africa Ave',
+                        'distance': 300,
+                        'duration': 60,
+                      },
+                      {
+                        'maneuver': {
+                          'type': 'roundabout',
+                          'modifier': 'right',
+                          'exit': 2,
+                          'location': [38.742, 9.012],
+                        },
+                        'name': '',
+                        'ref': 'Ring Road',
+                        'distance': 500,
+                        'duration': 100,
+                      },
+                      {
+                        'maneuver': {
+                          'type': 'fork',
+                          'modifier': 'slight left',
+                          'location': [38.743, 9.013],
+                        },
+                        'name': 'Meskel Flower',
+                        'distance': 200,
+                        'duration': 100,
+                      },
+                      {
+                        'maneuver': {
+                          'type': 'arrive',
+                          'location': [38.744, 9.014],
+                        },
+                        'name': 'Century Mall',
+                        'distance': 0,
+                        'duration': 0,
+                      },
+                    ],
                   },
                 ],
               },

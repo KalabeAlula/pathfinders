@@ -79,7 +79,7 @@ class MapboxNavigationGateway implements NavigationGateway {
       geometry: decodePolyline(first['geometry'] as String),
       distanceMeters: (first['distance'] as num?)?.toDouble() ?? 0,
       duration: Duration(seconds: seconds.round()),
-      steps: _stepsFrom(first['steps']),
+      steps: _stepsFrom(first['legs']),
       fetchedAt: DateTime.now(),
     );
   }
@@ -278,9 +278,15 @@ class MapboxNavigationGateway implements NavigationGateway {
   }
 }
 
+/// Directions puts steps inside each leg, so a multi-leg route flattens into
+/// one continuous list the driver follows.
 List<RouteStep> _stepsFrom(Object? raw) {
   if (raw is! List) return const [];
-  return [for (final step in raw) ?_stepFrom(step)];
+  return [
+    for (final leg in raw)
+      if (leg is Map && leg['steps'] is List)
+        for (final step in leg['steps'] as List) ?_stepFrom(step),
+  ];
 }
 
 RouteStep? _stepFrom(Object? raw) {
