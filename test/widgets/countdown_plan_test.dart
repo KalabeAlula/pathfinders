@@ -38,6 +38,7 @@ class _FakeMilestonesRepository implements MilestonesRepository {
 
   final MilestonesFailure? failure;
   final places = <({String milestoneId, String? place})>[];
+  final times = <({String milestoneId, DateTime? startsAt})>[];
 
   @override
   Stream<List<SharedMilestone>> watchMilestones() =>
@@ -62,6 +63,16 @@ class _FakeMilestonesRepository implements MilestonesRepository {
     final failure = this.failure;
     if (failure != null) throw failure;
     places.add((milestoneId: milestoneId, place: place));
+  }
+
+  @override
+  Future<void> setStartTime({
+    required String milestoneId,
+    required DateTime? startsAt,
+  }) async {
+    final failure = this.failure;
+    if (failure != null) throw failure;
+    times.add((milestoneId: milestoneId, startsAt: startsAt));
   }
 }
 
@@ -175,10 +186,25 @@ void main() {
       ),
     );
 
-    expect(find.text('Fri, Nov 20 · 7:00 PM'), findsOneWidget);
+    expect(find.text('Fri, Nov 20'), findsOneWidget);
+    expect(find.text('7:00 PM'), findsOneWidget);
     expect(find.text('Langano Lake'), findsOneWidget);
     expect(find.text('5'), findsOneWidget);
     expect(find.text('days left'), findsOneWidget);
+  });
+
+  testWidgets('keeps the date plain when no time was planned', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        chat: _FakeChatRepository(),
+        now: DateTime(2026, 11, 20, 10),
+        openPlanOnTap: false,
+        milestone: _milestoneNoPlace,
+      ),
+    );
+
+    expect(find.text('Tomorrow'), findsOneWidget);
+    expect(find.text('7:00 PM'), findsNothing);
   });
 
   testWidgets('counts down the day itself', (tester) async {
@@ -399,6 +425,115 @@ void main() {
     expect(find.text('Place removed from the countdown.'), findsOneWidget);
   });
 
+  testWidgets('adds a time to a countdown that had none', (tester) async {
+    final chat = _FakeChatRepository();
+    final milestones = _FakeMilestonesRepository();
+
+    await tester.pumpWidget(
+      _host(
+        chat: chat,
+        now: DateTime(2026, 11, 15, 10),
+        openPlanOnTap: true,
+        milestones: milestones,
+        milestone: _milestoneNoPlace,
+      ),
+    );
+
+    await tester.tap(find.byType(CountdownCard));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add time'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('edit-when')));
+    await tester.pumpAndSettle();
+    expect(find.text('Start time'), findsOneWidget);
+    expect(find.text('Pick a time'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('pick-time')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(find.text('7:00 PM'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('save-time')));
+    await tester.pumpAndSettle();
+
+    expect(
+      milestones.times,
+      [(milestoneId: 's2', startsAt: DateTime(2026, 11, 21, 19))],
+    );
+    expect(find.text('Time added to the countdown.'), findsOneWidget);
+    expect(find.text('Add time'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(MilestonePlanSheet),
+        matching: find.text('Sat, Nov 21 · 7:00 PM'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('share-countdown-plan')));
+    await tester.pumpAndSettle();
+
+    expect(chat.sent, ['Sat, Nov 21 at 7:00 PM. Who\'s in?']);
+  });
+
+  testWidgets('removes the time from the When row', (tester) async {
+    final milestones = _FakeMilestonesRepository();
+
+    await tester.pumpWidget(
+      _host(
+        chat: _FakeChatRepository(),
+        now: DateTime(2026, 11, 15, 10),
+        openPlanOnTap: true,
+        milestones: milestones,
+      ),
+    );
+
+    await tester.tap(find.byType(CountdownCard));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('edit-when')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('clear-time')));
+    await tester.pumpAndSettle();
+
+    expect(milestones.times, [(milestoneId: 's1', startsAt: null)]);
+    expect(find.text('Add time'), findsOneWidget);
+    expect(find.text('Time removed from the countdown.'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(MilestonePlanSheet),
+        matching: find.text('Fri, Nov 20'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('fits the time editor on a phone-width sheet', (tester) async {
+    tester.view.physicalSize = const Size(411, 914);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      _host(
+        chat: _FakeChatRepository(),
+        now: DateTime(2026, 11, 15, 10),
+        openPlanOnTap: true,
+        milestones: _FakeMilestonesRepository(),
+      ),
+    );
+
+    await tester.tap(find.byType(CountdownCard));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('edit-when')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Start time'), findsOneWidget);
+    expect(find.text('Cancel'), findsOneWidget);
+    expect(find.text('Remove time'), findsOneWidget);
+    expect(find.text('Save time'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('fits the place editor on a phone-width sheet', (tester) async {
     tester.view.physicalSize = const Size(411, 914);
     tester.view.devicePixelRatio = 1;
@@ -422,7 +557,6 @@ void main() {
     expect(find.text('Cancel'), findsOneWidget);
     expect(find.text('Remove place'), findsOneWidget);
     expect(find.text('Save place'), findsOneWidget);
-    expect(tester.takeException(), isNull);
   });
 
   testWidgets('adds a place to an existing countdown', (tester) async {

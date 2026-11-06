@@ -28,14 +28,17 @@ class CountdownCard extends ConsumerWidget {
     final days = milestone.daysFrom(clock);
     final displayDays = days < 0 ? 0 : days;
     final kind = milestone.kind;
-    final when = milestoneWhenLine(milestone, clock);
+    final start = milestone.startsAt;
+    final time = start == null ? null : formatEventTime(start);
+    final when = milestoneDayLine(milestone, clock);
     final place = milestone.place;
     final white = Colors.white;
     final faded = Colors.white.withValues(alpha: 0.72);
 
     return Semantics(
       label:
-          '${milestone.title}, ${formatCountdown(days)}, $when'
+          '${milestone.title}, ${formatCountdown(days)}, '
+          '${milestoneWhenLine(milestone, clock)}'
           '${place == null ? '' : ', $place'}',
       child: BentoCard(
         padding: const EdgeInsets.all(16),
@@ -58,14 +61,23 @@ class CountdownCard extends ConsumerWidget {
                     children: [
                       Icon(kind.icon, size: 12, color: faded),
                       const SizedBox(width: 5),
-                      Text(
-                        kind.label.toUpperCase(),
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: faded,
-                          fontSize: 8.5,
-                          letterSpacing: 1.1,
+                      Expanded(
+                        child: Text(
+                          kind.label.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: faded,
+                                fontSize: 8.5,
+                                letterSpacing: 1.1,
+                              ),
                         ),
                       ),
+                      if (time != null) ...[
+                        const SizedBox(width: 6),
+                        _TimeBadge(label: time),
+                      ],
                     ],
                   ),
                   const Spacer(),
@@ -133,6 +145,40 @@ class CountdownCard extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _TimeBadge extends StatelessWidget {
+  const _TimeBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.schedule_rounded, size: 10, color: Colors.white),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Colors.white,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
       ),
     );
   }

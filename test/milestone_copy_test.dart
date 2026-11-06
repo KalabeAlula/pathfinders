@@ -91,6 +91,66 @@ void main() {
     });
   });
 
+  group('milestoneDayLine', () {
+    test('leaves the clock time to its own badge', () {
+      final milestone = _milestone(
+        startsAt: DateTime(2026, 11, 20, 19),
+      );
+
+      expect(
+        milestoneDayLine(milestone, DateTime(2026, 11, 15, 10)),
+        'Fri, Nov 20',
+      );
+    });
+
+    test('counts the hours on the day itself', () {
+      final milestone = _milestone(
+        startsAt: DateTime(2026, 11, 20, 19),
+      );
+
+      expect(
+        milestoneDayLine(milestone, DateTime(2026, 11, 20, 14, 40)),
+        'Today · in 4h 20m',
+      );
+    });
+
+    test('says it is happening now shortly after the start', () {
+      final milestone = _milestone(
+        startsAt: DateTime(2026, 11, 20, 19),
+      );
+
+      expect(
+        milestoneDayLine(milestone, DateTime(2026, 11, 20, 19, 40)),
+        'Happening now',
+      );
+    });
+
+    test('stops naming the clock once the moment has passed', () {
+      final milestone = _milestone(
+        startsAt: DateTime(2026, 11, 20, 9),
+      );
+
+      expect(
+        milestoneDayLine(milestone, DateTime(2026, 11, 20, 18)),
+        'Earlier today',
+      );
+    });
+
+    test('names tomorrow and today without a time', () {
+      final withTime = _milestone(startsAt: DateTime(2026, 11, 20, 19));
+      final withoutTime = _milestone();
+
+      expect(
+        milestoneDayLine(withTime, DateTime(2026, 11, 19, 12)),
+        'Tomorrow',
+      );
+      expect(
+        milestoneDayLine(withoutTime, DateTime(2026, 11, 20, 12)),
+        'Today',
+      );
+    });
+  });
+
   group('milestoneShareText', () {
     test('hands the crew the whole plan', () {
       final milestone = _milestone(

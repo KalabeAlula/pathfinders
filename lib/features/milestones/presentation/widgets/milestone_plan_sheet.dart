@@ -67,11 +67,17 @@ class _MilestonePlanSheetState extends ConsumerState<MilestonePlanSheet> {
   bool _editingPlace = false;
   bool _savingPlace = false;
   String? _placeError;
+  late DateTime? _start;
+  bool _editingWhen = false;
+  bool _savingWhen = false;
+  TimeOfDay? _draftTime;
+  String? _whenError;
 
   @override
   void initState() {
     super.initState();
     _place = widget.milestone.place;
+    _start = widget.milestone.startsAt;
   }
 
   @override
@@ -84,8 +90,116 @@ class _MilestonePlanSheetState extends ConsumerState<MilestonePlanSheet> {
     _placeController.text = _place ?? '';
     setState(() {
       _editingPlace = true;
+      _editingWhen = false;
+      _whenError = null;
       _placeError = null;
     });
+  }
+
+  void _startWhen() {
+    setState(() {
+      _editingWhen = true;
+      _editingPlace = false;
+      _placeError = null;
+      _whenError = null;
+      _draftTime = _start == null ? null : TimeOfDay.fromDateTime(_start!);
+    });
+  }
+
+  void _cancelWhen() {
+    setState(() {
+      _editingWhen = false;
+      _whenError = null;
+    });
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _draftTime ?? const TimeOfDay(hour: 19, minute: 0),
+      helpText: 'What time?',
+    );
+    if (picked != null && mounted) setState(() => _draftTime = picked);
+  }
+
+  Future<void> _saveTime() async {
+    if (_savingWhen) return;
+    final time = _draftTime;
+    if (time == null) {
+      setState(() => _whenError = 'Pick a time first.');
+      return;
+    }
+
+    final previous = _start;
+    final date = widget.milestone.date;
+    final start = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+    setState(() {
+      _savingWhen = true;
+      _whenError = null;
+    });
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(milestonesRepositoryProvider(widget.circleId))
+          .setStartTime(milestoneId: widget.milestone.id, startsAt: start);
+      if (!mounted) return;
+      setState(() {
+        _start = start;
+        _editingWhen = false;
+        _savingWhen = false;
+      });
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            previous == null
+                ? 'Time added to the countdown.'
+                : 'Time updated on the countdown.',
+          ),
+        ),
+      );
+    } on MilestonesFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _savingWhen = false;
+        _whenError = failure.message;
+      });
+    }
+  }
+
+  Future<void> _clearTime() async {
+    if (_savingWhen) return;
+
+    setState(() {
+      _savingWhen = true;
+      _whenError = null;
+    });
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(milestonesRepositoryProvider(widget.circleId))
+          .setStartTime(milestoneId: widget.milestone.id, startsAt: null);
+      if (!mounted) return;
+      setState(() {
+        _start = null;
+        _editingWhen = false;
+        _savingWhen = false;
+      });
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Time removed from the countdown.')),
+      );
+    } on MilestonesFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _savingWhen = false;
+        _whenError = failure.message;
+      });
+    }
   }
 
   void _cancelPlace() {
@@ -179,7 +293,7 @@ class _MilestonePlanSheetState extends ConsumerState<MilestonePlanSheet> {
           .sendText(
             senderId: widget.currentUserId,
             text: milestoneShareText(
-              widget.milestone.copyWith(place: _place),
+              widget.milestone.withPlan(place: _place, startsAt: _start),
             ),
           );
       if (!mounted) return;
@@ -248,7 +362,7 @@ class _MilestonePlanSheetState extends ConsumerState<MilestonePlanSheet> {
     final milestone = widget.milestone;
     final kind = milestone.kind;
     final now = widget.now ?? DateTime.now();
-    final start = milestone.startsAt;
+    final start = _start;
     final place = _place;
     final note = milestone.subtitle;
 
@@ -298,13 +412,94 @@ class _MilestonePlanSheetState extends ConsumerState<MilestonePlanSheet> {
             const SizedBox(height: AppSpacing.lg),
             Text(milestone.title, style: theme.textTheme.headlineSmall),
             const SizedBox(height: AppSpacing.lg),
-            _DetailRow(
-              icon: Icons.event_rounded,
-              label: 'When',
-              value:
-                  '${formatMilestoneDate(milestone.date)}'
-                  '${start == null ? '' : ' · ${formatEventTime(start)}'}',
-            ),
+            if (!_editingWhen)
+              _DetailRow(
+                icon: Icons.event_rounded,
+                label: 'When',
+                value:
+                    '${formatMilestoneDate(milestone.date)}'
+                    '${start == null ? '' : ' · ${formatEventTime(start)}'}',
+                trailing: TextButton(
+                  key: const ValueKey('edit-when'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                    ),
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: _startWhen,
+                  child: Text(start == null ? 'Add time' : 'Edit'),
+                ),
+              ),
+            if (_editingWhen) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'Start time',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 6),
+              OutlinedButton.icon(
+                key: const ValueKey('pick-time'),
+                onPressed: _savingWhen ? null : _pickTime,
+                icon: const Icon(Icons.schedule_rounded, size: 18),
+                label: Text(
+                  _draftTime == null
+                      ? 'Pick a time'
+                      : formatEventTime(
+                          DateTime(
+                            2000,
+                            1,
+                            1,
+                            _draftTime!.hour,
+                            _draftTime!.minute,
+                          ),
+                        ),
+                ),
+              ),
+              if (_whenError != null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  _whenError!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.error,
+                  ),
+                ),
+              ],
+              Row(
+                children: [
+                  TextButton(
+                    onPressed: _savingWhen ? null : _cancelWhen,
+                    child: const Text('Cancel'),
+                  ),
+                  if (start != null) ...[
+                    const SizedBox(width: AppSpacing.sm),
+                    TextButton(
+                      key: const ValueKey('clear-time'),
+                      onPressed: _savingWhen ? null : _clearTime,
+                      child: const Text('Remove time'),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  key: const ValueKey('save-time'),
+                  onPressed: _savingWhen ? null : _saveTime,
+                  child: _savingWhen
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Save time'),
+                ),
+              ),
+            ],
             if (place != null && !_editingPlace) ...[
               const SizedBox(height: AppSpacing.md),
               _DetailRow(
@@ -356,25 +551,30 @@ class _MilestonePlanSheetState extends ConsumerState<MilestonePlanSheet> {
                     onPressed: _savingPlace ? null : _cancelPlace,
                     child: const Text('Cancel'),
                   ),
-                  if (place != null)
+                  if (place != null) ...[
+                    const SizedBox(width: AppSpacing.sm),
                     TextButton(
                       key: const ValueKey('clear-place'),
                       onPressed: _savingPlace ? null : _clearPlace,
                       child: const Text('Remove place'),
                     ),
-                  const Spacer(),
-                  FilledButton(
-                    key: const ValueKey('save-place'),
-                    onPressed: _savingPlace ? null : _savePlace,
-                    child: _savingPlace
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Save place'),
-                  ),
+                  ],
                 ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  key: const ValueKey('save-place'),
+                  onPressed: _savingPlace ? null : _savePlace,
+                  child: _savingPlace
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Save place'),
+                ),
               ),
             ] else if (place == null) ...[
               const SizedBox(height: AppSpacing.md),

@@ -15,4 +15,10 @@ abstract interface class MilestonesRepository {
 
   /// Fills in, changes, or clears ([place] null) where the circle is meeting.
   Future<void> setPlace({required String milestoneId, required String? place});
+
+  /// Fills in, changes, or clears ([startsAt] null) the start time.
+  Future<void> setStartTime({
+    required String milestoneId,
+    required DateTime? startsAt,
+  });
 }

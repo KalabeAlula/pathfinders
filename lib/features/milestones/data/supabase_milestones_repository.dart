@@ -154,6 +154,39 @@ class SupabaseMilestonesRepository implements MilestonesRepository {
     }
   }
 
+  @override
+  Future<void> setStartTime({
+    required String milestoneId,
+    required DateTime? startsAt,
+  }) async {
+    final List<Map<String, dynamic>> updated;
+    try {
+      updated = await _client
+          .from('milestones')
+          .update({
+            'starts_at': startsAt == null ? null : _timeOnly(startsAt),
+          })
+          .eq('id', milestoneId)
+          .select('id');
+    } on sb.PostgrestException catch (error) {
+      throw _mapFailure(
+        error,
+        fallback:
+            'Could not save the time. Check your connection and try again.',
+      );
+    } on Exception {
+      throw const MilestonesFailure(
+        'Could not save the time. Check your connection and try again.',
+      );
+    }
+
+    if (updated.isEmpty) {
+      throw const MilestonesFailure(
+        'Could not update that countdown. Pull to refresh and try again.',
+      );
+    }
+  }
+
   Future<List<SharedMilestone>> _fetchAndCache() async {
     final milestones = await _fetch();
     try {

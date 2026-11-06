@@ -1,11 +1,10 @@
 import '../../../core/utils/time_format.dart';
 import '../domain/shared_milestone.dart';
 
-/// The planning line under a countdown: "Today · in 4h 20m", "Tomorrow ·
-/// 7:00 PM", or "Sat, Nov 15 · 7:00 PM".
-String milestoneWhenLine(SharedMilestone milestone, DateTime now) {
+/// The day half of a countdown line, leaving the clock time for its own
+/// badge: "Today · in 4h 20m", "Tomorrow", or "Sat, Nov 15".
+String milestoneDayLine(SharedMilestone milestone, DateTime now) {
   final start = milestone.startsAt;
-  final time = start == null ? null : formatEventTime(start);
   final days = milestone.daysFrom(now);
 
   if (days == 0) {
@@ -14,13 +13,30 @@ String milestoneWhenLine(SharedMilestone milestone, DateTime now) {
     if (left.isNegative) {
       return left.abs() <= const Duration(hours: 3)
           ? 'Happening now'
-          : 'Started at $time';
+          : 'Earlier today';
     }
     return 'Today · in ${_shortLeft(left)}';
   }
-  if (days == 1) return time == null ? 'Tomorrow' : 'Tomorrow · $time';
-  final date = formatMilestoneDate(milestone.date);
-  return time == null ? date : '$date · $time';
+  if (days == 1) return 'Tomorrow';
+  return formatMilestoneDate(milestone.date);
+}
+
+/// The full planning line, time included: "Today · in 4h 20m", "Tomorrow ·
+/// 7:00 PM", or "Sat, Nov 15 · 7:00 PM".
+String milestoneWhenLine(SharedMilestone milestone, DateTime now) {
+  final start = milestone.startsAt;
+  if (start == null) return milestoneDayLine(milestone, now);
+
+  final time = formatEventTime(start);
+  final days = milestone.daysFrom(now);
+  if (days == 0) {
+    final left = start.difference(now);
+    return left.isNegative && left.abs() > const Duration(hours: 3)
+        ? 'Started at $time'
+        : milestoneDayLine(milestone, now);
+  }
+  if (days == 1) return 'Tomorrow · $time';
+  return '${formatMilestoneDate(milestone.date)} · $time';
 }
 
 /// The one message that hands the whole plan to the crew.

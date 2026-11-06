@@ -26,14 +26,17 @@ class SharedMilestone {
   /// Orders same-day countdowns by their start time.
   DateTime get sortKey => startsAt ?? date;
 
-  SharedMilestone copyWith({String? place}) => SharedMilestone(
+  SharedMilestone withPlan({
+    required String? place,
+    required DateTime? startsAt,
+  }) => SharedMilestone(
     id: id,
     title: title,
     date: date,
     kind: kind,
     subtitle: subtitle,
     startsAt: startsAt,
-    place: place ?? this.place,
+    place: place,
   );
 
   /// Whole calendar days remaining. Negative values mean the date has passed.
