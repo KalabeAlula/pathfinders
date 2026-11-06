@@ -6,6 +6,7 @@ import '../../../../core/utils/time_format.dart';
 import '../../application/milestones_providers.dart';
 import '../../domain/milestones_failure.dart';
 import '../../domain/shared_milestone.dart';
+import '../milestone_style.dart';
 
 Future<void> showMilestoneComposer(
   BuildContext context, {
@@ -40,8 +41,10 @@ class _MilestoneComposerSheetState
     extends ConsumerState<MilestoneComposerSheet> {
   final _title = TextEditingController();
   final _subtitle = TextEditingController();
+  final _place = TextEditingController();
   MilestoneKind _kind = MilestoneKind.birthday;
   late DateTime _date = _defaultDate();
+  TimeOfDay? _time;
   bool _saving = false;
   String? _error;
 
@@ -54,6 +57,7 @@ class _MilestoneComposerSheetState
   void dispose() {
     _title.dispose();
     _subtitle.dispose();
+    _place.dispose();
     super.dispose();
   }
 
@@ -70,6 +74,15 @@ class _MilestoneComposerSheetState
     if (picked != null && mounted) setState(() => _date = picked);
   }
 
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _time ?? const TimeOfDay(hour: 19, minute: 0),
+      helpText: 'What time?',
+    );
+    if (picked != null && mounted) setState(() => _time = picked);
+  }
+
   Future<void> _save() async {
     final title = _title.text.trim();
     if (title.isEmpty) {
@@ -84,6 +97,7 @@ class _MilestoneComposerSheetState
 
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
+    final time = _time;
     try {
       await ref
           .read(milestonesRepositoryProvider(widget.circleId))
@@ -93,6 +107,16 @@ class _MilestoneComposerSheetState
             date: _date,
             kind: _kind,
             subtitle: _subtitle.text,
+            startsAt: time == null
+                ? null
+                : DateTime(
+                    _date.year,
+                    _date.month,
+                    _date.day,
+                    time.hour,
+                    time.minute,
+                  ),
+            place: _place.text,
           );
       if (!mounted) return;
       navigator.pop();
@@ -166,15 +190,50 @@ class _MilestoneComposerSheetState
               ],
             ),
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _pickDate,
-                icon: const Icon(Icons.event_rounded, size: 18),
-                label: Text('Date · ${formatMilestoneDate(_date)}'),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _pickDate,
+                    icon: const Icon(Icons.event_rounded, size: 18),
+                    label: Text(
+                      formatMilestoneDate(_date),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _pickTime,
+                    icon: const Icon(Icons.schedule_rounded, size: 18),
+                    label: Text(
+                      _time == null
+                          ? 'Add a time'
+                          : formatEventTime(
+                              DateTime(2000, 1, 1, _time!.hour, _time!.minute),
+                            ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
+            TextField(
+              controller: _place,
+              maxLength: 80,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Place',
+                hintText: 'Where are you meeting?',
+                prefixIcon: Icon(Icons.place_rounded, size: 20),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 4),
             TextField(
               controller: _subtitle,
               maxLength: 120,
@@ -212,20 +271,4 @@ class _MilestoneComposerSheetState
       ),
     );
   }
-}
-
-extension on MilestoneKind {
-  String get label => switch (this) {
-    MilestoneKind.birthday => 'Birthday',
-    MilestoneKind.anniversary => 'Milestone',
-    MilestoneKind.trip => 'Trip',
-    MilestoneKind.goal => 'Goal',
-  };
-
-  IconData get icon => switch (this) {
-    MilestoneKind.birthday => Icons.cake_rounded,
-    MilestoneKind.anniversary => Icons.favorite_rounded,
-    MilestoneKind.trip => Icons.luggage_rounded,
-    MilestoneKind.goal => Icons.flag_rounded,
-  };
 }

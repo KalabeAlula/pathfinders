@@ -1,36 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/widgets/bento_card.dart';
+import '../../../../core/application/clock_provider.dart';
 import '../../../../core/utils/time_format.dart';
 import '../../domain/shared_milestone.dart';
+import '../milestone_copy.dart';
+import '../milestone_style.dart';
 
-class CountdownCard extends StatelessWidget {
+class CountdownCard extends ConsumerWidget {
   const CountdownCard({
     super.key,
     required this.milestone,
-    required this.now,
+    this.now,
     this.onTap,
   });
 
   final SharedMilestone milestone;
-  final DateTime now;
+
+  /// Pinned clock for tests; the card follows the app clock otherwise.
+  final DateTime? now;
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) {
-    final days = milestone.daysFrom(now);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final clock = now ?? ref.watch(appClockProvider).value ?? DateTime.now();
+    final days = milestone.daysFrom(clock);
     final displayDays = days < 0 ? 0 : days;
     final kind = milestone.kind;
+    final when = milestoneWhenLine(milestone, clock);
+    final place = milestone.place;
     final white = Colors.white;
     final faded = Colors.white.withValues(alpha: 0.72);
 
     return Semantics(
       label:
-          '${milestone.title}, ${formatCountdown(days)}. ${milestone.subtitle ?? ''}',
+          '${milestone.title}, ${formatCountdown(days)}, $when'
+          '${place == null ? '' : ', $place'}',
       child: BentoCard(
         padding: const EdgeInsets.all(16),
         onTap: onTap,
-        semanticLabel: 'Next countdown. Add another.',
+        semanticLabel: 'Plan ${milestone.title}.',
         gradient: LinearGradient(
           colors: kind.colors,
           begin: Alignment.topLeft,
@@ -56,13 +66,6 @@ class CountdownCard extends StatelessWidget {
                           letterSpacing: 1.1,
                         ),
                       ),
-                      if (onTap != null) const Spacer(),
-                      if (onTap != null)
-                        Icon(
-                          Icons.add_circle_outline_rounded,
-                          size: 12,
-                          color: faded,
-                        ),
                     ],
                   ),
                   const Spacer(),
@@ -78,10 +81,32 @@ class CountdownCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    formatMilestoneDate(milestone.date),
-                    style: Theme.of(context).textTheme.bodySmall
-                        ?.copyWith(color: faded, fontSize: 10.5),
+                    when,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: faded,
+                      fontSize: 10.5,
+                    ),
                   ),
+                  if (place != null) ...[
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(Icons.place_rounded, size: 11, color: faded),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(
+                            place,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: faded, fontSize: 10.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -111,27 +136,4 @@ class CountdownCard extends StatelessWidget {
       ),
     );
   }
-}
-
-extension on MilestoneKind {
-  List<Color> get colors => switch (this) {
-    MilestoneKind.birthday => const [Color(0xFFB86B4F), Color(0xFF8F4B36)],
-    MilestoneKind.anniversary => const [Color(0xFF8D6F88), Color(0xFF5E4659)],
-    MilestoneKind.trip => const [Color(0xFF7C8C6B), Color(0xFF56654A)],
-    MilestoneKind.goal => const [Color(0xFFC7974C), Color(0xFF8E6A2F)],
-  };
-
-  IconData get icon => switch (this) {
-    MilestoneKind.birthday => Icons.cake_rounded,
-    MilestoneKind.anniversary => Icons.favorite_rounded,
-    MilestoneKind.trip => Icons.luggage_rounded,
-    MilestoneKind.goal => Icons.flag_rounded,
-  };
-
-  String get label => switch (this) {
-    MilestoneKind.birthday => 'Birthday',
-    MilestoneKind.anniversary => 'Milestone',
-    MilestoneKind.trip => 'Trip',
-    MilestoneKind.goal => 'Goal',
-  };
 }

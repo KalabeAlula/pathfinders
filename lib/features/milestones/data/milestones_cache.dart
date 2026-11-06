@@ -58,6 +58,9 @@ class MilestonesCache {
     'date': _dateOnly(milestone.date),
     'kind': milestone.kind.name,
     'subtitle': milestone.subtitle,
+    if (milestone.startsAt != null)
+      'startsAt': milestone.startsAt!.toIso8601String(),
+    'place': milestone.place,
   };
 
   static SharedMilestone _decode(Map<String, dynamic> json) => SharedMilestone(
@@ -69,6 +72,11 @@ class MilestonesCache {
       orElse: () => MilestoneKind.goal,
     ),
     subtitle: json['subtitle'] as String?,
+    startsAt: switch (json['startsAt']) {
+      final String raw => DateTime.tryParse(raw),
+      _ => null,
+    },
+    place: json['place'] as String?,
   );
 
   static String _dateOnly(DateTime date) {

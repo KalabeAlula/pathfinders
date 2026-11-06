@@ -6,10 +6,12 @@ import '../../../app/theme/app_tokens.dart';
 import '../../../app/widgets/bento_card.dart';
 import '../../../core/utils/time_format.dart';
 import '../../circle/domain/user_profile.dart';
+import '../../location/domain/geo_point.dart';
 import '../../milestones/application/milestones_providers.dart';
 import '../../milestones/domain/shared_milestone.dart';
 import '../../milestones/presentation/widgets/countdown_card.dart';
 import '../../milestones/presentation/widgets/milestone_composer_sheet.dart';
+import '../../milestones/presentation/widgets/milestone_plan_sheet.dart';
 import '../application/memories_providers.dart';
 import '../domain/memory_post.dart';
 import 'memory_detail_screen.dart';
@@ -27,6 +29,7 @@ class MemoriesTab extends ConsumerStatefulWidget {
     this.circleName,
     this.authors = const {},
     this.now,
+    this.onPlanMeetup,
   });
 
   final String circleId;
@@ -38,6 +41,9 @@ class MemoriesTab extends ConsumerStatefulWidget {
 
   /// Fixed clock for tests; defaults to now.
   final DateTime? now;
+
+  /// Hands a countdown's geocoded place to the map's destination picker.
+  final void Function(GeoPoint point, String label)? onPlanMeetup;
 
   @override
   ConsumerState<MemoriesTab> createState() => _MemoriesTabState();
@@ -70,6 +76,17 @@ class _MemoriesTabState extends ConsumerState<MemoriesTab> {
     );
   }
 
+  void _openMilestone(SharedMilestone milestone) {
+    showMilestonePlan(
+      context,
+      circleId: widget.circleId,
+      currentUserId: widget.currentUserId,
+      milestone: milestone,
+      now: widget.now,
+      onPlanMeetup: widget.onPlanMeetup,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -82,7 +99,7 @@ class _MemoriesTabState extends ConsumerState<MemoriesTab> {
         [
           for (final milestone in milestones)
             if (milestone.daysFrom(clock) >= 0) milestone,
-        ]..sort((a, b) => a.date.compareTo(b.date));
+        ]..sort((a, b) => a.sortKey.compareTo(b.sortKey));
 
     return SafeArea(
       bottom: false,
@@ -94,10 +111,12 @@ class _MemoriesTabState extends ConsumerState<MemoriesTab> {
               circleName: widget.circleName,
               authors: widget.authors,
               now: clock,
+              milestoneNow: widget.now,
               authorFilter: _authorFilter,
               onSelectAuthor: _selectAuthor,
               milestones: upcoming,
               onAddMilestone: _addMilestone,
+              onOpenMilestone: _openMilestone,
               onAddMemory: _addMemory,
               onOpen: (memory) => Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -142,10 +161,12 @@ class _Gallery extends StatelessWidget {
     required this.circleName,
     required this.authors,
     required this.now,
+    required this.milestoneNow,
     required this.authorFilter,
     required this.onSelectAuthor,
     required this.milestones,
     required this.onAddMilestone,
+    required this.onOpenMilestone,
     required this.onAddMemory,
     required this.onOpen,
   });
@@ -154,10 +175,12 @@ class _Gallery extends StatelessWidget {
   final String? circleName;
   final Map<String, UserProfile> authors;
   final DateTime now;
+  final DateTime? milestoneNow;
   final String? authorFilter;
   final ValueChanged<String?> onSelectAuthor;
   final List<SharedMilestone> milestones;
   final VoidCallback onAddMilestone;
+  final ValueChanged<SharedMilestone> onOpenMilestone;
   final VoidCallback onAddMemory;
   final ValueChanged<MemoryPost> onOpen;
 
@@ -230,8 +253,9 @@ class _Gallery extends StatelessWidget {
         SliverToBoxAdapter(
           child: _MilestoneStrip(
             milestones: milestones,
-            now: now,
+            pinnedNow: milestoneNow,
             onAdd: onAddMilestone,
+            onOpen: onOpenMilestone,
           ),
         ),
         SliverToBoxAdapter(
@@ -308,13 +332,15 @@ class _Gallery extends StatelessWidget {
 class _MilestoneStrip extends StatelessWidget {
   const _MilestoneStrip({
     required this.milestones,
-    required this.now,
+    required this.pinnedNow,
     required this.onAdd,
+    required this.onOpen,
   });
 
   final List<SharedMilestone> milestones;
-  final DateTime now;
+  final DateTime? pinnedNow;
   final VoidCallback onAdd;
+  final ValueChanged<SharedMilestone> onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -365,8 +391,8 @@ class _MilestoneStrip extends StatelessWidget {
                 width: 292,
                 child: CountdownCard(
                   milestone: milestones[index],
-                  now: now,
-                  onTap: onAdd,
+                  now: pinnedNow,
+                  onTap: () => onOpen(milestones[index]),
                 ),
               );
             },

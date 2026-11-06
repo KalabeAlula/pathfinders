@@ -130,6 +130,8 @@ void main() {
           date: DateTime(2026, 12, 24),
           kind: MilestoneKind.anniversary,
           subtitle: 'Dinner at the usual spot',
+          startsAt: DateTime(2026, 12, 24, 19, 30),
+          place: 'Five Loaves, Bole',
         ),
         SharedMilestone(
           id: 's2',
@@ -147,7 +149,11 @@ void main() {
       expect(restored.first.date, DateTime(2026, 12, 24));
       expect(restored.first.kind, MilestoneKind.anniversary);
       expect(restored.first.subtitle, 'Dinner at the usual spot');
+      expect(restored.first.startsAt, DateTime(2026, 12, 24, 19, 30));
+      expect(restored.first.place, 'Five Loaves, Bole');
       expect(restored.last.subtitle, isNull);
+      expect(restored.last.startsAt, isNull);
+      expect(restored.last.place, isNull);
       expect(MilestonesCache(preferences, circleId: 'c2').read(), isNull);
     });
 

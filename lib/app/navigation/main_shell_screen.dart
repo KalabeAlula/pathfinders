@@ -121,6 +121,7 @@ class MainShellScreen extends ConsumerWidget {
             for (final member in snapshot.members)
               member.profile.id: member.profile,
           },
+          onPlanMeetup: showSharedLocation,
         ),
         ProfileTab(
           key: const ValueKey('profile'),

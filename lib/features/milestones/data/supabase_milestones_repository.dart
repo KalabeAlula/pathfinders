@@ -20,7 +20,8 @@ class SupabaseMilestonesRepository implements MilestonesRepository {
   final MilestonesCache? cache;
   final String circleId;
 
-  static const _columns = 'id, title, subtitle, due_on, kind, created_at';
+  static const _columns =
+      'id, title, subtitle, due_on, starts_at, place, kind, created_at';
 
   @override
   Stream<List<SharedMilestone>> watchMilestones() async* {
@@ -87,8 +88,12 @@ class SupabaseMilestonesRepository implements MilestonesRepository {
     required DateTime date,
     required MilestoneKind kind,
     String? subtitle,
+    DateTime? startsAt,
+    String? place,
   }) async {
     final note = subtitle?.trim();
+    final spot = place?.trim();
+    final start = startsAt;
     try {
       await _client.from('milestones').insert({
         'circle_id': circleId,
@@ -96,7 +101,9 @@ class SupabaseMilestonesRepository implements MilestonesRepository {
         'title': title.trim(),
         'due_on': _dateOnly(date),
         'kind': kind.name,
+        if (start != null) 'starts_at': _timeOnly(start),
         if (note != null && note.isNotEmpty) 'subtitle': note,
+        if (spot != null && spot.isNotEmpty) 'place': spot,
       });
     } on sb.PostgrestException catch (error) {
       throw _mapFailure(
@@ -108,6 +115,41 @@ class SupabaseMilestonesRepository implements MilestonesRepository {
     } on Exception {
       throw const MilestonesFailure(
         'Could not save that countdown. Check your connection and try again.',
+      );
+    }
+  }
+
+  @override
+  Future<void> setPlace({
+    required String milestoneId,
+    required String? place,
+  }) async {
+    final spot = place?.trim();
+    final List<Map<String, dynamic>> updated;
+    try {
+      updated = await _client
+          .from('milestones')
+          .update({'place': spot == null || spot.isEmpty ? null : spot})
+          .eq('id', milestoneId)
+          .select('id');
+    } on sb.PostgrestException catch (error) {
+      throw _mapFailure(
+        error,
+        fallback:
+            'Could not save the place. Check your connection and try again.',
+        tooLong: 'That place is a little too long.',
+      );
+    } on Exception {
+      throw const MilestonesFailure(
+        'Could not save the place. Check your connection and try again.',
+      );
+    }
+
+    // RLS filters rows instead of failing, so an unclaimed update means the
+    // member is no longer allowed to plan for this circle.
+    if (updated.isEmpty) {
+      throw const MilestonesFailure(
+        'Could not update that countdown. Pull to refresh and try again.',
       );
     }
   }
@@ -138,6 +180,11 @@ class SupabaseMilestonesRepository implements MilestonesRepository {
             date: DateTime.parse(row['due_on'] as String),
             kind: _kind(row['kind']),
             subtitle: _optionalLabel(row['subtitle']),
+            startsAt: _startsAt(
+              row['due_on'] as String,
+              row['starts_at'],
+            ),
+            place: _optionalLabel(row['place']),
           ),
       ];
     } on sb.PostgrestException catch (error) {
@@ -167,12 +214,31 @@ class SupabaseMilestonesRepository implements MilestonesRepository {
     return '${date.year}-$month-$day';
   }
 
+  /// Combines the stored `time` column with the milestone's day.
+  static DateTime? _startsAt(String dueOn, Object? value) {
+    if (value is! String) return null;
+    final parts = value.split(':');
+    if (parts.length < 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    final day = DateTime.tryParse(dueOn);
+    if (hour == null || minute == null || day == null) return null;
+    return DateTime(day.year, day.month, day.day, hour, minute);
+  }
+
+  static String _timeOnly(DateTime time) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute:00';
+  }
+
   static MilestonesFailure _mapFailure(
     sb.PostgrestException error, {
     required String fallback,
+    String tooLong = 'That title or note is a little too long.',
   }) {
     final message = switch (error.code) {
-      '23514' || '22001' => 'That title or note is a little too long.',
+      '23514' || '22001' => tooLong,
       '42501' || 'PGRST301' => 'Sign in again to save this countdown.',
       _ => null,
     };

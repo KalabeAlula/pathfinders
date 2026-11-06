@@ -64,6 +64,9 @@ String formatRouteEta(Duration duration) {
 /// The clock time a route lands, e.g. "4:35 PM".
 String formatArrivalClock(DateTime eta) => DateFormat('h:mm a').format(eta);
 
+/// The clock time an event starts, e.g. "7:00 PM".
+String formatEventTime(DateTime start) => DateFormat('h:mm a').format(start);
+
 String greetingFor(DateTime now) {
   if (now.hour < 5) return 'Still up';
   if (now.hour < 12) return 'Good morning';
