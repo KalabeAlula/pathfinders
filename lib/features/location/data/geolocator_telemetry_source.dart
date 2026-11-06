@@ -193,6 +193,9 @@ class GeolocatorTelemetrySource implements DeviceTelemetrySource {
     final accuracy = position.hasAccuracy && position.accuracy.isFinite
         ? math.max(position.accuracy, 0.0)
         : 0.0;
+    final heading = position.hasHeading && position.heading.isFinite
+        ? position.heading
+        : null;
 
     return _speedFilter.apply(
       point: GeoPoint(
@@ -202,6 +205,7 @@ class GeolocatorTelemetrySource implements DeviceTelemetrySource {
       accuracyMeters: accuracy,
       speedKph: speed * 3.6,
       speedAccuracyKph: speedAccuracy * 3.6,
+      headingDegrees: heading != null && heading >= 0 ? heading : null,
     );
   }
 

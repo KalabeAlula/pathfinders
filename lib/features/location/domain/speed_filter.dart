@@ -31,6 +31,7 @@ class StationarySpeedFilter {
     required double accuracyMeters,
     required double speedKph,
     double speedAccuracyKph = 0,
+    double? headingDegrees,
   }) {
     final previous = _previousPoint;
     final driftMeters = math.max(accuracyMeters, _previousAccuracy);
@@ -57,6 +58,7 @@ class StationarySpeedFilter {
       accuracyMeters: accuracyMeters,
       speedKph: moving ? speedKph : 0,
       speedAccuracyKph: speedAccuracyKph,
+      headingDegrees: headingDegrees,
     );
   }
 }

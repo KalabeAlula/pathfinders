@@ -8,6 +8,7 @@ import '../domain/navigation_failure.dart';
 import '../domain/navigation_gateway.dart';
 import '../domain/place_suggestion.dart';
 import '../domain/route_plan.dart';
+import '../domain/route_step.dart';
 import 'polyline_decoder.dart';
 
 /// Thin client for Mapbox Directions v5, Search Box v1, and reverse
@@ -57,7 +58,7 @@ class MapboxNavigationGateway implements NavigationGateway {
         'alternatives': 'false',
         'geometries': 'polyline',
         'overview': 'full',
-        'steps': 'false',
+        'steps': 'true',
         'access_token': _token,
       },
     );
@@ -78,6 +79,7 @@ class MapboxNavigationGateway implements NavigationGateway {
       geometry: decodePolyline(first['geometry'] as String),
       distanceMeters: (first['distance'] as num?)?.toDouble() ?? 0,
       duration: Duration(seconds: seconds.round()),
+      steps: _stepsFrom(first['steps']),
       fetchedAt: DateTime.now(),
     );
   }
@@ -275,6 +277,87 @@ class MapboxNavigationGateway implements NavigationGateway {
     return 'Mapbox could not complete that request.';
   }
 }
+
+List<RouteStep> _stepsFrom(Object? raw) {
+  if (raw is! List) return const [];
+  return [for (final step in raw) ?_stepFrom(step)];
+}
+
+RouteStep? _stepFrom(Object? raw) {
+  if (raw is! Map) return null;
+
+  final maneuver = raw['maneuver'];
+  if (maneuver is! Map) return null;
+  final coordinates = maneuver['location'];
+  if (coordinates is! List || coordinates.length < 2) return null;
+  final longitude = coordinates[0];
+  final latitude = coordinates[1];
+  if (longitude is! num || latitude is! num) return null;
+
+  final type = _text(maneuver['type'])?.toLowerCase() ?? '';
+  final modifier = _text(maneuver['modifier'])?.toLowerCase();
+  final exit = maneuver['exit'];
+
+  return RouteStep(
+    kind: _kind(type, modifier),
+    // `ref` carries the road number when the road itself has no name.
+    roadName: _text(raw['name']) ?? _text(raw['ref']) ?? '',
+    distanceMeters: (raw['distance'] as num?)?.toDouble() ?? 0,
+    duration: Duration(
+      seconds: ((raw['duration'] as num?)?.toDouble() ?? 0).round(),
+    ),
+    location: GeoPoint(
+      latitude: latitude.toDouble(),
+      longitude: longitude.toDouble(),
+    ),
+    exitNumber: exit is num ? exit.toInt() : null,
+  );
+}
+
+ManeuverKind _kind(String type, String? modifier) {
+  switch (type) {
+    case 'depart':
+      return ManeuverKind.depart;
+    case 'arrive':
+      return ManeuverKind.arrive;
+    case 'merge':
+      return ManeuverKind.merge;
+    case 'fork':
+      if (modifier == null) return ManeuverKind.straight;
+      return modifier.contains('left')
+          ? ManeuverKind.forkLeft
+          : modifier.contains('right')
+          ? ManeuverKind.forkRight
+          : ManeuverKind.straight;
+    case 'on ramp':
+    case 'off ramp':
+      if (modifier == null) return ManeuverKind.straight;
+      return modifier.contains('left')
+          ? ManeuverKind.rampLeft
+          : modifier.contains('right')
+          ? ManeuverKind.rampRight
+          : ManeuverKind.straight;
+    case 'roundabout':
+    case 'rotary':
+    case 'roundabout turn':
+    case 'exit roundabout':
+    case 'exit rotary':
+      return ManeuverKind.roundabout;
+    default:
+      return _turnFromModifier(modifier);
+  }
+}
+
+ManeuverKind _turnFromModifier(String? modifier) => switch (modifier) {
+  'left' => ManeuverKind.turnLeft,
+  'slight left' => ManeuverKind.slightLeft,
+  'sharp left' => ManeuverKind.sharpLeft,
+  'right' => ManeuverKind.turnRight,
+  'slight right' => ManeuverKind.slightRight,
+  'sharp right' => ManeuverKind.sharpRight,
+  'uturn' || 'u-turn' => ManeuverKind.uTurn,
+  _ => ManeuverKind.straight,
+};
 
 PlaceSuggestion? _placeFromSearchBoxFeature(Object? raw) {
   if (raw is! Map) return null;

@@ -12,6 +12,7 @@ import '../../features/location/domain/geo_point.dart';
 import '../../features/memories/application/memories_providers.dart';
 import '../../features/memories/presentation/memories_tab.dart';
 import '../../features/navigation/application/map_focus_providers.dart';
+import '../../features/navigation/application/navigation_providers.dart';
 import '../../features/navigation/presentation/map_tab.dart';
 import '../../features/nudges/application/nudge_providers.dart';
 import '../../features/nudges/presentation/warmth_actions.dart';
@@ -44,6 +45,9 @@ class MainShellScreen extends ConsumerWidget {
     );
     final activeNudge = ref.watch(
       nudgeControllerProvider(circleId, currentUserId),
+    );
+    final tripActive = ref.watch(
+      navigationControllerProvider(circleId).select((state) => state.isActive),
     );
 
     // Opening the gallery clears its badge, and moments that land while the
@@ -83,6 +87,7 @@ class MainShellScreen extends ConsumerWidget {
       onSelect: (index) => select(AppTab.values[index]),
       unreadChats: unreadChats,
       newMemories: newMemories,
+      dockVisible: !(tab == AppTab.map && tripActive),
       overlay: activeNudge == null
           ? null
           : WarmthBanner(

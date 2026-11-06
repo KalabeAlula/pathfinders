@@ -15,6 +15,12 @@ abstract final class AppColors {
   static const cocoa = Color(0xFF3A3028);
   static const ember = Color(0xFFE0A487);
 
+  /// Deep forest pair used by the active-trip cockpit. The banner needs to
+  /// out-shout the map underneath, so it stays dark in both themes.
+  static const forest = Color(0xFF234C3B);
+  static const forestDeep = Color(0xFF17362A);
+  static const mint = Color(0xFFD6EBDD);
+
   static final ColorScheme lightScheme =
       ColorScheme.fromSeed(
         seedColor: clay,

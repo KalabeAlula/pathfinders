@@ -17,6 +17,7 @@ class MainShellScaffold extends StatelessWidget {
     required this.unreadChats,
     required this.newMemories,
     required this.children,
+    this.dockVisible = true,
     this.overlay,
   });
 
@@ -25,6 +26,10 @@ class MainShellScaffold extends StatelessWidget {
   final int unreadChats;
   final int newMemories;
   final List<Widget> children;
+
+  /// False while a full-screen trip cockpit owns the map tab. The dock slides
+  /// away instead of vanishing, and stops accepting taps immediately.
+  final bool dockVisible;
 
   /// Drawn above every tab, e.g. the warmth banner.
   final Widget? overlay;
@@ -45,11 +50,23 @@ class MainShellScaffold extends StatelessWidget {
             TickerMode(enabled: i == index, child: children[i]),
         ],
       ),
-      bottomNavigationBar: GlassDock(
-        index: index,
-        onSelect: onSelect,
-        unreadChats: unreadChats,
-        newMemories: newMemories,
+      bottomNavigationBar: AnimatedSlide(
+        offset: dockVisible ? Offset.zero : const Offset(0, 1.2),
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeInCubic,
+        child: AnimatedOpacity(
+          opacity: dockVisible ? 1 : 0,
+          duration: const Duration(milliseconds: 200),
+          child: IgnorePointer(
+            ignoring: !dockVisible,
+            child: GlassDock(
+              index: index,
+              onSelect: onSelect,
+              unreadChats: unreadChats,
+              newMemories: newMemories,
+            ),
+          ),
+        ),
       ),
     );
 

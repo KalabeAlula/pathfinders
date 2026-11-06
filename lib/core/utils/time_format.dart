@@ -64,6 +64,24 @@ String formatRouteEta(Duration duration) {
 /// The clock time a route lands, e.g. "4:35 PM".
 String formatArrivalClock(DateTime eta) => DateFormat('h:mm a').format(eta);
 
+/// Spoken-style countdown to the next maneuver: "Now", "In 250 m", "In 1.2 km".
+String formatManeuverDistance(double meters) {
+  if (!meters.isFinite || meters < 15) return 'Now';
+  if (meters < 950) return 'In ${(meters / 10).round() * 10} m';
+  final kilometers = meters / 1000;
+  return 'In ${kilometers.toStringAsFixed(kilometers < 10 ? 1 : 0)} km';
+}
+
+/// The headline trip time, in full words: "14 min", "1 hr 20 min".
+String formatTripTime(Duration duration) {
+  if (duration.inSeconds < 60) return 'Under a minute';
+  final minutes = duration.inMinutes;
+  if (minutes < 60) return '$minutes min';
+  final hours = duration.inHours;
+  final rest = minutes.remainder(60);
+  return rest == 0 ? '$hours hr' : '$hours hr $rest min';
+}
+
 /// The clock time an event starts, e.g. "7:00 PM".
 String formatEventTime(DateTime start) => DateFormat('h:mm a').format(start);
 

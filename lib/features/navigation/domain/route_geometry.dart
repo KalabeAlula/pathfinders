@@ -63,6 +63,54 @@ double distanceToLineMeters(GeoPoint point, List<GeoPoint> line) {
 double _distanceToSegment(GeoPoint p, GeoPoint a, GeoPoint b) =>
     _projectOnSegment(p, a, b).distance;
 
+/// Compass bearing from [a] to [b], in degrees clockwise from north.
+double bearingBetween(GeoPoint a, GeoPoint b) {
+  final lat1 = _radians(a.latitude);
+  final lat2 = _radians(b.latitude);
+  final dLon = _radians(b.longitude - a.longitude);
+  final y = math.sin(dLon) * math.cos(lat2);
+  final x = math.cos(lat1) * math.sin(lat2) -
+      math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
+  final degrees = math.atan2(y, x) * 180 / math.pi;
+  return (degrees + 360) % 360;
+}
+
+/// Rotates [from] toward [to] along the shortest arc.
+///
+/// Bearings wrap at 360°, so a plain average would swing the long way round
+/// whenever the member crosses north. [t] of 0 keeps [from], 1 lands on [to].
+double lerpBearing(double from, double to, double t) {
+  final delta = ((to - from + 540) % 360) - 180;
+  return (from + delta * t + 360) % 360;
+}
+
+/// The point [ahead] metres further along [line] than [point] projects.
+///
+/// Used to lead the camera down the road instead of centring on the member,
+/// which would leave almost no road visible ahead. Clamps to the final vertex.
+GeoPoint? pointAheadOnLine(GeoPoint point, List<GeoPoint> line, double ahead) {
+  if (line.length < 2) return null;
+  final progress = progressAlongLine(point, line);
+  final target = math.min(progress.travelled + math.max(ahead, 0), progress.total);
+
+  var cumulative = 0.0;
+  for (var i = 0; i < line.length - 1; i++) {
+    final segment = distanceMeters(line[i], line[i + 1]);
+    if (cumulative + segment >= target) {
+      final fraction = segment == 0 ? 0.0 : (target - cumulative) / segment;
+      final clamped = fraction.clamp(0.0, 1.0);
+      return GeoPoint(
+        latitude: line[i].latitude +
+            (line[i + 1].latitude - line[i].latitude) * clamped,
+        longitude: line[i].longitude +
+            (line[i + 1].longitude - line[i].longitude) * clamped,
+      );
+    }
+    cumulative += segment;
+  }
+  return line.last;
+}
+
 /// Perpendicular distance to the segment plus where the closest point falls
 /// between its endpoints (0 at [a], 1 at [b]).
 ({double distance, double fraction}) _projectOnSegment(

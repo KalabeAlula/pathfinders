@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../circle/domain/circle_member.dart';
 import '../../../navigation/application/navigation_state.dart';
 import '../../../profile/domain/animal_avatar.dart';
+import '../../domain/geo_point.dart';
 import 'mapbox_live_annotations.dart';
 
 const _peerRouteColors = <Color>[
@@ -35,6 +36,18 @@ Map<String, Color> routeAccentColors({
                 _peerRouteColors.length],
   };
 }
+
+/// Every coordinate a destination overview must show: located members, the
+/// drawn route geometry and the shared destination.
+List<GeoPoint> routeOverviewPoints({
+  required MapCircleView view,
+  required GeoPoint destination,
+}) => [
+  for (final pin in view.pins)
+    GeoPoint(latitude: pin.latitude, longitude: pin.longitude),
+  for (final line in view.lines) ...line.points,
+  destination,
+];
 
 /// Maps the circle snapshot and navigation state onto everything the map
 /// draws, so the dashboard preview and the full picker stay identical.

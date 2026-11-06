@@ -1,4 +1,5 @@
 import '../../location/domain/geo_point.dart';
+import 'route_step.dart';
 
 /// A route from one member's live position to the shared destination.
 class RoutePlan {
@@ -7,11 +8,16 @@ class RoutePlan {
     required this.distanceMeters,
     required this.duration,
     required this.fetchedAt,
+    this.steps = const [],
   });
 
   final List<GeoPoint> geometry;
   final double distanceMeters;
   final Duration duration;
+
+  /// Turn-by-turn legs, ordered from departure to arrival. Empty when the
+  /// provider did not return steps.
+  final List<RouteStep> steps;
 
   /// When the route was calculated. ETA is this plus [duration], so it keeps
   /// ageing honestly on screen without another request.

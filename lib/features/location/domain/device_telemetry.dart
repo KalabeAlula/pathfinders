@@ -7,6 +7,7 @@ class DeviceReading {
     required this.accuracyMeters,
     required this.speedKph,
     this.speedAccuracyKph = 0,
+    this.headingDegrees,
   });
 
   final GeoPoint point;
@@ -18,6 +19,10 @@ class DeviceReading {
 
   /// How wrong the platform thinks [speedKph] is; 0 when it did not say.
   final double speedAccuracyKph;
+
+  /// Direction of travel in degrees clockwise from north, or null when the
+  /// platform could not compute one (which is common while standing still).
+  final double? headingDegrees;
 }
 
 /// What the device can tell us about its battery right now.

@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pathfinders/features/chat/data/chat_seen_store.dart';
+import 'package:pathfinders/features/location/data/last_known_location_store.dart';
+import 'package:pathfinders/features/location/domain/geo_point.dart';
 import 'package:pathfinders/features/memories/data/memories_cache.dart';
 import 'package:pathfinders/features/memories/domain/memory_post.dart';
 import 'package:pathfinders/features/milestones/data/milestones_cache.dart';
@@ -196,6 +198,39 @@ void main() {
 
       expect(store.read('c1'), DateTime(2026, 11, 2, 9));
       expect(store.read('c2'), DateTime(2026, 11, 2, 10));
+    });
+  });
+
+  group('LastKnownLocationStore', () {
+    test('returns null before the map has seen a fix', () async {
+      final preferences = await SharedPreferences.getInstance();
+
+      expect(LastKnownLocationStore(preferences).read(), isNull);
+    });
+
+    test('restores the last fix after a restart', () async {
+      final preferences = await SharedPreferences.getInstance();
+      await LastKnownLocationStore(preferences).write(
+        const GeoPoint(latitude: 9.0105, longitude: 38.7613),
+      );
+
+      final restored = LastKnownLocationStore(preferences).read();
+
+      expect(restored?.latitude, 9.0105);
+      expect(restored?.longitude, 38.7613);
+    });
+
+    test('overwrites the older fix', () async {
+      final preferences = await SharedPreferences.getInstance();
+      final store = LastKnownLocationStore(preferences);
+
+      await store.write(const GeoPoint(latitude: 9, longitude: 38.75));
+      await store.write(const GeoPoint(latitude: 9.02, longitude: 38.79));
+
+      final restored = store.read();
+
+      expect(restored?.latitude, 9.02);
+      expect(restored?.longitude, 38.79);
     });
   });
 
