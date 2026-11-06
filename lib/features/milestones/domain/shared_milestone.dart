@@ -9,6 +9,7 @@ class SharedMilestone {
     this.subtitle,
     this.startsAt,
     this.place,
+    this.createdBy,
   });
 
   final String id;
@@ -22,6 +23,9 @@ class SharedMilestone {
 
   /// Where the circle is meeting, when it was noted.
   final String? place;
+
+  /// The member who added the countdown; only they can remove it.
+  final String? createdBy;
 
   /// Orders same-day countdowns by their start time.
   DateTime get sortKey => startsAt ?? date;
@@ -37,6 +41,7 @@ class SharedMilestone {
     subtitle: subtitle,
     startsAt: startsAt,
     place: place,
+    createdBy: createdBy,
   );
 
   /// Whole calendar days remaining. Negative values mean the date has passed.

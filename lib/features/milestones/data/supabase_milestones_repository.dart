@@ -21,7 +21,8 @@ class SupabaseMilestonesRepository implements MilestonesRepository {
   final String circleId;
 
   static const _columns =
-      'id, title, subtitle, due_on, starts_at, place, kind, created_at';
+      'id, title, subtitle, due_on, starts_at, place, kind, created_by, '
+      'created_at';
 
   @override
   Stream<List<SharedMilestone>> watchMilestones() async* {
@@ -187,6 +188,38 @@ class SupabaseMilestonesRepository implements MilestonesRepository {
     }
   }
 
+  @override
+  Future<void> deleteMilestone(String milestoneId) async {
+    final List<Map<String, dynamic>> removed;
+    try {
+      removed = await _client
+          .from('milestones')
+          .delete()
+          .eq('id', milestoneId)
+          .select('id');
+    } on sb.PostgrestException catch (error) {
+      throw _mapFailure(
+        error,
+        fallback:
+            'Could not remove that countdown. Check your connection and '
+            'try again.',
+        denied: 'Sign in again to remove this countdown.',
+      );
+    } on Exception {
+      throw const MilestonesFailure(
+        'Could not remove that countdown. Check your connection and try '
+        'again.',
+      );
+    }
+
+    // RLS hides rows the member may not delete instead of failing the request.
+    if (removed.isEmpty) {
+      throw const MilestonesFailure(
+        'Only the member who added this countdown can remove it.',
+      );
+    }
+  }
+
   Future<List<SharedMilestone>> _fetchAndCache() async {
     final milestones = await _fetch();
     try {
@@ -218,6 +251,7 @@ class SupabaseMilestonesRepository implements MilestonesRepository {
               row['starts_at'],
             ),
             place: _optionalLabel(row['place']),
+            createdBy: row['created_by'] as String?,
           ),
       ];
     } on sb.PostgrestException catch (error) {
@@ -269,10 +303,11 @@ class SupabaseMilestonesRepository implements MilestonesRepository {
     sb.PostgrestException error, {
     required String fallback,
     String tooLong = 'That title or note is a little too long.',
+    String denied = 'Sign in again to save this countdown.',
   }) {
     final message = switch (error.code) {
       '23514' || '22001' => tooLong,
-      '42501' || 'PGRST301' => 'Sign in again to save this countdown.',
+      '42501' || 'PGRST301' => denied,
       _ => null,
     };
     return MilestonesFailure(message ?? fallback, code: error.code);

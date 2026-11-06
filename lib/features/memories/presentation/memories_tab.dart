@@ -361,93 +361,115 @@ class _MilestoneStrip extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              TextButton.icon(
-                onPressed: onAdd,
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: const Text('Countdown'),
-                style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+              if (milestones.isNotEmpty)
+                TextButton.icon(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: const Text('Countdown'),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
                 ),
-              ),
             ],
           ),
         ),
-        SizedBox(
-          height: 124,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-            itemCount: milestones.isEmpty ? 1 : milestones.length + 1,
-            separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
-            itemBuilder: (context, index) {
-              if (milestones.isEmpty) {
-                return _EmptyMilestoneCard(onTap: onAdd);
-              }
-              if (index == milestones.length) {
-                return _AddMilestoneCard(onTap: onAdd);
-              }
-              return SizedBox(
-                width: 292,
-                child: CountdownCard(
-                  milestone: milestones[index],
-                  now: pinnedNow,
-                  onTap: () => onOpen(milestones[index]),
-                ),
-              );
-            },
+        if (milestones.isEmpty)
+          _EmptyMilestoneRail(onAdd: onAdd)
+        else
+          SizedBox(
+            height: 124,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+              itemCount: milestones.length + 1,
+              separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
+              itemBuilder: (context, index) {
+                if (index == milestones.length) {
+                  return _AddMilestoneCard(onTap: onAdd);
+                }
+                return SizedBox(
+                  width: 292,
+                  child: CountdownCard(
+                    milestone: milestones[index],
+                    now: pinnedNow,
+                    onTap: () => onOpen(milestones[index]),
+                  ),
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }
 }
 
-class _EmptyMilestoneCard extends StatelessWidget {
-  const _EmptyMilestoneCard({required this.onTap});
+class _EmptyMilestoneRail extends StatelessWidget {
+  const _EmptyMilestoneRail({required this.onAdd});
 
-  final VoidCallback onTap;
+  final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return SizedBox(
-      width: 292,
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
       child: BentoCard(
         padding: const EdgeInsets.all(AppSpacing.lg),
-        onTap: onTap,
-        semanticLabel: 'Add your first countdown.',
+        onTap: onAdd,
+        semanticLabel: 'Nothing on the horizon. Plan a countdown.',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.event_available_rounded,
-                  size: 18,
-                  color: scheme.onSurfaceVariant,
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: scheme.secondaryContainer,
+                    borderRadius: BorderRadius.circular(AppRadius.tile),
+                  ),
+                  child: Icon(
+                    Icons.event_available_rounded,
+                    size: 20,
+                    color: scheme.onSecondaryContainer,
+                  ),
                 ),
-                const Spacer(),
-                Icon(
-                  Icons.add_circle_outline_rounded,
-                  size: 18,
-                  color: scheme.onSurfaceVariant,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Nothing on the horizon',
+                        style: theme.textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Add a countdown for the next thing you all care '
+                        'about.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-            const Spacer(),
-            Text(
-              'Nothing on the horizon',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'Add a countdown for the next thing you all care about.',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-                fontSize: 10.5,
+            const SizedBox(height: AppSpacing.md),
+            FilledButton.icon(
+              key: const ValueKey('empty-countdown-cta'),
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Plan a countdown'),
+              style: FilledButton.styleFrom(
+                visualDensity: VisualDensity.compact,
               ),
             ),
           ],

@@ -61,6 +61,7 @@ class MilestonesCache {
     if (milestone.startsAt != null)
       'startsAt': milestone.startsAt!.toIso8601String(),
     'place': milestone.place,
+    if (milestone.createdBy != null) 'createdBy': milestone.createdBy,
   };
 
   static SharedMilestone _decode(Map<String, dynamic> json) => SharedMilestone(
@@ -77,6 +78,7 @@ class MilestonesCache {
       _ => null,
     },
     place: json['place'] as String?,
+    createdBy: json['createdBy'] as String?,
   );
 
   static String _dateOnly(DateTime date) {

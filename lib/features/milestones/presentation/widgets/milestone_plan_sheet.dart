@@ -72,6 +72,7 @@ class _MilestonePlanSheetState extends ConsumerState<MilestonePlanSheet> {
   bool _savingWhen = false;
   TimeOfDay? _draftTime;
   String? _whenError;
+  bool _deleting = false;
 
   @override
   void initState() {
@@ -354,6 +355,50 @@ class _MilestonePlanSheetState extends ConsumerState<MilestonePlanSheet> {
           child: CircularProgressIndicator(strokeWidth: 2),
         )
       : const Icon(Icons.campaign_rounded, size: 18);
+
+  bool get _canDelete => widget.milestone.createdBy == widget.currentUserId;
+
+  Future<void> _confirmDelete() async {
+    if (_deleting) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete this countdown?'),
+        content: const Text(
+          'It disappears for everyone in the circle. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep it'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    setState(() => _deleting = true);
+    try {
+      await ref
+          .read(milestonesRepositoryProvider(widget.circleId))
+          .deleteMilestone(widget.milestone.id);
+      if (!mounted) return;
+      navigator.pop();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Countdown removed.')),
+      );
+    } on MilestonesFailure catch (failure) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      messenger.showSnackBar(SnackBar(content: Text(failure.message)));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -647,6 +692,22 @@ class _MilestonePlanSheetState extends ConsumerState<MilestonePlanSheet> {
                 color: scheme.onSurfaceVariant,
               ),
             ),
+            if (_canDelete) ...[
+              const SizedBox(height: AppSpacing.md),
+              TextButton.icon(
+                key: const ValueKey('delete-countdown'),
+                onPressed: _deleting ? null : _confirmDelete,
+                style: TextButton.styleFrom(foregroundColor: scheme.error),
+                icon: _deleting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.delete_outline_rounded, size: 18),
+                label: const Text('Delete countdown'),
+              ),
+            ],
           ],
         ),
       ),

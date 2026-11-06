@@ -24,6 +24,7 @@ final _milestone = SharedMilestone(
   startsAt: DateTime(2026, 11, 20, 19),
   place: 'Langano Lake',
   subtitle: 'Bring the guitar',
+  createdBy: 'u1',
 );
 
 final _milestoneNoPlace = SharedMilestone(
@@ -39,6 +40,7 @@ class _FakeMilestonesRepository implements MilestonesRepository {
   final MilestonesFailure? failure;
   final places = <({String milestoneId, String? place})>[];
   final times = <({String milestoneId, DateTime? startsAt})>[];
+  final deleted = <String>[];
 
   @override
   Stream<List<SharedMilestone>> watchMilestones() =>
@@ -73,6 +75,13 @@ class _FakeMilestonesRepository implements MilestonesRepository {
     final failure = this.failure;
     if (failure != null) throw failure;
     times.add((milestoneId: milestoneId, startsAt: startsAt));
+  }
+
+  @override
+  Future<void> deleteMilestone(String milestoneId) async {
+    final failure = this.failure;
+    if (failure != null) throw failure;
+    deleted.add(milestoneId);
   }
 }
 
@@ -699,5 +708,118 @@ void main() {
     expect(find.text('Type where you’re meeting first.'), findsOneWidget);
     expect(milestones.places, isEmpty);
     expect(find.byKey(const ValueKey('place-field')), findsOneWidget);
+  });
+
+  testWidgets('removes the countdown after confirming', (tester) async {
+    final milestones = _FakeMilestonesRepository();
+
+    await tester.pumpWidget(
+      _host(
+        chat: _FakeChatRepository(),
+        now: DateTime(2026, 11, 15, 10),
+        openPlanOnTap: true,
+        milestones: milestones,
+      ),
+    );
+
+    await tester.tap(find.byType(CountdownCard));
+    await tester.pumpAndSettle();
+    final deleteButton = find.byKey(const ValueKey('delete-countdown'));
+    await tester.ensureVisible(deleteButton);
+    await tester.pumpAndSettle();
+    await tester.tap(deleteButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete this countdown?'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(milestones.deleted, ['s1']);
+    expect(find.byType(MilestonePlanSheet), findsNothing);
+    expect(find.text('Countdown removed.'), findsOneWidget);
+  });
+
+  testWidgets('keeps the countdown when the delete is dismissed', (
+    tester,
+  ) async {
+    final milestones = _FakeMilestonesRepository();
+
+    await tester.pumpWidget(
+      _host(
+        chat: _FakeChatRepository(),
+        now: DateTime(2026, 11, 15, 10),
+        openPlanOnTap: true,
+        milestones: milestones,
+      ),
+    );
+
+    await tester.tap(find.byType(CountdownCard));
+    await tester.pumpAndSettle();
+    final deleteButton = find.byKey(const ValueKey('delete-countdown'));
+    await tester.ensureVisible(deleteButton);
+    await tester.pumpAndSettle();
+    await tester.tap(deleteButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Keep it'));
+    await tester.pumpAndSettle();
+
+    expect(milestones.deleted, isEmpty);
+    expect(find.byType(MilestonePlanSheet), findsOneWidget);
+  });
+
+  testWidgets('only offers delete to the member who added it', (tester) async {
+    final fromSomeoneElse = SharedMilestone(
+      id: 's3',
+      title: 'Game night',
+      date: DateTime(2026, 11, 21),
+      kind: MilestoneKind.goal,
+      createdBy: 'u2',
+    );
+
+    await tester.pumpWidget(
+      _host(
+        chat: _FakeChatRepository(),
+        now: DateTime(2026, 11, 15, 10),
+        openPlanOnTap: true,
+        milestones: _FakeMilestonesRepository(),
+        milestone: fromSomeoneElse,
+      ),
+    );
+
+    await tester.tap(find.byType(CountdownCard));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('delete-countdown')), findsNothing);
+  });
+
+  testWidgets('keeps the sheet open when deleting fails', (tester) async {
+    const failure = MilestonesFailure(
+      'Only the member who added this countdown can remove it.',
+    );
+    final milestones = _FakeMilestonesRepository(failure: failure);
+
+    await tester.pumpWidget(
+      _host(
+        chat: _FakeChatRepository(),
+        now: DateTime(2026, 11, 15, 10),
+        openPlanOnTap: true,
+        milestones: milestones,
+      ),
+    );
+
+    await tester.tap(find.byType(CountdownCard));
+    await tester.pumpAndSettle();
+    final deleteButton = find.byKey(const ValueKey('delete-countdown'));
+    await tester.ensureVisible(deleteButton);
+    await tester.pumpAndSettle();
+    await tester.tap(deleteButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(find.text(failure.message), findsOneWidget);
+    expect(find.byType(MilestonePlanSheet), findsOneWidget);
+    expect(milestones.deleted, isEmpty);
   });
 }

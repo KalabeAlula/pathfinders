@@ -82,12 +82,15 @@ class _FakeMemoriesRepository implements MemoriesRepository {
   Future<void> clearReaction(String memoryId) async {}
 }
 
-Widget _host(_FakeMemoriesRepository repository) {
+Widget _host(
+  _FakeMemoriesRepository repository, {
+  List<SharedMilestone> milestones = const [],
+}) {
   return ProviderScope(
     overrides: [
       memoriesRepositoryProvider('c1').overrideWithValue(repository),
       milestonesProvider('c1').overrideWith(
-        (_) => Stream.value(const <SharedMilestone>[]),
+        (_) => Stream.value(milestones),
       ),
     ],
     child: MaterialApp(
@@ -193,6 +196,53 @@ void main() {
     expect(find.text('No memories yet'), findsOneWidget);
     expect(find.text('Save a memory'), findsOneWidget);
     expect(find.text('Memories'), findsOneWidget);
+  });
+
+  testWidgets('invites a first countdown when the rail is empty', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host(_FakeMemoriesRepository(_memories())));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nothing on the horizon'), findsOneWidget);
+    expect(find.text('Plan a countdown'), findsOneWidget);
+    expect(find.text('Countdown'), findsNothing);
+    expect(find.text('Add countdown'), findsNothing);
+  });
+
+  testWidgets('opens the composer from the empty countdown rail', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_host(_FakeMemoriesRepository(_memories())));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('empty-countdown-cta')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add a countdown'), findsOneWidget);
+  });
+
+  testWidgets('drops the empty panel once a countdown exists', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        _FakeMemoriesRepository(_memories()),
+        milestones: [
+          SharedMilestone(
+            id: 's1',
+            title: 'Dooms day',
+            date: DateTime(2026, 11, 16),
+            kind: MilestoneKind.birthday,
+            createdBy: 'alex',
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Dooms day'), findsOneWidget);
+    expect(find.text('Countdown'), findsOneWidget);
+    expect(find.text('Nothing on the horizon'), findsNothing);
+    expect(find.text('Plan a countdown'), findsNothing);
   });
 
   testWidgets('shows an error state that can retry', (tester) async {

@@ -21,4 +21,7 @@ abstract interface class MilestonesRepository {
     required String milestoneId,
     required DateTime? startsAt,
   });
+
+  /// Removes the countdown for everyone in the circle.
+  Future<void> deleteMilestone(String milestoneId);
 }
