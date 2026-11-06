@@ -23,7 +23,7 @@ void main() {
     updatedAt: now,
   );
 
-  Widget host({required bool arrived}) {
+  Widget host({required bool arrived, bool everyoneArrived = false}) {
     final snapshot = CircleSnapshot(
       circle: Circle(
         id: 'c1',
@@ -44,11 +44,11 @@ void main() {
             destination: destination,
             distanceMeters: arrived ? 12 : 800,
             arrived: arrived,
+            everyoneArrived: everyoneArrived,
           ),
         ),
-        circleSnapshotProvider('u1').overrideWith(
-          (_) => Stream.value(snapshot),
-        ),
+        circleSnapshotProvider('u1')
+            .overrideWith((_) => Stream.value(snapshot)),
       ],
       child: MaterialApp(
         theme: AppTheme.light(),
@@ -83,5 +83,16 @@ void main() {
 
     expect(find.byType(ArrivalCard), findsOneWidget);
     expect(find.byType(AnimatedPetSticker), findsNothing);
+  });
+
+  testWidgets('says the trip wraps up on its own once everyone is here', (
+    tester,
+  ) async {
+    await tester.pumpWidget(host(arrived: true, everyoneArrived: true));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text("Everyone's here. Ending soon."), findsOneWidget);
+    expect(find.text('End now'), findsOneWidget);
   });
 }

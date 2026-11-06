@@ -14,8 +14,10 @@ import '../../location/application/telemetry_providers.dart';
 import '../../location/domain/geo_point.dart';
 import '../domain/arrival.dart';
 import '../domain/navigation_destination.dart';
+import '../domain/navigation_failure.dart';
 import '../domain/route_geometry.dart';
 import 'navigation_providers.dart';
+import 'trip_auto_end.dart';
 
 part 'arrival_controller.g.dart';
 
@@ -38,17 +40,21 @@ class ArrivalState {
   }
 }
 
-/// Detects the local member's arrival at the shared destination and announces
-/// it in the crew thread once per trip.
+/// Detects the local member's arrival at the shared destination, announces it
+/// in the crew thread once per trip, and ends the trip once everyone is there.
 @Riverpod(keepAlive: true)
 class ArrivalController extends _$ArrivalController {
   bool _announcing = false;
+  String? _circleId;
+  late final TripAutoEnd _autoEnd = TripAutoEnd(onFinish: _finishTrip);
 
   @override
   ArrivalState build(String circleId) {
+    _circleId = circleId;
     final userId = ref.watch(authSessionProvider).value?.userId;
     final destination = ref.watch(circleDestinationProvider(circleId)).value;
     if (userId == null || destination == null) {
+      _autoEnd.cancel();
       return const ArrivalState();
     }
 
@@ -64,10 +70,20 @@ class ArrivalController extends _$ArrivalController {
           destination.point,
           accuracyMeters: reading?.accuracyMeters ?? 0,
         );
+    final everyoneArrived = _everyoneArrived(
+      userId: userId,
+      snapshot: snapshot,
+      destination: destination,
+      localPoint: localPoint,
+    );
 
     if (arrived) {
       unawaited(_announce(circleId, userId, destination, snapshot));
     }
+    _autoEnd.update(
+      tripKey: destinationTripKey(destination),
+      everyoneArrived: everyoneArrived,
+    );
 
     return ArrivalState(
       destination: destination,
@@ -75,12 +91,7 @@ class ArrivalController extends _$ArrivalController {
           ? null
           : distanceMeters(localPoint, destination.point),
       arrived: arrived,
-      everyoneArrived: _everyoneArrived(
-        userId: userId,
-        snapshot: snapshot,
-        destination: destination,
-        localPoint: localPoint,
-      ),
+      everyoneArrived: everyoneArrived,
     );
   }
 
@@ -104,6 +115,39 @@ class ArrivalController extends _$ArrivalController {
     final status = member.status;
     if (status == null || !status.isOnline) return null;
     return status.location;
+  }
+
+  /// Clears the shared destination for the whole circle.
+  ///
+  /// Re-reads the destination first: a member may have set a new trip while
+  /// the timer was counting down, and that trip must not be cancelled.
+  Future<bool> _finishTrip(String tripKey) async {
+    if (!ref.mounted) return false;
+    final circleId = _circleId;
+    if (circleId == null) return false;
+
+    final current = ref.read(circleDestinationProvider(circleId)).value;
+    if (current == null) return true;
+    if (destinationTripKey(current) != tripKey) return true;
+
+    try {
+      await ref.read(navigationRepositoryProvider(circleId)).clearDestination();
+      return true;
+    } on NavigationFailure catch (failure) {
+      developer.log(
+        'Could not auto-end the trip: ${failure.message}',
+        name: 'pathfinders.arrival',
+        error: failure,
+      );
+      return false;
+    } on Exception catch (error) {
+      developer.log(
+        'Could not auto-end the trip',
+        name: 'pathfinders.arrival',
+        error: error,
+      );
+      return false;
+    }
   }
 
   Future<void> _announce(

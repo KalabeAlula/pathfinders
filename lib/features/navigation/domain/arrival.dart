@@ -8,6 +8,11 @@ const arrivalRadiusMeters = 40.0;
 /// A fix this vague cannot tell 40 m from the next block, so it never arrives.
 const arrivalAccuracyCeilingMeters = 100.0;
 
+/// How long the whole circle must stay at the destination before the trip
+/// finishes itself. Long enough to show the everyone-here moment and to ride
+/// out GPS wobble on the radius boundary.
+const arrivalAutoEndGrace = Duration(seconds: 15);
+
 bool isWithinArrivalRadius(
   GeoPoint current,
   GeoPoint destination, {

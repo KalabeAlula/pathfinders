@@ -14,8 +14,8 @@ import '../../domain/navigation_failure.dart';
 
 /// Shown once the local member is inside the shared destination's radius.
 ///
-/// The card doubles as the end-of-trip prompt: once every located member is
-/// here, it offers to clear the destination for the whole circle.
+/// Once every member is here the trip finishes itself after a short grace
+/// period; the card shows that window and offers to end it right away.
 class ArrivalCard extends ConsumerStatefulWidget {
   const ArrivalCard({
     super.key,
@@ -194,7 +194,7 @@ class _ArrivalCardState extends ConsumerState<ArrivalCard> {
                     const SizedBox(width: 5),
                     Expanded(
                       child: Text(
-                        "Everyone's here.",
+                        "Everyone's here. Ending soon.",
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelSmall?.copyWith(
@@ -204,7 +204,7 @@ class _ArrivalCardState extends ConsumerState<ArrivalCard> {
                     ),
                     TextButton(
                       onPressed: _endNavigation,
-                      child: const Text('End navigation'),
+                      child: const Text('End now'),
                     ),
                   ],
                 ),

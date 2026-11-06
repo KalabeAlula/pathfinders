@@ -56,9 +56,9 @@ const _tripMinMoveMeters = 5.0;
 const _tripMinBearingChange = 3.0;
 const _tripMinInterval = Duration(milliseconds: 1200);
 
-/// How long after an app-driven camera move a change event is still treated as
-/// ours. Mapbox can emit a trailing event after the animation future resolves.
-const _tripSettleGrace = Duration(milliseconds: 600);
+/// A finger must travel this far across the map before a touch counts as a
+/// pan; taps and pinch starts should not stop the tracking camera.
+const _tripDragSlop = 8.0;
 
 /// Matches the maneuver banner (top) and summary bar (bottom) so the member's
 /// pin lands in the lower third with the road ahead visible.
@@ -145,7 +145,7 @@ class _MapTabState extends ConsumerState<MapTab> {
   double? _trackBearing;
   GeoPoint? _trackedPoint;
   DateTime? _lastTrackedAt;
-  DateTime? _cameraIgnoreUntil;
+  Offset? _touchStart;
   GeoPoint? _pendingUserCenter;
   MapFocusRequest? _pendingFocus;
   int _appliedFocusRevision = 0;
@@ -237,7 +237,7 @@ class _MapTabState extends ConsumerState<MapTab> {
       _trackBearing = null;
       _trackedPoint = null;
       _lastTrackedAt = null;
-      _cameraIgnoreUntil = null;
+      _touchStart = null;
     }
     setState(() => _foreground = foreground);
 
@@ -279,7 +279,7 @@ class _MapTabState extends ConsumerState<MapTab> {
     _trackBearing = null;
     _trackedPoint = null;
     _lastTrackedAt = null;
-    _cameraIgnoreUntil = null;
+    _touchStart = null;
     _map = null;
     _moving = false;
   }
@@ -469,9 +469,6 @@ class _MapTabState extends ConsumerState<MapTab> {
     } catch (_) {
       // A style swap can reject the camera mid-flight.
     } finally {
-      // The grace starts when the animation ends: Mapbox can emit trailing
-      // change events afterwards that must not read as a member gesture.
-      _cameraIgnoreUntil = DateTime.now().add(_tripSettleGrace);
       _programmaticCamera = false;
       _setMoving(false);
     }
@@ -539,7 +536,6 @@ class _MapTabState extends ConsumerState<MapTab> {
     } catch (_) {
       // Best effort; the next fix retries.
     } finally {
-      _cameraIgnoreUntil = DateTime.now().add(_tripSettleGrace);
       _programmaticCamera = false;
     }
   }
@@ -568,6 +564,7 @@ class _MapTabState extends ConsumerState<MapTab> {
 
   /// Snaps back to the tracking perspective after the member pans away.
   void _recenterTrip() {
+    _touchStart = null;
     setState(() => _tripPaused = false);
     _trackBearing = null;
     _trackedPoint = null;
@@ -581,6 +578,7 @@ class _MapTabState extends ConsumerState<MapTab> {
     _trackBearing = null;
     _trackedPoint = null;
     _lastTrackedAt = null;
+    _touchStart = null;
 
     final map = _map;
     if (map == null || !_styleReady || !mounted) return;
@@ -595,7 +593,6 @@ class _MapTabState extends ConsumerState<MapTab> {
 
     _centerFlight = true;
     _programmaticCamera = true;
-    _cameraIgnoreUntil = DateTime.now().add(const Duration(milliseconds: 1500));
     _setMoving(true);
     try {
       await map.easeTo(
@@ -661,6 +658,7 @@ class _MapTabState extends ConsumerState<MapTab> {
       _trackBearing = null;
       _trackedPoint = null;
       _lastTrackedAt = null;
+      _touchStart = null;
       _pendingUserCenter = null;
       if (wasActive) unawaited(_leaveTripCamera());
       return;
@@ -674,6 +672,7 @@ class _MapTabState extends ConsumerState<MapTab> {
     _trackBearing = null;
     _trackedPoint = null;
     _lastTrackedAt = null;
+    _touchStart = null;
     _pendingUserCenter = null;
     // Let the entrance flight drive the angled camera for the new trip.
     _initialCameraFlightDone = false;
@@ -935,16 +934,31 @@ class _MapTabState extends ConsumerState<MapTab> {
       // entrance-flight flag must stop.
       _centerFlight = false;
       _setMoving(true);
+    }
+    // During a trip every camera move we did not command is either an
+    // animation frame or a drag. Only a real touch pauses tracking (see
+    // [_onPointerMove]) so trailing frames cannot fake a gesture.
+  }
+
+  void _onPointerDown(PointerDownEvent event) {
+    if (ref.read(navigationControllerProvider(widget.circleId)).destination ==
+        null) {
       return;
     }
+    _touchStart = event.position;
+  }
 
-    // During a trip any camera move we did not command is the member's own
-    // gesture, so tracking pauses until they ask to re-center.
-    final ignoreUntil = _cameraIgnoreUntil;
-    if (ignoreUntil != null && DateTime.now().isBefore(ignoreUntil)) return;
-    if (!_tripPaused) {
-      setState(() => _tripPaused = true);
-    }
+  void _onPointerMove(PointerMoveEvent event) {
+    final start = _touchStart;
+    if (start == null || _tripPaused) return;
+    if ((event.position - start).distance < _tripDragSlop) return;
+
+    _touchStart = null;
+    setState(() => _tripPaused = true);
+  }
+
+  void _onPointerRelease(PointerEvent event) {
+    _touchStart = null;
   }
 
   void _onStyleLoaded(StyleLoadedEventData event) {
@@ -1302,19 +1316,26 @@ class _MapTabState extends ConsumerState<MapTab> {
                 child: !configured
                     ? const _MissingMapToken()
                     : showNativeMap
-                    ? MapWidget(
-                        styleUri: MapboxStandardStyle.uri,
-                        viewport: _viewport,
-                        // A TextureView is composited inside the Flutter view,
-                        // so it respects tab and route z-order. SurfaceView
-                        // punches through Flutter's canvas on Android.
-                        textureView:
-                            !kIsWeb &&
-                            defaultTargetPlatform == TargetPlatform.android,
-                        onMapCreated: _onMapCreated,
-                        onStyleLoadedListener: _onStyleLoaded,
-                        onCameraChangeListener: _onCameraChanged,
-                        onMapIdleListener: (_) => unawaited(_handleIdle()),
+                    ? Listener(
+                        onPointerDown: _onPointerDown,
+                        onPointerMove: _onPointerMove,
+                        onPointerUp: _onPointerRelease,
+                        onPointerCancel: _onPointerRelease,
+                        child: MapWidget(
+                          styleUri: MapboxStandardStyle.uri,
+                          viewport: _viewport,
+                          // A TextureView is composited inside the Flutter
+                          // view, so it respects tab and route z-order.
+                          // SurfaceView punches through Flutter's canvas on
+                          // Android.
+                          textureView:
+                              !kIsWeb &&
+                              defaultTargetPlatform == TargetPlatform.android,
+                          onMapCreated: _onMapCreated,
+                          onStyleLoadedListener: _onStyleLoaded,
+                          onCameraChangeListener: _onCameraChanged,
+                          onMapIdleListener: (_) => unawaited(_handleIdle()),
+                        ),
                       )
                     // Mounted while the tab is hidden or the app is in the
                     // background; never painted because the tab is offstage.
