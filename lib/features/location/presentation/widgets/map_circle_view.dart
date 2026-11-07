@@ -14,6 +14,16 @@ const _peerRouteColors = <Color>[
   Color(0xFF4A9A9A),
 ];
 
+/// Lighter peers of [_peerRouteColors] for the night basemap, where the
+/// originals disappear into Standard's dark ground.
+const _peerRouteColorsDark = <Color>[
+  Color(0xFF8FB6E8),
+  Color(0xFFA9CE9C),
+  Color(0xFFC7A2E0),
+  Color(0xFFEBC784),
+  Color(0xFF8ED0D0),
+];
+
 /// The accent each member's route and pin uses.
 ///
 /// The local user always takes [ColorScheme.primary]; peers cycle through a
@@ -27,13 +37,15 @@ Map<String, Color> routeAccentColors({
     for (final member in members)
       if (member.profile.id != currentUserId) member.profile.id,
   ]..sort();
+  final palette = scheme.brightness == Brightness.dark
+      ? _peerRouteColorsDark
+      : _peerRouteColors;
 
   return {
     for (final member in members)
       member.profile.id: member.profile.id == currentUserId
           ? scheme.primary
-          : _peerRouteColors[peerIds.indexOf(member.profile.id) %
-                _peerRouteColors.length],
+          : palette[peerIds.indexOf(member.profile.id) % palette.length],
   };
 }
 

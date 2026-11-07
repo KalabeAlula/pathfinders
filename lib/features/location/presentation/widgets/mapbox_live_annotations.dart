@@ -114,6 +114,9 @@ class MapboxLiveAnnotations {
       _routes = await _map.annotations.createPolylineAnnotationManager(
         id: 'live-routes-$generation',
       );
+      // Standard's night preset lights runtime layers, which turns route
+      // colors nearly black; full emissive keeps them at their own value.
+      await _routes!.setLineEmissiveStrength(1);
       _members = await _map.annotations.createPointAnnotationManager(
         id: 'live-members-$generation',
       );
