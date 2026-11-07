@@ -59,18 +59,13 @@ class MainShellScreen extends ConsumerWidget {
     // member is already watching the gallery are marked seen as they arrive.
     if (tab == AppTab.memories && newMemories > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref
-            .read(memoriesSeenControllerProvider(circleId).notifier)
-            .markSeen();
+        ref.read(memoriesSeenControllerProvider(circleId).notifier).markSeen();
       });
     }
 
     // The shell stays mounted for the whole signed-in session, so watching the
     // heartbeat here keeps sharing alive across every tab.
     ref.listen(telemetryControllerProvider(currentUserId), (_, _) {});
-    // Same for chat notifications: every circle's realtime thread is watched
-    // for the whole session so messages keep arriving while the app is away.
-    ref.listen(chatNotificationWatcherProvider(currentUserId), (_, _) {});
     // Holds this device's push token for the signed-in member, so delivery
     // still reaches the phone when the process is not running.
     ref.watch(pushTokenRegistrationProvider(currentUserId));

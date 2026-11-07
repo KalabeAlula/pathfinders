@@ -34,6 +34,8 @@ class _FakeChatRepository implements ChatRepository {
   Future<void> sendText({
     required String senderId,
     required String text,
+    String? replyToId,
+    List<String> mentionedUserIds = const [],
   }) async {}
 
   @override
@@ -42,7 +44,18 @@ class _FakeChatRepository implements ChatRepository {
     required double latitude,
     required double longitude,
     String? placeLabel,
+    String? replyToId,
   }) async {}
+
+  @override
+  Future<void> editText({
+    required String messageId,
+    required String text,
+    List<String> mentionedUserIds = const [],
+  }) async {}
+
+  @override
+  Future<void> deleteMessage(String messageId) async {}
 }
 
 void main() {

@@ -95,10 +95,7 @@ class _FakeNavigationGateway implements NavigationGateway {
   bool get isConfigured => true;
 
   @override
-  Future<RoutePlan> route({
-    required GeoPoint from,
-    required GeoPoint to,
-  }) {
+  Future<RoutePlan> route({required GeoPoint from, required GeoPoint to}) {
     throw UnimplementedError();
   }
 
@@ -125,6 +122,8 @@ class _FakeChatRepository implements ChatRepository {
   Future<void> sendText({
     required String senderId,
     required String text,
+    String? replyToId,
+    List<String> mentionedUserIds = const [],
   }) async {
     sent.add(text);
   }
@@ -135,7 +134,18 @@ class _FakeChatRepository implements ChatRepository {
     required double latitude,
     required double longitude,
     String? placeLabel,
+    String? replyToId,
   }) async {}
+
+  @override
+  Future<void> editText({
+    required String messageId,
+    required String text,
+    List<String> mentionedUserIds = const [],
+  }) async {}
+
+  @override
+  Future<void> deleteMessage(String messageId) async {}
 }
 
 Widget _host({
@@ -232,11 +242,7 @@ void main() {
   testWidgets('opens the plan and shares it with the crew', (tester) async {
     final chat = _FakeChatRepository();
     await tester.pumpWidget(
-      _host(
-        chat: chat,
-        now: DateTime(2026, 11, 15, 10),
-        openPlanOnTap: true,
-      ),
+      _host(chat: chat, now: DateTime(2026, 11, 15, 10), openPlanOnTap: true),
     );
 
     await tester.tap(find.byType(CountdownCard));
@@ -466,10 +472,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('save-time')));
     await tester.pumpAndSettle();
 
-    expect(
-      milestones.times,
-      [(milestoneId: 's2', startsAt: DateTime(2026, 11, 21, 19))],
-    );
+    expect(milestones.times, [
+      (milestoneId: 's2', startsAt: DateTime(2026, 11, 21, 19)),
+    ]);
     expect(find.text('Time added to the countdown.'), findsOneWidget);
     expect(find.text('Add time'), findsNothing);
     expect(

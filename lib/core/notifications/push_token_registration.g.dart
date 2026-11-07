@@ -8,26 +8,41 @@ part of 'push_token_registration.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Keeps this device's FCM token tied to the signed-in member.
+/// Keeps this device reachable by cloud push for the signed-in member.
 ///
-/// The shell watches this for the whole session. Signing out disposes it and
-/// removes the row, so the device drops off the old account's delivery list.
+/// FlutterFire 17 registers through Firebase Installations and hands back the
+/// installation ID, which is what the server sends to. The shell watches this
+/// for the whole session; signing out disposes it and removes the row, so the
+/// device drops off the old account's delivery list.
+///
+/// This is also where the tray permission is requested, because the push
+/// handler cannot show anything without it.
 
 @ProviderFor(pushTokenRegistration)
 final pushTokenRegistrationProvider = PushTokenRegistrationFamily._();
 
-/// Keeps this device's FCM token tied to the signed-in member.
+/// Keeps this device reachable by cloud push for the signed-in member.
 ///
-/// The shell watches this for the whole session. Signing out disposes it and
-/// removes the row, so the device drops off the old account's delivery list.
+/// FlutterFire 17 registers through Firebase Installations and hands back the
+/// installation ID, which is what the server sends to. The shell watches this
+/// for the whole session; signing out disposes it and removes the row, so the
+/// device drops off the old account's delivery list.
+///
+/// This is also where the tray permission is requested, because the push
+/// handler cannot show anything without it.
 
 final class PushTokenRegistrationProvider
     extends $FunctionalProvider<AsyncValue<void>, void, FutureOr<void>>
     with $FutureModifier<void>, $FutureProvider<void> {
-  /// Keeps this device's FCM token tied to the signed-in member.
+  /// Keeps this device reachable by cloud push for the signed-in member.
   ///
-  /// The shell watches this for the whole session. Signing out disposes it and
-  /// removes the row, so the device drops off the old account's delivery list.
+  /// FlutterFire 17 registers through Firebase Installations and hands back the
+  /// installation ID, which is what the server sends to. The shell watches this
+  /// for the whole session; signing out disposes it and removes the row, so the
+  /// device drops off the old account's delivery list.
+  ///
+  /// This is also where the tray permission is requested, because the push
+  /// handler cannot show anything without it.
   PushTokenRegistrationProvider._({
     required PushTokenRegistrationFamily super.from,
     required String super.argument,
@@ -72,12 +87,17 @@ final class PushTokenRegistrationProvider
 }
 
 String _$pushTokenRegistrationHash() =>
-    r'11f9afff37f85883d7e64d51ca2369ced5ce6550';
+    r'7b9acfec2ba9545347d246ec05eaa4193d455181';
 
-/// Keeps this device's FCM token tied to the signed-in member.
+/// Keeps this device reachable by cloud push for the signed-in member.
 ///
-/// The shell watches this for the whole session. Signing out disposes it and
-/// removes the row, so the device drops off the old account's delivery list.
+/// FlutterFire 17 registers through Firebase Installations and hands back the
+/// installation ID, which is what the server sends to. The shell watches this
+/// for the whole session; signing out disposes it and removes the row, so the
+/// device drops off the old account's delivery list.
+///
+/// This is also where the tray permission is requested, because the push
+/// handler cannot show anything without it.
 
 final class PushTokenRegistrationFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<void>, String> {
@@ -90,10 +110,15 @@ final class PushTokenRegistrationFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Keeps this device's FCM token tied to the signed-in member.
+  /// Keeps this device reachable by cloud push for the signed-in member.
   ///
-  /// The shell watches this for the whole session. Signing out disposes it and
-  /// removes the row, so the device drops off the old account's delivery list.
+  /// FlutterFire 17 registers through Firebase Installations and hands back the
+  /// installation ID, which is what the server sends to. The shell watches this
+  /// for the whole session; signing out disposes it and removes the row, so the
+  /// device drops off the old account's delivery list.
+  ///
+  /// This is also where the tray permission is requested, because the push
+  /// handler cannot show anything without it.
 
   PushTokenRegistrationProvider call(String userId) =>
       PushTokenRegistrationProvider._(argument: userId, from: this);

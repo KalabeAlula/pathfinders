@@ -19,8 +19,11 @@ class SupabaseChatRepository implements ChatRepository {
 
   static const _columns =
       'id, sender_id, kind, body, latitude, longitude, place_label, '
-      'created_at, sender:profiles!chat_messages_sender_id_fkey'
-      '(display_name, avatar_color)';
+      'created_at, mentioned_user_ids, edited_at, '
+      'sender:profiles!chat_messages_sender_id_fkey'
+      '(display_name, avatar_color), '
+      'reply:chat_messages!reply_to_id'
+      '(id, sender_id, kind, body, place_label, sender:profiles(display_name))';
 
   @override
   Stream<List<ChatMessage>> watchMessages() async* {
@@ -75,10 +78,17 @@ class SupabaseChatRepository implements ChatRepository {
   Future<void> sendText({
     required String senderId,
     required String text,
+    String? replyToId,
+    List<String> mentionedUserIds = const [],
   }) async {
     final clean = text.trim();
     if (clean.isEmpty) return;
-    await _insert(senderId, {'kind': 'text', 'body': clean});
+    await _insert(senderId, {
+      'kind': 'text',
+      'body': clean,
+      'reply_to_id': ?replyToId,
+      if (mentionedUserIds.isNotEmpty) 'mentioned_user_ids': mentionedUserIds,
+    });
   }
 
   @override
@@ -87,6 +97,7 @@ class SupabaseChatRepository implements ChatRepository {
     required double latitude,
     required double longitude,
     String? placeLabel,
+    String? replyToId,
   }) async {
     await _insert(senderId, {
       'kind': 'location_share',
@@ -94,7 +105,71 @@ class SupabaseChatRepository implements ChatRepository {
       'longitude': longitude,
       if (placeLabel != null && placeLabel.trim().isNotEmpty)
         'place_label': placeLabel.trim(),
+      'reply_to_id': ?replyToId,
     });
+  }
+
+  @override
+  Future<void> editText({
+    required String messageId,
+    required String text,
+    List<String> mentionedUserIds = const [],
+  }) async {
+    final clean = text.trim();
+    if (clean.isEmpty) {
+      throw const ChatFailure('Write something before saving the edit.');
+    }
+
+    final List<Map<String, dynamic>> rows;
+    try {
+      rows = await _client
+          .from('chat_messages')
+          .update({'body': clean, 'mentioned_user_ids': mentionedUserIds})
+          .eq('id', messageId)
+          .select('id');
+    } on sb.PostgrestException catch (error) {
+      throw _mapFailure(
+        error,
+        fallback:
+            'Could not save that edit. Check your connection and try again.',
+      );
+    } on Exception {
+      throw const ChatFailure(
+        'Could not save that edit. Check your connection and try again.',
+      );
+    }
+
+    // RLS quietly matches nothing when the message is not the caller's.
+    if (rows.isEmpty) {
+      throw const ChatFailure('Only the sender can edit a message.');
+    }
+  }
+
+  @override
+  Future<void> deleteMessage(String messageId) async {
+    final List<Map<String, dynamic>> rows;
+    try {
+      rows = await _client
+          .from('chat_messages')
+          .delete()
+          .eq('id', messageId)
+          .select('id');
+    } on sb.PostgrestException catch (error) {
+      throw _mapFailure(
+        error,
+        fallback:
+            'Could not delete that message. Check your connection and try '
+            'again.',
+      );
+    } on Exception {
+      throw const ChatFailure(
+        'Could not delete that message. Check your connection and try again.',
+      );
+    }
+
+    if (rows.isEmpty) {
+      throw const ChatFailure('Only the sender can delete a message.');
+    }
   }
 
   Future<void> _insert(String senderId, Map<String, Object?> fields) async {
@@ -162,7 +237,60 @@ class SupabaseChatRepository implements ChatRepository {
       latitude: (row['latitude'] as num?)?.toDouble(),
       longitude: (row['longitude'] as num?)?.toDouble(),
       createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
+      replyTo: _reply(row['reply']),
+      mentionedUserIds:
+          (row['mentioned_user_ids'] as List?)?.whereType<String>().toList(
+            growable: false,
+          ) ??
+          const [],
+      editedAt: _timestamp(row['edited_at']),
     );
+  }
+
+  static ChatMessageReply? _reply(Object? value) {
+    final reply = switch (value) {
+      final Map<String, dynamic> row => row,
+      final List<dynamic> rows when rows.isNotEmpty =>
+        rows.first is Map<String, dynamic>
+            ? rows.first as Map<String, dynamic>
+            : null,
+      _ => null,
+    };
+    final id = reply?['id'];
+    if (reply == null || id is! String) return null;
+
+    final sender = switch (reply['sender']) {
+      final Map<String, dynamic> profile => profile,
+      final List<dynamic> profiles when profiles.isNotEmpty =>
+        profiles.first is Map<String, dynamic>
+            ? profiles.first as Map<String, dynamic>
+            : const <String, dynamic>{},
+      _ => const <String, dynamic>{},
+    };
+    final kind = reply['kind'];
+    final place = _text(reply['place_label']);
+
+    return ChatMessageReply(
+      id: id,
+      senderId: reply['sender_id'] as String? ?? '',
+      senderName: _text(sender['display_name']) ?? 'A member',
+      text: switch (kind) {
+        'text' => _text(reply['body']),
+        'destination_update' =>
+          place == null
+              ? 'Updated the destination'
+              : 'Updated the destination to $place',
+        _ => null,
+      },
+      mediaPreview: kind == 'location_share'
+          ? place ?? 'Shared location'
+          : null,
+    );
+  }
+
+  static DateTime? _timestamp(Object? value) {
+    if (value is! String) return null;
+    return DateTime.tryParse(value)?.toLocal();
   }
 
   static ChatMessageKind _kind(Object? value) => switch (value) {
@@ -184,6 +312,7 @@ class SupabaseChatRepository implements ChatRepository {
     final message = switch (error.code) {
       '23514' || '22001' => 'That message is a little too long.',
       '42501' || 'PGRST301' => 'Sign in again to send messages.',
+      '23503' || 'P0001' => 'That message is no longer in this thread.',
       _ => null,
     };
     return ChatFailure(message ?? fallback, code: error.code);

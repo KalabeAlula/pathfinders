@@ -15,7 +15,9 @@ import 'local_chat_notifier.dart';
 @pragma('vm:entry-point')
 Future<void> chatPushHandler(RemoteMessage message) async {
   if (Firebase.apps.isEmpty) {
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
   }
 
   final data = message.data;
