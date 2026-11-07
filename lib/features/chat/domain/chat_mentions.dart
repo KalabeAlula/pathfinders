@@ -29,6 +29,28 @@ class ChatTextSegment {
   final String? userId;
 }
 
+/// The `@…` run the caret is in while a mention is being typed.
+class ChatMentionDraft {
+  const ChatMentionDraft({
+    required this.start,
+    required this.end,
+    required this.query,
+    required this.matches,
+  });
+
+  /// Index of the `@`.
+  final int start;
+
+  /// Caret position just past the typed characters.
+  final int end;
+
+  /// What was typed after the `@`, possibly empty.
+  final String query;
+
+  /// Members whose display name starts with [query], in display order.
+  final List<UserProfile> matches;
+}
+
 /// Finds the member mentions in [text].
 ///
 /// A token is `@` followed by the member's full display name, so names with
@@ -87,6 +109,65 @@ List<String> findMentionedUserIds(String text, Iterable<UserProfile> members) {
     ids.add(mention.userId);
   }
   return List<String>.unmodifiable(ids);
+}
+
+/// The mention the caret is in, or null when it is outside one.
+///
+/// The query may contain spaces so `@Ann Lee` keeps matching while it is
+/// typed. It ends as soon as the run stops being a prefix of a member name,
+/// which also hides the popover once a completed `@Name ` is followed by more
+/// words.
+ChatMentionDraft? findMentionDraft({
+  required String text,
+  required int caret,
+  required Iterable<UserProfile> members,
+  String? excludeUserId,
+}) {
+  if (caret <= 0 || caret > text.length) return null;
+
+  final at = text.lastIndexOf('@', caret - 1);
+  if (at < 0 || !_startsToken(text, at)) return null;
+
+  final query = text.substring(at + 1, caret);
+  if (query.contains('\n') || query.contains('\r')) return null;
+
+  final folded = query.toLowerCase();
+  final matches = <UserProfile>[
+    for (final member in members)
+      if (member.id != excludeUserId &&
+          member.displayName.trim().toLowerCase().startsWith(folded))
+        member,
+  ];
+  if (matches.isEmpty) return null;
+
+  matches.sort(
+    (a, b) =>
+        a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
+  );
+  return ChatMentionDraft(
+    start: at,
+    end: caret,
+    query: query,
+    matches: List<UserProfile>.unmodifiable(matches),
+  );
+}
+
+/// Swaps [draft] for `@Display Name ` and reports where the caret belongs.
+///
+/// A space the user already typed after the run is folded into the token so
+/// picking a suggestion never leaves a double space behind.
+({String text, int caret}) completeMention(
+  String text,
+  ChatMentionDraft draft,
+  String displayName,
+) {
+  final token = '@${displayName.trim()} ';
+  var end = draft.end;
+  if (end < text.length && text[end] == ' ') end++;
+  return (
+    text: text.replaceRange(draft.start, end, token),
+    caret: draft.start + token.length,
+  );
 }
 
 /// Splits [text] into plain and mention pieces for styled rendering.

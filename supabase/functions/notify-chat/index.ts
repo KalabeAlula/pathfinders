@@ -15,6 +15,7 @@ type ChatRecord = {
   sender_id: string;
   kind: string;
   body: string | null;
+  mentioned_user_ids: string[] | null;
 };
 
 type ServiceAccount = {
@@ -218,8 +219,8 @@ Deno.serve(async (request) => {
   }
 
   const ids = members.map((member) => member.user_id).join(",");
-  const targets = await select<{ token: string }>(
-    `device_push_tokens?user_id=in.(${ids})&select=token`,
+  const targets = await select<{ token: string; user_id: string }>(
+    `device_push_tokens?user_id=in.(${ids})&select=token,user_id`,
   );
   if (targets.length === 0) {
     return Response.json({ skipped: "no devices" });
@@ -227,6 +228,7 @@ Deno.serve(async (request) => {
 
   const circleName = circle?.name ?? "Circle";
   const senderName = sender?.display_name ?? "A friend";
+  const mentioned = new Set(record.mentioned_user_ids ?? []);
   const accessToken = await fcmAccessToken(account);
   const data = {
     kind: "chat",
@@ -234,20 +236,19 @@ Deno.serve(async (request) => {
     circle_name: circleName,
     message_id: record.id,
     sender_name: senderName,
-    title: `${senderName} • ${circleName}`,
     body: text,
   };
 
   let sent = 0;
   let removed = 0;
   await Promise.all(
-    targets.map(async ({ token }) => {
-      const response = await sendTo(
-        accessToken,
-        account.project_id,
-        token,
-        data,
-      );
+    targets.map(async ({ token, user_id }) => {
+      const response = await sendTo(accessToken, account.project_id, token, {
+        ...data,
+        title: mentioned.has(user_id)
+          ? `${senderName} mentioned you • ${circleName}`
+          : `${senderName} • ${circleName}`,
+      });
       if (response.ok) {
         sent++;
         return;

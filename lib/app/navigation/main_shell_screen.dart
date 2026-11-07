@@ -135,6 +135,7 @@ class MainShellScreen extends ConsumerWidget {
           key: ValueKey('chat-$circleId'),
           circleId: circleId,
           currentUserId: currentUserId,
+          members: snapshot.members,
           active: tab == AppTab.chat,
           onShowLocation: showSharedLocation,
         ),

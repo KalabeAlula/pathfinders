@@ -12,10 +12,8 @@ import '../domain/chat_notifier.dart';
 /// Each circle owns a notification group: one child per message plus a silent
 /// summary, so a busy group stacks in the shade instead of spamming it.
 class LocalChatNotifier implements ChatNotifier {
-  LocalChatNotifier(
-    this._preferences, {
-    NotificationPlugin? notifications,
-  }) : _notifications = notifications ?? NotificationPlugin.instance;
+  LocalChatNotifier(this._preferences, {NotificationPlugin? notifications})
+    : _notifications = notifications ?? NotificationPlugin.instance;
 
   /// Keeps the summary's inbox lines short and bounded.
   static const _maxGrouped = 8;

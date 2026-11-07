@@ -86,4 +86,105 @@ void main() {
       expect(segments.map((segment) => segment.text).join(), text);
     });
   });
+
+  group('findMentionDraft', () {
+    test('opens on a bare @ at a word start', () {
+      final draft = findMentionDraft(
+        text: 'hey @',
+        caret: 5,
+        members: _members,
+      );
+
+      expect(draft, isNotNull);
+      expect(draft!.start, 4);
+      expect(draft.query, isEmpty);
+      expect(
+        [for (final member in draft.matches) member.id],
+        ['ann', 'ann-lee', 'sam'],
+      );
+    });
+
+    test('narrows the matches by name prefix', () {
+      final draft = findMentionDraft(
+        text: 'hey @ann l',
+        caret: 10,
+        members: _members,
+      );
+
+      expect([for (final member in draft!.matches) member.id], ['ann-lee']);
+      expect(draft.query, 'ann l');
+    });
+
+    test('ignores an @ inside a word', () {
+      expect(
+        findMentionDraft(text: 'mail hello@', caret: 10, members: _members),
+        isNull,
+      );
+    });
+
+    test('keeps suggesting a longer name after a space', () {
+      final draft = findMentionDraft(
+        text: '@Ann ',
+        caret: 5,
+        members: _members,
+      );
+
+      expect([for (final member in draft!.matches) member.id], ['ann-lee']);
+    });
+
+    test('closes once the run stops matching a name', () {
+      expect(
+        findMentionDraft(text: '@Sam R thanks', caret: 12, members: _members),
+        isNull,
+      );
+    });
+
+    test('uses the caret, not the end of the text', () {
+      final draft = findMentionDraft(
+        text: '@Ann and more',
+        caret: 4,
+        members: _members,
+      );
+
+      expect(draft!.query, 'Ann');
+      expect(
+        [for (final member in draft.matches) member.id],
+        ['ann', 'ann-lee'],
+      );
+    });
+
+    test('skips the member writing the message', () {
+      final draft = findMentionDraft(
+        text: '@',
+        caret: 1,
+        members: _members,
+        excludeUserId: 'ann',
+      );
+
+      expect(
+        [for (final member in draft!.matches) member.id],
+        ['ann-lee', 'sam'],
+      );
+    });
+  });
+
+  group('completeMention', () {
+    test('replaces the typed run with the full token', () {
+      const text = 'hey @ann see you';
+      final draft = findMentionDraft(text: text, caret: 8, members: _members)!;
+      final completed = completeMention(text, draft, 'Ann Lee');
+
+      expect(completed.text, 'hey @Ann Lee see you');
+      expect(completed.caret, 13);
+    });
+
+    test('adds the separating space when the run ends the text', () {
+      const text = 'hey @ann';
+      final draft = findMentionDraft(text: text, caret: 8, members: _members)!;
+      final completed = completeMention(text, draft, 'Ann');
+
+      expect(completed.text, 'hey @Ann ');
+      expect(completed.caret, 9);
+    });
+  });
 }

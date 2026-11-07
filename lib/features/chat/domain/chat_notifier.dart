@@ -9,7 +9,10 @@ abstract interface class ChatNotifier {
   Future<void> ensurePermission();
 
   /// Posts [notification] and refreshes the circle's silent group summary.
-  Future<void> show(ChatNotification notification, {required String circleName});
+  Future<void> show(
+    ChatNotification notification, {
+    required String circleName,
+  });
 
   /// Removes every notification belonging to [circleId], e.g. once its thread
   /// is on screen.

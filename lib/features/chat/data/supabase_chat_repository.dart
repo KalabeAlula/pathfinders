@@ -19,11 +19,13 @@ class SupabaseChatRepository implements ChatRepository {
 
   static const _columns =
       'id, sender_id, kind, body, latitude, longitude, place_label, '
-      'created_at, mentioned_user_ids, edited_at, '
+      'created_at, mentioned_user_ids, edited_at, reply_to_id, '
       'sender:profiles!chat_messages_sender_id_fkey'
-      '(display_name, avatar_color), '
-      'reply:chat_messages!reply_to_id'
-      '(id, sender_id, kind, body, place_label, sender:profiles(display_name))';
+      '(display_name, avatar_color)';
+
+  static const _replyColumns =
+      'id, sender_id, kind, body, place_label, '
+      'sender:profiles!chat_messages_sender_id_fkey(display_name)';
 
   @override
   Stream<List<ChatMessage>> watchMessages() async* {
@@ -202,9 +204,26 @@ class SupabaseChatRepository implements ChatRepository {
           .order('created_at', ascending: false)
           .limit(100);
 
+      // A self-join embed is ambiguous over PostgREST, so quoted parents are
+      // fetched by id. This also lets a reply quote a message that has aged
+      // out of the rolling 100-message window.
+      final replyIds = <String>{
+        for (final row in rows)
+          if (row['reply_to_id'] case final String id) id,
+      };
+      final parents = replyIds.isEmpty
+          ? const <Map<String, dynamic>>[]
+          : await _client
+                .from('chat_messages')
+                .select(_replyColumns)
+                .inFilter('id', replyIds.toList());
+      final parentsById = {
+        for (final parent in parents) parent['id'] as String: parent,
+      };
+
       // The query is newest-first for the limit; the thread renders oldest
       // first like every other chat app.
-      return [for (final row in rows.reversed) _message(row)];
+      return [for (final row in rows.reversed) _message(row, parentsById)];
     } on sb.PostgrestException catch (error) {
       throw _mapFailure(
         error,
@@ -215,7 +234,10 @@ class SupabaseChatRepository implements ChatRepository {
     }
   }
 
-  static ChatMessage _message(Map<String, dynamic> row) {
+  static ChatMessage _message(
+    Map<String, dynamic> row,
+    Map<String, Map<String, dynamic>> parentsById,
+  ) {
     final sender = switch (row['sender']) {
       final Map<String, dynamic> profile => profile,
       final List<dynamic> profiles when profiles.isNotEmpty =>
@@ -237,7 +259,10 @@ class SupabaseChatRepository implements ChatRepository {
       latitude: (row['latitude'] as num?)?.toDouble(),
       longitude: (row['longitude'] as num?)?.toDouble(),
       createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
-      replyTo: _reply(row['reply']),
+      replyTo: switch (row['reply_to_id']) {
+        final String replyId => _reply(parentsById[replyId]),
+        _ => null,
+      },
       mentionedUserIds:
           (row['mentioned_user_ids'] as List?)?.whereType<String>().toList(
             growable: false,
@@ -247,15 +272,7 @@ class SupabaseChatRepository implements ChatRepository {
     );
   }
 
-  static ChatMessageReply? _reply(Object? value) {
-    final reply = switch (value) {
-      final Map<String, dynamic> row => row,
-      final List<dynamic> rows when rows.isNotEmpty =>
-        rows.first is Map<String, dynamic>
-            ? rows.first as Map<String, dynamic>
-            : null,
-      _ => null,
-    };
+  static ChatMessageReply? _reply(Map<String, dynamic>? reply) {
     final id = reply?['id'];
     if (reply == null || id is! String) return null;
 

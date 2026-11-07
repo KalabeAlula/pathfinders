@@ -76,5 +76,21 @@ class ChatMessage {
 
   bool mentions(String userId) => mentionedUserIds.contains(userId);
 
+  /// One-line summary used when this message is quoted in a reply.
+  String get quotePreview {
+    final body = text;
+    if (body != null) return body;
+    final place = placeLabel;
+    return switch (kind) {
+      ChatMessageKind.locationShare =>
+        place == null ? 'Shared a location' : 'Shared $place',
+      ChatMessageKind.destinationUpdate =>
+        place == null
+            ? 'Updated the destination'
+            : 'Updated the destination to $place',
+      ChatMessageKind.text => 'Message',
+    };
+  }
+
   String get senderFirstName => senderName.split(' ').first;
 }
