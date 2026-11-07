@@ -119,6 +119,42 @@ void main() {
       expect(notification.body, '📍 Shared a location');
     });
 
+    test('builds the same entry from a cloud push', () {
+      final notification = ChatNotification.fromPush(
+        messageId: 'm3',
+        circleId: 'c1',
+        senderName: 'Hana Bekele',
+        title: 'Hana Bekele • Simien Pair',
+        body: '📍 Shared a location',
+      );
+
+      expect(notification.title, 'Hana Bekele • Simien Pair');
+      expect(notification.body, '📍 Shared a location');
+      expect(chatCircleFromPayload(notification.payload), 'c1');
+      expect(
+        notification.id,
+        ChatNotification.fromPush(
+          messageId: 'm3',
+          circleId: 'c1',
+          senderName: 'Hana Bekele',
+          title: 'Hana Bekele • Simien Pair',
+          body: '📍 Shared a location',
+        ).id,
+      );
+      expect(
+        notification.id,
+        isNot(
+          ChatNotification.fromPush(
+            messageId: 'm4',
+            circleId: 'c1',
+            senderName: 'Hana Bekele',
+            title: 'Hana Bekele • Simien Pair',
+            body: 'See you there',
+          ).id,
+        ),
+      );
+    });
+
     test('ignores payloads that are not chat taps', () {
       expect(chatCircleFromPayload(null), isNull);
       expect(chatCircleFromPayload('not json'), isNull);

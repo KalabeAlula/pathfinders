@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
@@ -10,6 +11,7 @@ import 'core/config/mapbox_config.dart';
 import 'core/config/supabase_config.dart';
 import 'core/firebase/firebase_options.dart';
 import 'core/storage/storage_providers.dart';
+import 'features/chat/data/chat_push_handler.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +21,10 @@ Future<void> main() async {
     ..maximumSize = 200
     ..maximumSizeBytes = 64 * 1024 * 1024;
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Chat pushes are data-only, so the app renders the notification itself.
+  // Registering the handler early is what lets a push that wakes a stopped
+  // process be handled instead of dropped.
+  FirebaseMessaging.onBackgroundMessage(chatPushHandler);
   await Supabase.initialize(
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.publishableKey,

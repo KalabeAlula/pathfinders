@@ -30,6 +30,25 @@ class ChatNotification {
     );
   }
 
+  /// Mirrors [ChatNotification.fromMessage] for messages that arrived as a
+  /// cloud push, so both paths post the same grouped entry.
+  factory ChatNotification.fromPush({
+    required String messageId,
+    required String circleId,
+    required String senderName,
+    required String title,
+    required String body,
+  }) {
+    return ChatNotification(
+      id: messageId.hashCode & 0x7fffffff,
+      circleId: circleId,
+      senderName: senderName,
+      title: title,
+      body: body,
+      payload: jsonEncode({'kind': 'chat', 'circle_id': circleId}),
+    );
+  }
+
   final int id;
   final String circleId;
   final String senderName;

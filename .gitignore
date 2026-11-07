@@ -57,3 +57,6 @@ mapbox.env.json
 credentials.json
 *.keystore
 
+
+# Firebase Admin service-account keys (server secrets, never commit)
+*-firebase-adminsdk-*.json

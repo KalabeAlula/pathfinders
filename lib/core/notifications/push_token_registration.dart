@@ -4,6 +4,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../storage/storage_providers.dart';
+import 'notification_plugin.dart';
+
 part 'push_token_registration.g.dart';
 
 /// Keeps this device reachable by cloud push for the signed-in member.
@@ -12,6 +15,9 @@ part 'push_token_registration.g.dart';
 /// installation ID, which is what the server sends to. The shell watches this
 /// for the whole session; signing out disposes it and removes the row, so the
 /// device drops off the old account's delivery list.
+///
+/// This is also where the tray permission is requested, because the push
+/// handler cannot show anything without it.
 @riverpod
 Future<void> pushTokenRegistration(Ref ref, String userId) async {
   if (!Platform.isAndroid && !Platform.isIOS) return;
@@ -19,6 +25,9 @@ Future<void> pushTokenRegistration(Ref ref, String userId) async {
   final messaging = FirebaseMessaging.instance;
   final client = Supabase.instance.client;
   String? registered;
+  await NotificationPlugin.instance.ensurePermission(
+    ref.read(sharedPreferencesProvider),
+  );
 
   Future<void> save(String target) async {
     registered = target;
@@ -52,6 +61,6 @@ Future<void> pushTokenRegistration(Ref ref, String userId) async {
   try {
     await messaging.register();
   } catch (_) {
-    // The next sign-in or registration refresh retries.
+    // The next launch retries; a signed-out shell disposes this provider.
   }
 }
