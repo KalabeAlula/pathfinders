@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/notifications/push_token_registration.dart';
+import '../../features/chat/application/chat_notification_providers.dart';
 import '../../features/chat/application/chat_providers.dart';
 import '../../features/chat/presentation/chat_tab.dart';
+import '../../features/circle/application/circle_providers.dart';
 import '../../features/circle/domain/circle_member.dart';
 import '../../features/circle/domain/circle_snapshot.dart';
 import '../../features/circle/presentation/circle_tab.dart';
@@ -63,6 +68,36 @@ class MainShellScreen extends ConsumerWidget {
     // The shell stays mounted for the whole signed-in session, so watching the
     // heartbeat here keeps sharing alive across every tab.
     ref.listen(telemetryControllerProvider(currentUserId), (_, _) {});
+    // Same for chat notifications: every circle's realtime thread is watched
+    // for the whole session so messages keep arriving while the app is away.
+    ref.listen(chatNotificationWatcherProvider(currentUserId), (_, _) {});
+    // Holds this device's push token for the signed-in member, so delivery
+    // still reaches the phone when the process is not running.
+    ref.watch(pushTokenRegistrationProvider(currentUserId));
+
+    // A tapped chat notification asks for a specific circle and the chat tab.
+    // It is consumed once, after the frame, because switching the circle
+    // rebuilds this screen with the new snapshot.
+    final pendingChat = ref.watch(chatNotificationTargetProvider);
+    if (pendingChat != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        final target = ref.read(chatNotificationTargetProvider);
+        if (target == null) return;
+        ref.read(chatNotificationTargetProvider.notifier).clear();
+
+        final memberships =
+            ref.read(circlesProvider(currentUserId)).value ?? const [];
+        if (!memberships.any((circle) => circle.id == target)) return;
+
+        unawaited(
+          ref
+              .read(activeCircleControllerProvider(currentUserId).notifier)
+              .select(target),
+        );
+        ref.read(activeTabControllerProvider.notifier).select(AppTab.chat);
+      });
+    }
 
     void select(AppTab target) =>
         ref.read(activeTabControllerProvider.notifier).select(target);

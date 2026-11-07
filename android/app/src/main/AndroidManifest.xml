@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <!-- Android 13+ hides the service notification without this. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Heads-up messages in the chat channel also vibrate. -->
+    <uses-permission android:name="android.permission.VIBRATE"/>
     <application
         android:label="Pathfinders"
         android:name="${applicationName}"
@@ -43,6 +45,14 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Cloud push from the server lands in the same channel and uses the
+             same monochrome icon as in-app chat notifications. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="pathfinders_chat_channel" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_pathfinders" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

@@ -8,18 +8,18 @@ part of 'arrival_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Detects the local member's arrival at the shared destination and announces
-/// it in the crew thread once per trip.
+/// Detects the local member's arrival at the shared destination, announces it
+/// in the crew thread once per trip, and ends the trip once everyone is there.
 
 @ProviderFor(ArrivalController)
 final arrivalControllerProvider = ArrivalControllerFamily._();
 
-/// Detects the local member's arrival at the shared destination and announces
-/// it in the crew thread once per trip.
+/// Detects the local member's arrival at the shared destination, announces it
+/// in the crew thread once per trip, and ends the trip once everyone is there.
 final class ArrivalControllerProvider
     extends $NotifierProvider<ArrivalController, ArrivalState> {
-  /// Detects the local member's arrival at the shared destination and announces
-  /// it in the crew thread once per trip.
+  /// Detects the local member's arrival at the shared destination, announces it
+  /// in the crew thread once per trip, and ends the trip once everyone is there.
   ArrivalControllerProvider._({
     required ArrivalControllerFamily super.from,
     required String super.argument,
@@ -64,10 +64,10 @@ final class ArrivalControllerProvider
   }
 }
 
-String _$arrivalControllerHash() => r'fa1f4e6f9d70c01b90bb4bc8f0dcd4873375bf6b';
+String _$arrivalControllerHash() => r'dc5c7a8063e07f7c8d3ec0c057770aab17adf818';
 
-/// Detects the local member's arrival at the shared destination and announces
-/// it in the crew thread once per trip.
+/// Detects the local member's arrival at the shared destination, announces it
+/// in the crew thread once per trip, and ends the trip once everyone is there.
 
 final class ArrivalControllerFamily extends $Family
     with
@@ -87,8 +87,8 @@ final class ArrivalControllerFamily extends $Family
         isAutoDispose: false,
       );
 
-  /// Detects the local member's arrival at the shared destination and announces
-  /// it in the crew thread once per trip.
+  /// Detects the local member's arrival at the shared destination, announces it
+  /// in the crew thread once per trip, and ends the trip once everyone is there.
 
   ArrivalControllerProvider call(String circleId) =>
       ArrivalControllerProvider._(argument: circleId, from: this);
@@ -97,8 +97,8 @@ final class ArrivalControllerFamily extends $Family
   String toString() => r'arrivalControllerProvider';
 }
 
-/// Detects the local member's arrival at the shared destination and announces
-/// it in the crew thread once per trip.
+/// Detects the local member's arrival at the shared destination, announces it
+/// in the crew thread once per trip, and ends the trip once everyone is there.
 
 abstract class _$ArrivalController extends $Notifier<ArrivalState> {
   late final _$args = ref.$arg as String;

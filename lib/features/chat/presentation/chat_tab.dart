@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,6 +12,7 @@ import '../../location/application/telemetry_providers.dart';
 import '../../location/domain/geo_point.dart';
 import '../../navigation/application/navigation_providers.dart';
 import '../../navigation/domain/navigation_failure.dart';
+import '../application/chat_notification_providers.dart';
 import '../application/chat_providers.dart';
 import '../domain/chat_failure.dart';
 import '../domain/chat_message.dart';
@@ -40,7 +43,8 @@ class ChatTab extends ConsumerStatefulWidget {
   ConsumerState<ChatTab> createState() => _ChatTabState();
 }
 
-class _ChatTabState extends ConsumerState<ChatTab> {
+class _ChatTabState extends ConsumerState<ChatTab>
+    with WidgetsBindingObserver {
   final _text = TextEditingController();
   final _scroll = ScrollController();
   bool _sending = false;
@@ -50,6 +54,7 @@ class _ChatTabState extends ConsumerState<ChatTab> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.active) _markSeenAfterFrame();
   }
 
@@ -59,15 +64,32 @@ class _ChatTabState extends ConsumerState<ChatTab> {
     if (widget.active && !oldWidget.active) _markSeenAfterFrame();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Returning to a thread that was already open clears the notifications
+    // posted while the app was away.
+    if (state == AppLifecycleState.resumed && widget.active) {
+      _markSeenAfterFrame();
+    }
+  }
+
   void _markSeenAfterFrame() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !widget.active) return;
-      ref.read(chatSeenControllerProvider(widget.circleId).notifier).markSeen();
+      _markSeen();
     });
+  }
+
+  void _markSeen() {
+    ref.read(chatSeenControllerProvider(widget.circleId).notifier).markSeen();
+    unawaited(
+      ref.read(chatNotificationsProvider).clearCircle(widget.circleId),
+    );
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _text.dispose();
     _scroll.dispose();
     super.dispose();
@@ -167,7 +189,7 @@ class _ChatTabState extends ConsumerState<ChatTab> {
 
     ref.listen(circleMessagesProvider(widget.circleId), (_, _) {
       if (!widget.active) return;
-      ref.read(chatSeenControllerProvider(widget.circleId).notifier).markSeen();
+      _markSeen();
     });
 
     return ColoredBox(
