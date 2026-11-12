@@ -27,6 +27,11 @@ class NotificationPlugin {
   static const chatChannelName = 'Crew chat';
   static const chatChannelDescription = 'Messages from your circles.';
 
+  static const countdownChannelId = 'pathfinders_countdowns';
+  static const countdownChannelName = 'Countdown reminders';
+  static const countdownChannelDescription =
+      'An evening heads-up before a countdown your circle planned.';
+
   static const _permissionAskedKey = 'notification_permission_asked';
 
   final FlutterLocalNotificationsPlugin _plugin =
@@ -121,6 +126,16 @@ class NotificationPlugin {
         chatChannelName,
         description: chatChannelDescription,
         importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+      ),
+    );
+    await android.createNotificationChannel(
+      const AndroidNotificationChannel(
+        countdownChannelId,
+        countdownChannelName,
+        description: countdownChannelDescription,
+        importance: Importance.high,
         playSound: true,
         enableVibration: true,
       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../app/theme/app_colors.dart';
 import '../../../../app/widgets/bento_card.dart';
 import '../../../../core/application/clock_provider.dart';
 import '../../../../core/utils/time_format.dart';
@@ -127,6 +128,13 @@ class CountdownCard extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                if (days == 0 || days == 1) ...[
+                  _NearBadge(
+                    label: days == 0 ? 'Today' : 'Tomorrow',
+                    onTap: onTap,
+                  ),
+                  const Spacer(),
+                ],
                 Text(
                   '$displayDays',
                   style: Theme.of(context).textTheme.displaySmall
@@ -144,6 +152,54 @@ class CountdownCard extends ConsumerWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NearBadge extends StatelessWidget {
+  const _NearBadge({required this.label, this.onTap});
+
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(999);
+    return Semantics(
+      button: onTap != null,
+      label: 'Open the plan. $label.',
+      child: Material(
+        key: const ValueKey('plan-soon-badge'),
+        color: AppColors.linen,
+        borderRadius: radius,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: radius,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.notifications_active_rounded,
+                  size: 10,
+                  color: AppColors.cocoa,
+                ),
+                const SizedBox(width: 3),
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.cocoa,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

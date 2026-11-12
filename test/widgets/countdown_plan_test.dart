@@ -222,8 +222,64 @@ void main() {
       ),
     );
 
-    expect(find.text('Tomorrow'), findsOneWidget);
+    expect(find.byKey(const ValueKey('plan-soon-badge')), findsOneWidget);
+    expect(find.text('Tomorrow'), findsNWidgets(2));
     expect(find.text('7:00 PM'), findsNothing);
+  });
+
+  testWidgets('warns with a tomorrow badge the day before', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        chat: _FakeChatRepository(),
+        now: DateTime(2026, 11, 19, 10),
+        openPlanOnTap: false,
+      ),
+    );
+
+    expect(find.text('Tomorrow'), findsNWidgets(2));
+    expect(find.text('7:00 PM'), findsOneWidget);
+  });
+
+  testWidgets('marks the day itself with a today badge', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        chat: _FakeChatRepository(),
+        now: DateTime(2026, 11, 20, 10),
+        openPlanOnTap: false,
+      ),
+    );
+
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.byKey(const ValueKey('plan-soon-badge')), findsOneWidget);
+  });
+
+  testWidgets('keeps the badge off when the date is further out', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        chat: _FakeChatRepository(),
+        now: DateTime(2026, 11, 15, 10),
+        openPlanOnTap: false,
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('plan-soon-badge')), findsNothing);
+  });
+
+  testWidgets('opens the plan from the near badge', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        chat: _FakeChatRepository(),
+        now: DateTime(2026, 11, 19, 10),
+        openPlanOnTap: true,
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('plan-soon-badge')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(MilestonePlanSheet), findsOneWidget);
   });
 
   testWidgets('counts down the day itself', (tester) async {

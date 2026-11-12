@@ -5,6 +5,7 @@ import '../../../app/navigation/main_shell_screen.dart';
 import '../../../app/widgets/onboarding_shell.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../location/application/telemetry_providers.dart';
+import '../../milestones/application/countdown_reminder_providers.dart';
 import '../application/circle_providers.dart';
 import '../domain/circle_failure.dart';
 import 'circle_onboarding_screen.dart';
@@ -22,6 +23,9 @@ class CircleGate extends ConsumerWidget {
     // mounted under pushed screens, whereas watching telemetry from individual
     // widgets would let auto-dispose stop the heartbeat on navigation.
     ref.listen(telemetryControllerProvider(userId), (_, _) {});
+    // Same reason as telemetry: keeps the evening reminder alarms in step
+    // with every circle's countdowns while the gate is mounted.
+    ref.listen(countdownRemindersProvider(userId), (_, _) {});
     ref.listen(circleMembershipNoticeProvider, (_, notice) {
       if (notice == null) return;
       ref.read(circleMembershipNoticeProvider.notifier).clear();

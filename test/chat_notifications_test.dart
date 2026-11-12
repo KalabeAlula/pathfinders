@@ -102,6 +102,16 @@ void main() {
         isNull,
       );
       expect(
+        chatCircleFromPayload(
+          jsonEncode({
+            'kind': 'countdown',
+            'circle_id': 'c1',
+            'milestone_id': 'm1',
+          }),
+        ),
+        isNull,
+      );
+      expect(
         chatCircleFromPayload(jsonEncode({'kind': 'chat', 'circle_id': ''})),
         isNull,
       );
