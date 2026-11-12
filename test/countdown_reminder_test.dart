@@ -76,6 +76,35 @@ void main() {
     });
   });
 
+  test('tap routing reads its own payload and ignores the rest', () {
+    final tap = countdownTapFromPayload(build(milestone())!.payload)!;
+
+    expect(tap.circleId, 'c1');
+    expect(tap.milestoneId, 'm1');
+    expect(countdownTapFromPayload(null), isNull);
+    expect(countdownTapFromPayload('not json'), isNull);
+    expect(
+      countdownTapFromPayload(jsonEncode({'kind': 'chat', 'circle_id': 'c1'})),
+      isNull,
+    );
+    expect(
+      countdownTapFromPayload(
+        jsonEncode({'kind': 'countdown', 'circle_id': 'c1'}),
+      ),
+      isNull,
+    );
+    expect(
+      countdownTapFromPayload(
+        jsonEncode({
+          'kind': 'countdown',
+          'circle_id': '',
+          'milestone_id': 'm1',
+        }),
+      ),
+      isNull,
+    );
+  });
+
   test('ids are stable and stay in the positive int range Android expects', () {
     expect(CountdownReminder.idFor('m1'), CountdownReminder.idFor('m1'));
     expect(

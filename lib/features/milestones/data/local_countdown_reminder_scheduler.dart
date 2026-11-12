@@ -30,6 +30,7 @@ class LocalCountdownReminderScheduler implements CountdownReminderScheduler {
   final NotificationPlugin _notifications;
 
   bool _timeZoneReady = false;
+  bool _armedThisRun = false;
   Future<void> _tail = Future<void>.value();
 
   bool get _isMobile => Platform.isAndroid || Platform.isIOS;
@@ -69,7 +70,11 @@ class LocalCountdownReminderScheduler implements CountdownReminderScheduler {
     }
 
     for (final reminder in reminders) {
-      if (queued[reminder.id] == current[reminder.id]) continue;
+      // Re-arm once per launch: an app update or a system cleanup can drop the
+      // alarm while the recorded slot still looks current.
+      if (_armedThisRun && queued[reminder.id] == current[reminder.id]) {
+        continue;
+      }
       await _notifications.plugin.zonedSchedule(
         id: reminder.id,
         title: reminder.title,
@@ -105,6 +110,7 @@ class LocalCountdownReminderScheduler implements CountdownReminderScheduler {
       _slotsKey,
       [for (final entry in current.entries) '${entry.key}:${entry.value}'],
     );
+    _armedThisRun = true;
   }
 
   Map<int, int> _parseSlots(List<String> entries) {

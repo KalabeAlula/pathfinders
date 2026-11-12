@@ -89,3 +89,33 @@ class CountdownReminder {
     return details.join(' · ');
   }
 }
+
+/// The countdown a reminder tap asked to open.
+class CountdownTap {
+  const CountdownTap({required this.circleId, required this.milestoneId});
+
+  final String circleId;
+  final String milestoneId;
+}
+
+/// The countdown a notification payload points at, or null for payloads this
+/// feature does not own (chat, warmth, or malformed data).
+CountdownTap? countdownTapFromPayload(String? payload) {
+  if (payload == null) return null;
+  try {
+    final decoded = jsonDecode(payload);
+    if (decoded is Map<String, dynamic> && decoded['kind'] == 'countdown') {
+      final circleId = decoded['circle_id'];
+      final milestoneId = decoded['milestone_id'];
+      if (circleId is String &&
+          circleId.isNotEmpty &&
+          milestoneId is String &&
+          milestoneId.isNotEmpty) {
+        return CountdownTap(circleId: circleId, milestoneId: milestoneId);
+      }
+    }
+  } on FormatException {
+    return null;
+  }
+  return null;
+}

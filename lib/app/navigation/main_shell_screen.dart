@@ -16,6 +16,9 @@ import '../../features/location/application/telemetry_providers.dart';
 import '../../features/location/domain/geo_point.dart';
 import '../../features/memories/application/memories_providers.dart';
 import '../../features/memories/presentation/memories_tab.dart';
+import '../../features/milestones/application/countdown_reminder_providers.dart';
+import '../../features/milestones/application/milestones_providers.dart';
+import '../../features/milestones/presentation/widgets/milestone_plan_sheet.dart';
 import '../../features/navigation/application/map_focus_providers.dart';
 import '../../features/navigation/application/navigation_providers.dart';
 import '../../features/navigation/presentation/map_tab.dart';
@@ -110,6 +113,52 @@ class MainShellScreen extends ConsumerWidget {
     void showSharedLocation(GeoPoint point, String? label) {
       ref.read(mapFocusControllerProvider.notifier).focus(point, label: label);
       select(AppTab.map);
+    }
+
+    // A tapped countdown reminder asks for its circle and that plan. The sheet
+    // waits for the circle's milestones: a tap can land before they load, or
+    // the countdown can be gone by the time the reminder is tapped.
+    final pendingCountdown = ref.watch(countdownReminderTargetProvider);
+    if (pendingCountdown != null) {
+      final plans = ref
+          .watch(milestonesProvider(pendingCountdown.circleId))
+          .value;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        final target = ref.read(countdownReminderTargetProvider);
+        if (target == null) return;
+
+        final memberships =
+            ref.read(circlesProvider(currentUserId)).value ?? const [];
+        if (!memberships.any((circle) => circle.id == target.circleId)) {
+          ref.read(countdownReminderTargetProvider.notifier).clear();
+          return;
+        }
+
+        if (circleId != target.circleId) {
+          unawaited(
+            ref
+                .read(activeCircleControllerProvider(currentUserId).notifier)
+                .select(target.circleId),
+          );
+        }
+        select(AppTab.memories);
+
+        if (plans == null) return;
+        ref.read(countdownReminderTargetProvider.notifier).clear();
+
+        for (final plan in plans) {
+          if (plan.id != target.milestoneId) continue;
+          showMilestonePlan(
+            context,
+            circleId: target.circleId,
+            currentUserId: currentUserId,
+            milestone: plan,
+            onPlanMeetup: showSharedLocation,
+          );
+          break;
+        }
+      });
     }
 
     return MainShellScaffold(

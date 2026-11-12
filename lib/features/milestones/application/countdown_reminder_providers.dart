@@ -15,6 +15,35 @@ part 'countdown_reminder_providers.g.dart';
 CountdownReminderScheduler countdownReminderScheduler(Ref ref) =>
     LocalCountdownReminderScheduler(ref.watch(sharedPreferencesProvider));
 
+/// The countdown a reminder tap asked to open. The shell consumes it once,
+/// after switching the circle and the tab, so the request survives the frames
+/// in between.
+@Riverpod(keepAlive: true)
+class CountdownReminderTarget extends _$CountdownReminderTarget {
+  @override
+  CountdownTap? build() => null;
+
+  void open(CountdownTap tap) => state = tap;
+
+  void clear() => state = null;
+}
+
+/// Turns countdown reminder taps into a pending plan target.
+///
+/// Owned by the app-level tap dispatcher, which reads the single cold-start
+/// payload and hands it to every router.
+class CountdownReminderRouter {
+  CountdownReminderRouter(this._target);
+
+  final CountdownReminderTarget _target;
+
+  void handlePayload(String payload) {
+    final tap = countdownTapFromPayload(payload);
+    if (tap == null) return;
+    _target.open(tap);
+  }
+}
+
 /// Keeps the OS alarm queue in step with the countdowns this member can see.
 ///
 /// Watched from the circle gate, which stays mounted for the whole signed-in

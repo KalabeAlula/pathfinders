@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -169,5 +170,47 @@ void main() {
     plans.add([_plan('m2', _inDays(2))]);
     await pumpEventQueue();
     expect(scheduler.syncs.last, hasLength(1));
+  });
+
+  group('countdown reminder taps', () {
+    test('holds a tapped countdown until the shell consumes it', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(container.read(countdownReminderTargetProvider), isNull);
+      container
+          .read(countdownReminderTargetProvider.notifier)
+          .open(const CountdownTap(circleId: 'c1', milestoneId: 'm1'));
+
+      final target = container.read(countdownReminderTargetProvider)!;
+      expect(target.circleId, 'c1');
+      expect(target.milestoneId, 'm1');
+
+      container.read(countdownReminderTargetProvider.notifier).clear();
+      expect(container.read(countdownReminderTargetProvider), isNull);
+    });
+
+    test('router ignores taps meant for other features', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final router = CountdownReminderRouter(
+        container.read(countdownReminderTargetProvider.notifier),
+      );
+
+      router.handlePayload(jsonEncode({'kind': 'chat', 'circle_id': 'c1'}));
+      expect(container.read(countdownReminderTargetProvider), isNull);
+
+      router.handlePayload(
+        jsonEncode({
+          'kind': 'countdown',
+          'circle_id': 'c1',
+          'milestone_id': 'm1',
+        }),
+      );
+      expect(
+        container.read(countdownReminderTargetProvider)?.milestoneId,
+        'm1',
+      );
+    });
   });
 }

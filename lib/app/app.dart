@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/application/app_visibility.dart';
 import '../features/auth/presentation/session_gate.dart';
-import '../features/chat/application/chat_notification_providers.dart';
+import 'navigation/notification_taps.dart';
 import 'theme/app_theme.dart';
 
 class PathfindersApp extends ConsumerStatefulWidget {
@@ -37,7 +37,7 @@ class _PathfindersAppState extends ConsumerState<PathfindersApp>
   Widget build(BuildContext context) {
     // Owns the notification tap stream for the whole process, including the
     // payload that cold-started the app from the shade.
-    ref.watch(chatNotificationRouterProvider);
+    ref.watch(notificationTapDispatcherProvider);
 
     return MaterialApp(
       title: 'Pathfinders',

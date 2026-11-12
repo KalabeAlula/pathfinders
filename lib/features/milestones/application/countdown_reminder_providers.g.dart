@@ -58,6 +58,73 @@ final class CountdownReminderSchedulerProvider
 String _$countdownReminderSchedulerHash() =>
     r'5402d7f96fd272026381a81501b88378084b7478';
 
+/// The countdown a reminder tap asked to open. The shell consumes it once,
+/// after switching the circle and the tab, so the request survives the frames
+/// in between.
+
+@ProviderFor(CountdownReminderTarget)
+final countdownReminderTargetProvider = CountdownReminderTargetProvider._();
+
+/// The countdown a reminder tap asked to open. The shell consumes it once,
+/// after switching the circle and the tab, so the request survives the frames
+/// in between.
+final class CountdownReminderTargetProvider
+    extends $NotifierProvider<CountdownReminderTarget, CountdownTap?> {
+  /// The countdown a reminder tap asked to open. The shell consumes it once,
+  /// after switching the circle and the tab, so the request survives the frames
+  /// in between.
+  CountdownReminderTargetProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'countdownReminderTargetProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$countdownReminderTargetHash();
+
+  @$internal
+  @override
+  CountdownReminderTarget create() => CountdownReminderTarget();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(CountdownTap? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<CountdownTap?>(value),
+    );
+  }
+}
+
+String _$countdownReminderTargetHash() =>
+    r'a3c07d788ef77b4d2c4eb1c8fc862624ba5d2d91';
+
+/// The countdown a reminder tap asked to open. The shell consumes it once,
+/// after switching the circle and the tab, so the request survives the frames
+/// in between.
+
+abstract class _$CountdownReminderTarget extends $Notifier<CountdownTap?> {
+  CountdownTap? build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<CountdownTap?, CountdownTap?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<CountdownTap?, CountdownTap?>,
+              CountdownTap?,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
 /// Keeps the OS alarm queue in step with the countdowns this member can see.
 ///
 /// Watched from the circle gate, which stays mounted for the whole signed-in
@@ -136,7 +203,7 @@ final class CountdownRemindersProvider
 }
 
 String _$countdownRemindersHash() =>
-    r'd7676f1b11488c3c49d94bd55772d8f6a175c345';
+    r'233e53ea55d58b2af495a48b694d0f898994d466';
 
 /// Keeps the OS alarm queue in step with the countdowns this member can see.
 ///

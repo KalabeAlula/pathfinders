@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../core/notifications/notification_plugin.dart';
 import '../../../core/storage/storage_providers.dart';
 import '../data/local_chat_notifier.dart';
 import '../domain/chat_notification.dart';
@@ -28,27 +27,8 @@ class ChatNotificationTarget extends _$ChatNotificationTarget {
 
 /// Turns notification taps into a pending chat target.
 ///
-/// Lives above the signed-in shell so a cold-start tap is not lost while the
-/// session gate is still resolving.
-@Riverpod(keepAlive: true)
-ChatNotificationRouter chatNotificationRouter(Ref ref) {
-  final router = ChatNotificationRouter(
-    ref.read(chatNotificationTargetProvider.notifier),
-    ref.read(chatNotificationsProvider),
-  );
-  final subscription = NotificationPlugin.instance.taps.listen(
-    router.handlePayload,
-  );
-  ref.onDispose(subscription.cancel);
-
-  unawaited(
-    NotificationPlugin.instance.takeLaunchPayload().then((payload) {
-      if (payload != null) router.handlePayload(payload);
-    }),
-  );
-  return router;
-}
-
+/// Owned by the app-level tap dispatcher, which reads the single cold-start
+/// payload and hands it to every router.
 class ChatNotificationRouter {
   ChatNotificationRouter(this._target, this._notifier);
 
