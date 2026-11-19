@@ -4,4 +4,13 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <application>
+        <!-- Profiling only: the engine falls back to OpenGLES on this device
+             even though Vulkan 1.1 is available, and Vulkan measured ~40%
+             faster Flutter-side rasterisation. Kept out of main so release
+             keeps the engine's own driver selection. -->
+        <meta-data
+            android:name="io.flutter.embedding.android.ImpellerBackend"
+            android:value="vulkan" />
+    </application>
 </manifest>
