@@ -1,6 +1,6 @@
 import '../../location/domain/geo_point.dart';
 
-enum ChatMessageKind { text, locationShare, destinationUpdate }
+enum ChatMessageKind { text, locationShare, destinationUpdate, gif }
 
 /// The message a reply quotes.
 ///
@@ -41,6 +41,7 @@ class ChatMessage {
     this.placeLabel,
     this.latitude,
     this.longitude,
+    this.gifUrl,
     this.replyTo,
     this.mentionedUserIds = const [],
     this.editedAt,
@@ -56,6 +57,10 @@ class ChatMessage {
   final String? placeLabel;
   final double? latitude;
   final double? longitude;
+
+  /// Giphy media URL for [ChatMessageKind.gif]; null for a URL the app will
+  /// not render.
+  final String? gifUrl;
   final DateTime createdAt;
   final ChatMessageReply? replyTo;
 
@@ -72,12 +77,15 @@ class ChatMessage {
 
   bool get isDestinationUpdate => kind == ChatMessageKind.destinationUpdate;
 
+  bool get isGif => kind == ChatMessageKind.gif;
+
   bool get isEdited => editedAt != null;
 
   bool mentions(String userId) => mentionedUserIds.contains(userId);
 
   /// One-line summary used when this message is quoted in a reply.
   String get quotePreview {
+    if (isGif) return 'GIF';
     final body = text;
     if (body != null) return body;
     final place = placeLabel;
@@ -88,7 +96,7 @@ class ChatMessage {
         place == null
             ? 'Updated the destination'
             : 'Updated the destination to $place',
-      ChatMessageKind.text => 'Message',
+      ChatMessageKind.text || ChatMessageKind.gif => 'Message',
     };
   }
 

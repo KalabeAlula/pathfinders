@@ -21,6 +21,7 @@ import '../domain/chat_failure.dart';
 import '../domain/chat_mentions.dart';
 import '../domain/chat_message.dart';
 import 'widgets/chat_map_preview.dart';
+import 'widgets/gif_picker_sheet.dart';
 
 /// The circle's thread: text, shared locations and destination updates.
 ///
@@ -258,6 +259,34 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
       setState(() => _error = failure.message);
     } finally {
       if (mounted) setState(() => _sharing = false);
+    }
+  }
+
+  Future<void> _pickGif() async {
+    if (_sending || _sharing || _editing != null) return;
+
+    final url = await showGifPickerSheet(context);
+    if (!mounted || url == null) return;
+
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(chatRepositoryProvider(widget.circleId))
+          .sendGif(
+            senderId: widget.currentUserId,
+            url: url,
+            replyToId: _replyTo?.id,
+          );
+      if (!mounted) return;
+      setState(() => _replyTo = null);
+    } on ChatFailure catch (failure) {
+      if (!mounted) return;
+      setState(() => _error = failure.message);
+    } finally {
+      if (mounted) setState(() => _sending = false);
     }
   }
 
@@ -583,6 +612,7 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
                 onMentionSelected: _applyMention,
                 onSend: _send,
                 onShareLocation: _shareLocation,
+                onPickGif: _pickGif,
               ),
             ),
           ],
@@ -690,27 +720,36 @@ class _MessageRow extends StatelessWidget {
             onTap: onShowQuote,
           );
 
-    final bubble = message.kind == ChatMessageKind.locationShare
-        ? _LocationBubble(
-            message: message,
-            bubbleColor: bubbleColor,
-            textColor: textColor,
-            mutedColor: mutedColor,
-            quote: quote,
-            onTap: onShowLocation,
-          )
-        : _TextBubble(
-            message: message,
-            bubbleColor: bubbleColor,
-            textColor: textColor,
-            mutedColor: mutedColor,
-            quote: quote,
-            isMine: isMine,
-            members: members,
-            mentionColor: isMine ? scheme.onPrimary : scheme.primary,
-            mentionBackground: (isMine ? scheme.onPrimary : scheme.primary)
-                .withValues(alpha: isMine ? 0.22 : 0.14),
-          );
+    final bubble = switch (message.kind) {
+      ChatMessageKind.locationShare => _LocationBubble(
+        message: message,
+        bubbleColor: bubbleColor,
+        textColor: textColor,
+        mutedColor: mutedColor,
+        quote: quote,
+        onTap: onShowLocation,
+      ),
+      ChatMessageKind.gif => _GifBubble(
+        message: message,
+        bubbleColor: bubbleColor,
+        textColor: textColor,
+        mutedColor: mutedColor,
+        quote: quote,
+        isMine: isMine,
+      ),
+      ChatMessageKind.text || ChatMessageKind.destinationUpdate => _TextBubble(
+        message: message,
+        bubbleColor: bubbleColor,
+        textColor: textColor,
+        mutedColor: mutedColor,
+        quote: quote,
+        isMine: isMine,
+        members: members,
+        mentionColor: isMine ? scheme.onPrimary : scheme.primary,
+        mentionBackground: (isMine ? scheme.onPrimary : scheme.primary)
+            .withValues(alpha: isMine ? 0.22 : 0.14),
+      ),
+    };
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1238,6 +1277,145 @@ class _LocationBubble extends StatelessWidget {
   }
 }
 
+class _GifBubble extends StatelessWidget {
+  const _GifBubble({
+    required this.message,
+    required this.bubbleColor,
+    required this.textColor,
+    required this.mutedColor,
+    required this.quote,
+    required this.isMine,
+  });
+
+  final ChatMessage message;
+  final Color bubbleColor;
+  final Color textColor;
+  final Color mutedColor;
+  final Widget? quote;
+  final bool isMine;
+
+  static const _maxWidth = 232.0;
+  static const _maxHeight = 300.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final url = message.gifUrl;
+
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: bubbleColor,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(16),
+          topRight: const Radius.circular(16),
+          bottomLeft: Radius.circular(isMine ? 16 : 5),
+          bottomRight: Radius.circular(isMine ? 5 : 16),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (quote != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+              child: quote,
+            ),
+          if (url == null)
+            _GifUnavailable(
+              color: scheme.surfaceContainerHighest,
+              iconColor: scheme.onSurfaceVariant,
+            )
+          else
+            ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: _maxWidth,
+                maxHeight: _maxHeight,
+              ),
+              child: Image.network(
+                url,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                loadingBuilder: (context, child, progress) => progress == null
+                    ? child
+                    : Container(
+                        width: _maxWidth,
+                        height: 150,
+                        color: scheme.surfaceContainerHighest,
+                        alignment: Alignment.center,
+                        child: const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                errorBuilder: (_, _, _) => _GifUnavailable(
+                  color: scheme.surfaceContainerHighest,
+                  iconColor: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.gif_box_rounded, size: 15, color: textColor),
+                const SizedBox(width: 4),
+                Text(
+                  'GIF',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: textColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  timeAgo(message.createdAt),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: mutedColor,
+                    fontSize: 9.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GifUnavailable extends StatelessWidget {
+  const _GifUnavailable({required this.color, required this.iconColor});
+
+  final Color color;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: _GifBubble._maxWidth,
+      height: 140,
+      color: color,
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.gif_box_outlined, size: 26, color: iconColor),
+          const SizedBox(height: 4),
+          Text(
+            'GIF unavailable',
+            style: Theme.of(context).textTheme.labelSmall
+                ?.copyWith(color: iconColor),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DestinationUpdateRow extends StatelessWidget {
   const _DestinationUpdateRow({
     required this.message,
@@ -1501,6 +1679,7 @@ class _Composer extends StatelessWidget {
     required this.onMentionSelected,
     required this.onSend,
     required this.onShareLocation,
+    required this.onPickGif,
   });
 
   final TextEditingController controller;
@@ -1516,6 +1695,7 @@ class _Composer extends StatelessWidget {
   final ValueChanged<UserProfile> onMentionSelected;
   final VoidCallback onSend;
   final VoidCallback onShareLocation;
+  final VoidCallback onPickGif;
 
   @override
   Widget build(BuildContext context) {
@@ -1577,6 +1757,15 @@ class _Composer extends StatelessWidget {
                       )
                     : const Icon(Icons.my_location_rounded, size: 19),
               ),
+              // A GIF replaces the draft, so the picker stays out of edit mode.
+              if (editingMessage == null) ...[
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  onPressed: sending || sharing ? null : onPickGif,
+                  tooltip: 'Send a GIF',
+                  icon: const Icon(Icons.gif_box_rounded, size: 19),
+                ),
+              ],
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(

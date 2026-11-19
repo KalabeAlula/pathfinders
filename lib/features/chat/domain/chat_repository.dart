@@ -20,6 +20,14 @@ abstract interface class ChatRepository {
     String? replyToId,
   });
 
+  /// Posts a Giphy rendition. The URL is validated against the allowed hosts
+  /// before it reaches the database.
+  Future<void> sendGif({
+    required String senderId,
+    required String url,
+    String? replyToId,
+  });
+
   /// Rewrites one of the caller's own text messages. The database stamps the
   /// edit time; the caller only supplies the new words and mentions.
   Future<void> editText({

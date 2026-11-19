@@ -4,6 +4,7 @@ import 'dart:developer' as developer;
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../domain/chat_failure.dart';
+import '../domain/chat_gif.dart';
 import '../domain/chat_message.dart';
 import '../domain/chat_repository.dart';
 
@@ -107,6 +108,23 @@ class SupabaseChatRepository implements ChatRepository {
       'longitude': longitude,
       if (placeLabel != null && placeLabel.trim().isNotEmpty)
         'place_label': placeLabel.trim(),
+      'reply_to_id': ?replyToId,
+    });
+  }
+
+  @override
+  Future<void> sendGif({
+    required String senderId,
+    required String url,
+    String? replyToId,
+  }) async {
+    final clean = url.trim();
+    if (!isAllowedGifUrl(clean)) {
+      throw const ChatFailure('That GIF link is not supported.');
+    }
+    await _insert(senderId, {
+      'kind': 'gif',
+      'body': clean,
       'reply_to_id': ?replyToId,
     });
   }
@@ -246,6 +264,8 @@ class SupabaseChatRepository implements ChatRepository {
             : const <String, dynamic>{},
       _ => const <String, dynamic>{},
     };
+    final kind = _kind(row['kind']);
+    final body = _text(row['body']);
 
     return ChatMessage(
       id: row['id'] as String,
@@ -253,8 +273,11 @@ class SupabaseChatRepository implements ChatRepository {
       senderName: _text(sender['display_name']) ?? 'A member',
       senderAvatarColor:
           (sender['avatar_color'] as num?)?.toInt() ?? 0xFF6F9E62,
-      kind: _kind(row['kind']),
-      text: _text(row['body']),
+      kind: kind,
+      text: kind == ChatMessageKind.gif ? null : body,
+      gifUrl: kind == ChatMessageKind.gif && isAllowedGifUrl(body)
+          ? body
+          : null,
       placeLabel: _text(row['place_label']),
       latitude: (row['latitude'] as num?)?.toDouble(),
       longitude: (row['longitude'] as num?)?.toDouble(),
@@ -299,9 +322,11 @@ class SupabaseChatRepository implements ChatRepository {
               : 'Updated the destination to $place',
         _ => null,
       },
-      mediaPreview: kind == 'location_share'
-          ? place ?? 'Shared location'
-          : null,
+      mediaPreview: switch (kind) {
+        'location_share' => place ?? 'Shared location',
+        'gif' => 'GIF',
+        _ => null,
+      },
     );
   }
 
@@ -313,6 +338,7 @@ class SupabaseChatRepository implements ChatRepository {
   static ChatMessageKind _kind(Object? value) => switch (value) {
     'location_share' => ChatMessageKind.locationShare,
     'destination_update' => ChatMessageKind.destinationUpdate,
+    'gif' => ChatMessageKind.gif,
     _ => ChatMessageKind.text,
   };
 

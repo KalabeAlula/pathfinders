@@ -19,8 +19,21 @@ abstract final class ShellDock {
   static double bottomGap(BuildContext context) =>
       math.max(MediaQuery.viewPaddingOf(context).bottom + 12, 24);
 
+  /// Room bottom-anchored tab content keeps under itself for the dock.
+  ///
+  /// Scaffold pins the dock to the window bottom, so while the keyboard is up
+  /// the IME covers it; reserving its height then leaves a dead band above the
+  /// keyboard. The body's own MediaQuery has the inset stripped, so read it
+  /// from the view.
+  /// Room bottom-anchored tab content keeps under itself for the dock.
+  ///
+  /// While the keyboard is up Scaffold gives the body the keyboard's space
+  /// instead, so the dock sits behind the IME and is reported as zero padding
+  /// here; reserving its height then leaves a dead band above the keyboard.
   static double contentInset(BuildContext context) =>
-      bottomGap(context) + height + 12;
+      MediaQuery.paddingOf(context).bottom <= 0
+      ? AppSpacing.md
+      : bottomGap(context) + height + 12;
 }
 
 /// A floating, frosted pill holding the five destinations.

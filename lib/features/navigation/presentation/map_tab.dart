@@ -1328,9 +1328,7 @@ class _MapTabState extends ConsumerState<MapTab> {
                           // view, so it respects tab and route z-order.
                           // SurfaceView punches through Flutter's canvas on
                           // Android.
-                          textureView:
-                              !kIsWeb &&
-                              defaultTargetPlatform == TargetPlatform.android,
+                          textureView: false, // TEMP perf experiment
                           onMapCreated: _onMapCreated,
                           onStyleLoadedListener: _onStyleLoaded,
                           onCameraChangeListener: _onCameraChanged,

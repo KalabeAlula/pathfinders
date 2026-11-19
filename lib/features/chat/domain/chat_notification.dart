@@ -68,6 +68,7 @@ String chatNotificationBody(ChatMessage message) => switch (message.kind) {
   ChatMessageKind.text => message.text ?? '',
   ChatMessageKind.locationShare => '📍 Shared a location',
   ChatMessageKind.destinationUpdate => '📍 Updated the destination',
+  ChatMessageKind.gif => 'Sent a GIF',
 };
 
 /// The circle a notification payload points at, or null for payloads this

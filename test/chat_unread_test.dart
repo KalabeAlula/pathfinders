@@ -48,6 +48,13 @@ class _FakeChatRepository implements ChatRepository {
   }) async {}
 
   @override
+  Future<void> sendGif({
+    required String senderId,
+    required String url,
+    String? replyToId,
+  }) async {}
+
+  @override
   Future<void> editText({
     required String messageId,
     required String text,
