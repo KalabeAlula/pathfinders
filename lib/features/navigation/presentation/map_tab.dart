@@ -129,6 +129,7 @@ class _MapTabState extends ConsumerState<MapTab> {
   Timer? _annotationTimer;
   bool _styleReady = false;
   bool _mapAttached = false;
+  bool? _appliedDark;
   bool _foreground = true;
   bool _moving = false;
   bool _seeded = false;
@@ -263,6 +264,7 @@ class _MapTabState extends ConsumerState<MapTab> {
   void _detachNativeMap() {
     _mapAttached = false;
     _styleReady = false;
+    _appliedDark = null;
     _styleGeneration++;
     _annotationTimer?.cancel();
     _annotationTimer = null;
@@ -961,19 +963,34 @@ class _MapTabState extends ConsumerState<MapTab> {
     _touchStart = null;
   }
 
+  /// The Standard import keeps its config across style edits, so a day/night
+  /// switch only reaches the map when the preset is re-applied explicitly —
+  /// the style itself never reloads.
+  void _applyStandardStyle() {
+    final map = _map;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    if (!_styleReady || !_mapAttached || map == null || _appliedDark == dark) {
+      return;
+    }
+    _appliedDark = dark;
+    unawaited(MapboxStandardStyle.apply(map, dark: dark));
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _applyStandardStyle();
+  }
+
   void _onStyleLoaded(StyleLoadedEventData event) {
     if (!mounted || !_mapAttached) return;
     _styleReady = true;
+    _appliedDark = null;
     _annotations?.dispose();
     final map = _map;
     if (map == null) return;
 
-    unawaited(
-      MapboxStandardStyle.apply(
-        map,
-        dark: Theme.of(context).brightness == Brightness.dark,
-      ),
-    );
+    _applyStandardStyle();
 
     final annotations = MapboxLiveAnnotations(map, iconScale: 0.5);
     annotations.onMemberTapped = (memberId) {
