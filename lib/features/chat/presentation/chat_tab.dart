@@ -63,6 +63,7 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
   bool _sending = false;
   bool _sharing = false;
   final _voting = <String>{};
+  final _applying = <String>{};
   String? _error;
   ChatMessage? _replyTo;
   ChatMessage? _editing;
@@ -377,6 +378,41 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _makeDestination(
+    ChatMessage message,
+    ChatPollOption option,
+  ) async {
+    final point = option.point;
+    if (point == null || _applying.contains(message.id)) return;
+    HapticFeedback.selectionClick();
+    setState(() => _applying.add(message.id));
+    final label = option.placeLabel ?? option.label;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(navigationRepositoryProvider(widget.circleId))
+          .setDestination(
+            label: label,
+            latitude: point.latitude,
+            longitude: point.longitude,
+            setBy: widget.currentUserId,
+          );
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Everyone is heading to $label.')),
+      );
+    } on NavigationFailure catch (failure) {
+      if (!mounted) return;
+      setState(() => _error = failure.message);
+    } finally {
+      if (!mounted) {
+        _applying.remove(message.id);
+      } else {
+        setState(() => _applying.remove(message.id));
+      }
+    }
+  }
+
   void _showOnMap(ChatMessage message) {
     final point = message.point;
     if (point == null) return;
@@ -649,8 +685,13 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
                                         widget.currentUserId,
                                     currentUserId: widget.currentUserId,
                                     members: _memberProfiles,
+                                    applyingDestination: _applying.contains(
+                                      message.id,
+                                    ),
                                     onVote: (optionId) =>
                                         _vote(message, optionId),
+                                    onMakeDestination: (option) =>
+                                        _makeDestination(message, option),
                                     onShowLocation: message.hasLocation
                                         ? () => _showOnMap(message)
                                         : null,
@@ -777,7 +818,9 @@ class _MessageRow extends StatelessWidget {
     required this.currentUserId,
     required this.members,
     required this.onVote,
+    required this.onMakeDestination,
     required this.onShowLocation,
+    this.applyingDestination = false,
     this.onShowQuote,
   });
 
@@ -786,6 +829,8 @@ class _MessageRow extends StatelessWidget {
   final String currentUserId;
   final List<UserProfile> members;
   final ValueChanged<String> onVote;
+  final ValueChanged<ChatPollOption> onMakeDestination;
+  final bool applyingDestination;
   final VoidCallback? onShowLocation;
   final VoidCallback? onShowQuote;
 
@@ -840,7 +885,9 @@ class _MessageRow extends StatelessWidget {
         quote: quote,
         isMine: isMine,
         currentUserId: currentUserId,
+        applyingDestination: applyingDestination,
         onVote: onVote,
+        onMakeDestination: onMakeDestination,
       ),
       ChatMessageKind.text || ChatMessageKind.destinationUpdate => _TextBubble(
         message: message,
@@ -1273,7 +1320,9 @@ class _PollBubble extends StatelessWidget {
     required this.quote,
     required this.isMine,
     required this.currentUserId,
+    required this.applyingDestination,
     required this.onVote,
+    required this.onMakeDestination,
   });
 
   final ChatMessage message;
@@ -1283,7 +1332,9 @@ class _PollBubble extends StatelessWidget {
   final Widget? quote;
   final bool isMine;
   final String currentUserId;
+  final bool applyingDestination;
   final ValueChanged<String> onVote;
+  final ValueChanged<ChatPollOption> onMakeDestination;
 
   static String _voteCount(int votes) => switch (votes) {
     0 => 'No votes yet',
@@ -1360,6 +1411,13 @@ class _PollBubble extends StatelessWidget {
                   textColor: textColor,
                   mutedColor: mutedColor,
                   onTap: () => onVote(option.id),
+                ),
+              if (poll.leader?.hasPlace ?? false)
+                _MakeDestinationAction(
+                  applying: applyingDestination,
+                  textColor: textColor,
+                  mutedColor: mutedColor,
+                  onTap: () => onMakeDestination(poll.leader!),
                 ),
               const SizedBox(height: 5),
               Row(
@@ -1515,6 +1573,71 @@ class _PollOptionRow extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MakeDestinationAction extends StatelessWidget {
+  const _MakeDestinationAction({
+    required this.applying,
+    required this.textColor,
+    required this.mutedColor,
+    required this.onTap,
+  });
+
+  final bool applying;
+  final Color textColor;
+  final Color mutedColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Material(
+        color: textColor.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: applying ? null : onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 10, 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (applying)
+                  SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.6,
+                      color: mutedColor,
+                    ),
+                  )
+                else
+                  Icon(Icons.navigation_rounded, size: 13, color: textColor),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    applying
+                        ? 'Setting the destination…'
+                        : 'Make this the destination',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: textColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 10.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2122,21 +2245,6 @@ class _Composer extends StatelessWidget {
                       )
                     : const Icon(Icons.my_location_rounded, size: 19),
               ),
-              // A GIF replaces the draft, so the picker stays out of edit mode.
-              if (editingMessage == null) ...[
-                const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  onPressed: sending || sharing ? null : onPickGif,
-                  tooltip: 'Send a GIF',
-                  icon: const Icon(Icons.gif_box_rounded, size: 19),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  onPressed: sending || sharing ? null : onStartPoll,
-                  tooltip: 'Start a vote',
-                  icon: const Icon(Icons.how_to_vote_rounded, size: 19),
-                ),
-              ],
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
@@ -2164,6 +2272,33 @@ class _Composer extends StatelessWidget {
                       borderRadius: BorderRadius.circular(AppRadius.pill),
                       borderSide: BorderSide.none,
                     ),
+                    // A GIF replaces the draft, so the picker stays out of
+                    // edit mode.
+                    suffixIcon: editingMessage == null
+                        ? Padding(
+                            padding: const EdgeInsets.only(right: 5),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _BarAction(
+                                  icon: Icons.gif_box_rounded,
+                                  tooltip: 'Send a GIF',
+                                  onPressed: sending || sharing
+                                      ? null
+                                      : onPickGif,
+                                ),
+                                _BarAction(
+                                  icon: Icons.how_to_vote_rounded,
+                                  tooltip: 'Start a vote',
+                                  onPressed: sending || sharing
+                                      ? null
+                                      : onStartPoll,
+                                ),
+                              ],
+                            ),
+                          )
+                        : null,
+                    suffixIconConstraints: const BoxConstraints(),
                   ),
                 ),
               ),
@@ -2188,6 +2323,37 @@ class _Composer extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Small icon slots that live inside the composer's text pill.
+class _BarAction extends StatelessWidget {
+  const _BarAction({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return IconButton(
+      onPressed: onPressed,
+      tooltip: tooltip,
+      iconSize: 20,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+      visualDensity: VisualDensity.compact,
+      color: onPressed == null
+          ? scheme.onSurfaceVariant.withValues(alpha: 0.4)
+          : scheme.onSurfaceVariant,
+      icon: Icon(icon),
     );
   }
 }

@@ -164,7 +164,9 @@ class MainShellScreen extends ConsumerWidget {
     return MainShellScaffold(
       index: tab.index,
       onSelect: (index) => select(AppTab.values[index]),
-      unreadChats: unreadChats,
+      // While the thread itself is on screen every row in the count is already
+      // in front of the member, so the dock must not flag it.
+      unreadChats: tab == AppTab.chat ? 0 : unreadChats,
       newMemories: newMemories,
       dockVisible: !(tab == AppTab.map && tripActive),
       overlay: activeNudge == null

@@ -8,6 +8,10 @@ import 'package:pathfinders/features/chat/domain/chat_poll.dart';
 import 'package:pathfinders/features/chat/domain/chat_repository.dart';
 import 'package:pathfinders/features/chat/presentation/chat_tab.dart';
 import 'package:pathfinders/features/chat/presentation/widgets/poll_composer_sheet.dart';
+import 'package:pathfinders/features/navigation/application/navigation_providers.dart';
+import 'package:pathfinders/features/navigation/domain/navigation_destination.dart'
+    as nav;
+import 'package:pathfinders/features/navigation/domain/navigation_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final _poll = ChatMessage(
@@ -102,6 +106,33 @@ class _FakeChatRepository implements ChatRepository {
   Future<void> deleteMessage(String messageId) async {}
 }
 
+class _FakeNavigationRepository implements NavigationRepository {
+  final destinations =
+      <({String label, double latitude, double longitude, String setBy})>[];
+
+  @override
+  Future<void> setDestination({
+    required String label,
+    required double latitude,
+    required double longitude,
+    required String setBy,
+  }) async {
+    destinations.add((
+      label: label,
+      latitude: latitude,
+      longitude: longitude,
+      setBy: setBy,
+    ));
+  }
+
+  @override
+  Future<void> clearDestination() async {}
+
+  @override
+  Stream<nav.NavigationDestination?> watchDestination() =>
+      Stream<nav.NavigationDestination?>.value(null);
+}
+
 Finder _field(String hint) => find.byWidgetPredicate(
   (widget) => widget is TextField && widget.decoration?.hintText == hint,
 );
@@ -145,6 +176,76 @@ void main() {
     await tester.pump();
 
     expect(repository.votes, [(messageId: 'p1', optionId: 'o2')]);
+    // The leader (Bole) has no place pinned, so there is nothing to apply.
+    expect(find.text('Make this the destination'), findsNothing);
+  });
+
+  testWidgets('the leading place becomes the destination', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final chat = _FakeChatRepository([
+      ChatMessage(
+        id: 'p2',
+        senderId: 'alex',
+        senderName: 'Alex Doe',
+        kind: ChatMessageKind.poll,
+        text: 'Where should we go tonight?',
+        poll: const ChatPoll(
+          options: [
+            ChatPollOption(
+              id: 'o1',
+              position: 0,
+              label: 'Bole',
+              voterIds: ['me'],
+            ),
+            ChatPollOption(
+              id: 'o2',
+              position: 1,
+              label: 'Entoto',
+              latitude: 9.08,
+              longitude: 38.77,
+              placeLabel: 'Entoto Park',
+              voterIds: ['alex', 'sam'],
+            ),
+          ],
+        ),
+        createdAt: DateTime.now(),
+      ),
+    ]);
+    final navigation = _FakeNavigationRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+          chatRepositoryProvider('c1').overrideWithValue(chat),
+          navigationRepositoryProvider('c1').overrideWithValue(navigation),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: ChatTab(
+              circleId: 'c1',
+              currentUserId: 'me',
+              members: const [],
+              active: false,
+              onShowLocation: (_, _) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Make this the destination'), findsOneWidget);
+
+    await tester.tap(find.text('Make this the destination'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(navigation.destinations, [
+      (label: 'Entoto Park', latitude: 9.08, longitude: 38.77, setBy: 'me'),
+    ]);
+    expect(find.text('Everyone is heading to Entoto Park.'), findsOneWidget);
   });
 
   testWidgets('the composer starts a vote only when it is complete', (

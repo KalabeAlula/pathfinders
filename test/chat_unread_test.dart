@@ -132,6 +132,43 @@ void main() {
         0,
       );
     });
+
+    test('does not count a poll the member has already voted in', () {
+      ChatMessage poll({List<String> myVoters = const []}) => ChatMessage(
+        id: 'p1',
+        senderId: 'alex',
+        senderName: 'Alex Doe',
+        kind: ChatMessageKind.poll,
+        text: 'Where to?',
+        poll: ChatPoll(
+          options: [
+            ChatPollOption(
+              id: 'o1',
+              position: 0,
+              label: 'Bole',
+              voterIds: myVoters,
+            ),
+            const ChatPollOption(id: 'o2', position: 1, label: 'Entoto'),
+          ],
+        ),
+        createdAt: lastSeen.add(const Duration(minutes: 1)),
+      );
+
+      expect(
+        countUnreadMessages(
+          [
+            poll(myVoters: const ['me']),
+          ],
+          lastSeen: lastSeen,
+          currentUserId: 'me',
+        ),
+        0,
+      );
+      expect(
+        countUnreadMessages([poll()], lastSeen: lastSeen, currentUserId: 'me'),
+        1,
+      );
+    });
   });
 
   group('ChatMessage', () {

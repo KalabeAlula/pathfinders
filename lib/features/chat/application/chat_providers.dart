@@ -66,7 +66,10 @@ int countUnreadMessages(
       .where(
         (message) =>
             message.senderId != currentUserId &&
-            message.createdAt.isAfter(lastSeen),
+            message.createdAt.isAfter(lastSeen) &&
+            // A vote can only be cast from the open thread, so a poll this
+            // member voted in was read even if the seen mark missed it.
+            message.poll?.votedOptionId(currentUserId) == null,
       )
       .length;
 }

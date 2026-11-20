@@ -114,9 +114,15 @@ class SupabaseChatRepository implements ChatRepository {
     }
 
     // Inserts are append-only; edits and deletes touch rows the incremental
-    // query would never see.
-    void onChange({required bool insert}) {
-      if (!insert) needsFullFetch = true;
+    // query would never see. Votes are inserts too, but of poll tables, so
+    // only a chat_messages insert may take the incremental path.
+    void onChange(Map<String, dynamic> message) {
+      final body = message['payload'];
+      final table = body is Map ? body['table'] : message['table'];
+      final messageInsert =
+          message['event'] == 'INSERT' &&
+          (table == null || table == 'chat_messages');
+      if (!messageInsert) needsFullFetch = true;
       scheduleRefresh();
     }
 
@@ -126,11 +132,7 @@ class SupabaseChatRepository implements ChatRepository {
               'chat:$circleId',
               opts: const sb.RealtimeChannelConfig(private: true),
             )
-            ..onBroadcast(
-              event: '*',
-              callback: (message) =>
-                  onChange(insert: message['event'] == 'INSERT'),
-            )
+            ..onBroadcast(event: '*', callback: (message) => onChange(message))
             ..subscribe((status, error) {
               if (status != sb.RealtimeSubscribeStatus.channelError &&
                   status != sb.RealtimeSubscribeStatus.timedOut) {
