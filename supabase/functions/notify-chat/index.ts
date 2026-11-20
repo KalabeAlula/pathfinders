@@ -141,6 +141,8 @@ function preview(kind: string, body: string | null): string | null {
       return "📍 Shared a location";
     case "gif":
       return "Sent a GIF";
+    case "poll":
+      return "🗳️ Started a vote";
     default:
       return null;
   }

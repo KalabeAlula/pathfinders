@@ -1,6 +1,7 @@
 import '../../location/domain/geo_point.dart';
+import 'chat_poll.dart';
 
-enum ChatMessageKind { text, locationShare, destinationUpdate, gif }
+enum ChatMessageKind { text, locationShare, destinationUpdate, gif, poll }
 
 /// The message a reply quotes.
 ///
@@ -42,6 +43,7 @@ class ChatMessage {
     this.latitude,
     this.longitude,
     this.gifUrl,
+    this.poll,
     this.replyTo,
     this.mentionedUserIds = const [],
     this.editedAt,
@@ -61,6 +63,10 @@ class ChatMessage {
   /// Giphy media URL for [ChatMessageKind.gif]; null for a URL the app will
   /// not render.
   final String? gifUrl;
+
+  /// Options and votes for [ChatMessageKind.poll]; [text] carries the
+  /// question.
+  final ChatPoll? poll;
   final DateTime createdAt;
   final ChatMessageReply? replyTo;
 
@@ -79,6 +85,8 @@ class ChatMessage {
 
   bool get isGif => kind == ChatMessageKind.gif;
 
+  bool get isPoll => kind == ChatMessageKind.poll;
+
   bool get isEdited => editedAt != null;
 
   bool mentions(String userId) => mentionedUserIds.contains(userId);
@@ -96,9 +104,38 @@ class ChatMessage {
         place == null
             ? 'Updated the destination'
             : 'Updated the destination to $place',
+      ChatMessageKind.poll => 'Vote',
       ChatMessageKind.text || ChatMessageKind.gif => 'Message',
     };
   }
 
+  /// The same message with its poll votes adjusted (an unconfirmed vote).
+  ChatMessage withPoll(ChatPoll poll) => ChatMessage(
+    id: id,
+    senderId: senderId,
+    senderName: senderName,
+    senderAvatarUrl: senderAvatarUrl,
+    senderAvatarColor: senderAvatarColor,
+    kind: kind,
+    text: text,
+    placeLabel: placeLabel,
+    latitude: latitude,
+    longitude: longitude,
+    gifUrl: gifUrl,
+    poll: poll,
+    replyTo: replyTo,
+    mentionedUserIds: mentionedUserIds,
+    createdAt: createdAt,
+    editedAt: editedAt,
+  );
+
   String get senderFirstName => senderName.split(' ').first;
+
+  /// The quote card a reply to this message shows.
+  ChatMessageReply toReply() => ChatMessageReply(
+    id: id,
+    senderId: senderId,
+    senderName: senderName,
+    text: quotePreview,
+  );
 }

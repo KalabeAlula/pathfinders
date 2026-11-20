@@ -20,8 +20,11 @@ import '../application/chat_providers.dart';
 import '../domain/chat_failure.dart';
 import '../domain/chat_mentions.dart';
 import '../domain/chat_message.dart';
+import '../domain/chat_poll.dart';
+import '../domain/chat_repository.dart';
 import 'widgets/chat_map_preview.dart';
 import 'widgets/gif_picker_sheet.dart';
+import 'widgets/poll_composer_sheet.dart';
 
 /// The circle's thread: text, shared locations and destination updates.
 ///
@@ -59,6 +62,7 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
   final _messageKeys = <String, GlobalKey>{};
   bool _sending = false;
   bool _sharing = false;
+  final _voting = <String>{};
   String? _error;
   ChatMessage? _replyTo;
   ChatMessage? _editing;
@@ -69,6 +73,21 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
   List<UserProfile> get _memberProfiles => [
     for (final member in widget.members) member.profile,
   ];
+
+  /// Null when the snapshot has not loaded the caller yet; the repository
+  /// then sends without a local echo.
+  ChatSender? get _localEcho {
+    for (final member in widget.members) {
+      final profile = member.profile;
+      if (profile.id == widget.currentUserId) {
+        return ChatSender(
+          displayName: profile.displayName,
+          avatarColor: profile.avatarColor,
+        );
+      }
+    }
+    return null;
+  }
 
   Set<String> get _onlineIds => {
     for (final member in widget.members)
@@ -159,6 +178,8 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
     if (text.isEmpty || _sending) return;
 
     final editing = _editing;
+    final replyTo = _replyTo;
+    final mentions = findMentionedUserIds(text, _memberProfiles);
     setState(() {
       _sending = true;
       _error = null;
@@ -172,7 +193,7 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
               .editText(
                 messageId: editing.id,
                 text: text,
-                mentionedUserIds: findMentionedUserIds(text, _memberProfiles),
+                mentionedUserIds: mentions,
               );
         }
         if (!mounted) return;
@@ -180,22 +201,38 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
         return;
       }
 
-      await ref
-          .read(chatRepositoryProvider(widget.circleId))
-          .sendText(
-            senderId: widget.currentUserId,
-            text: text,
-            replyToId: _replyTo?.id,
-            mentionedUserIds: findMentionedUserIds(text, _memberProfiles),
-          );
-      if (!mounted) return;
+      // The composer empties now; the repository echoes the message, and a
+      // failed insert puts the draft back below.
       _text.clear();
       setState(() {
         _replyTo = null;
         _mention = null;
       });
+
+      await ref
+          .read(chatRepositoryProvider(widget.circleId))
+          .sendText(
+            senderId: widget.currentUserId,
+            text: text,
+            replyTo: replyTo,
+            mentionedUserIds: mentions,
+            localEcho: _localEcho,
+          );
     } on ChatFailure catch (failure) {
       if (!mounted) return;
+      if (editing == null) {
+        setState(() {
+          _replyTo ??= replyTo;
+          if (_text.text.isEmpty) {
+            _text.value = TextEditingValue(
+              text: text,
+              selection: TextSelection.collapsed(offset: text.length),
+            );
+          }
+          _error = failure.message;
+        });
+        return;
+      }
       setState(() => _error = failure.message);
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -250,7 +287,8 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
             latitude: reading.point.latitude,
             longitude: reading.point.longitude,
             placeLabel: label,
-            replyToId: _replyTo?.id,
+            replyTo: _replyTo,
+            localEcho: _localEcho,
           );
       if (!mounted) return;
       setState(() => _replyTo = null);
@@ -278,7 +316,8 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
           .sendGif(
             senderId: widget.currentUserId,
             url: url,
-            replyToId: _replyTo?.id,
+            replyTo: _replyTo,
+            localEcho: _localEcho,
           );
       if (!mounted) return;
       setState(() => _replyTo = null);
@@ -287,6 +326,54 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
       setState(() => _error = failure.message);
     } finally {
       if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _startPoll() async {
+    if (_sending || _sharing || _editing != null) return;
+
+    final draft = await showPollComposerSheet(
+      context,
+      userId: widget.currentUserId,
+    );
+    if (!mounted || draft == null) return;
+
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(chatRepositoryProvider(widget.circleId))
+          .createPoll(
+            senderId: widget.currentUserId,
+            question: draft.question,
+            options: draft.options,
+            replyTo: _replyTo,
+            localEcho: _localEcho,
+          );
+      if (!mounted) return;
+      setState(() => _replyTo = null);
+    } on ChatFailure catch (failure) {
+      if (!mounted) return;
+      setState(() => _error = failure.message);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _vote(ChatMessage message, String optionId) async {
+    if (!_voting.add(message.id)) return;
+    HapticFeedback.selectionClick();
+    try {
+      await ref
+          .read(chatRepositoryProvider(widget.circleId))
+          .castVote(messageId: message.id, optionId: optionId);
+    } on ChatFailure catch (failure) {
+      if (!mounted) return;
+      setState(() => _error = failure.message);
+    } finally {
+      _voting.remove(message.id);
     }
   }
 
@@ -560,7 +647,10 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
                                     isMine:
                                         message.senderId ==
                                         widget.currentUserId,
+                                    currentUserId: widget.currentUserId,
                                     members: _memberProfiles,
+                                    onVote: (optionId) =>
+                                        _vote(message, optionId),
                                     onShowLocation: message.hasLocation
                                         ? () => _showOnMap(message)
                                         : null,
@@ -613,6 +703,7 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
                 onSend: _send,
                 onShareLocation: _shareLocation,
                 onPickGif: _pickGif,
+                onStartPoll: _startPoll,
               ),
             ),
           ],
@@ -683,14 +774,18 @@ class _MessageRow extends StatelessWidget {
   const _MessageRow({
     required this.message,
     required this.isMine,
+    required this.currentUserId,
     required this.members,
+    required this.onVote,
     required this.onShowLocation,
     this.onShowQuote,
   });
 
   final ChatMessage message;
   final bool isMine;
+  final String currentUserId;
   final List<UserProfile> members;
+  final ValueChanged<String> onVote;
   final VoidCallback? onShowLocation;
   final VoidCallback? onShowQuote;
 
@@ -736,6 +831,16 @@ class _MessageRow extends StatelessWidget {
         mutedColor: mutedColor,
         quote: quote,
         isMine: isMine,
+      ),
+      ChatMessageKind.poll => _PollBubble(
+        message: message,
+        bubbleColor: bubbleColor,
+        textColor: textColor,
+        mutedColor: mutedColor,
+        quote: quote,
+        isMine: isMine,
+        currentUserId: currentUserId,
+        onVote: onVote,
       ),
       ChatMessageKind.text || ChatMessageKind.destinationUpdate => _TextBubble(
         message: message,
@@ -1154,6 +1259,264 @@ class _TextBubble extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PollBubble extends StatelessWidget {
+  const _PollBubble({
+    required this.message,
+    required this.bubbleColor,
+    required this.textColor,
+    required this.mutedColor,
+    required this.quote,
+    required this.isMine,
+    required this.currentUserId,
+    required this.onVote,
+  });
+
+  final ChatMessage message;
+  final Color bubbleColor;
+  final Color textColor;
+  final Color mutedColor;
+  final Widget? quote;
+  final bool isMine;
+  final String currentUserId;
+  final ValueChanged<String> onVote;
+
+  static String _voteCount(int votes) => switch (votes) {
+    0 => 'No votes yet',
+    1 => '1 vote',
+    _ => '$votes votes',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final poll = message.poll;
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 228, maxWidth: 296),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 9, 12, 7),
+        decoration: BoxDecoration(
+          color: bubbleColor,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isMine ? 16 : 5),
+            bottomRight: Radius.circular(isMine ? 5 : 16),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (quote != null) ...[quote!, const SizedBox(height: 6)],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Icon(
+                    Icons.how_to_vote_rounded,
+                    size: 15,
+                    color: textColor,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    message.text ?? 'Vote',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: textColor,
+                      fontWeight: FontWeight.w600,
+                      height: 1.25,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (poll == null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6, bottom: 2),
+                child: Text(
+                  'Vote options are loading…',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: mutedColor,
+                  ),
+                ),
+              )
+            else ...[
+              const SizedBox(height: 4),
+              for (final option in poll.options)
+                _PollOptionRow(
+                  option: option,
+                  totalVotes: poll.totalVotes,
+                  selected: option.voterIds.contains(currentUserId),
+                  isMine: isMine,
+                  scheme: scheme,
+                  textColor: textColor,
+                  mutedColor: mutedColor,
+                  onTap: () => onVote(option.id),
+                ),
+              const SizedBox(height: 5),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _voteCount(poll.totalVotes),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: mutedColor,
+                      fontSize: 9.5,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '·',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: mutedColor,
+                      fontSize: 9.5,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    timeAgo(message.createdAt),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: mutedColor,
+                      fontSize: 9.5,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PollOptionRow extends StatelessWidget {
+  const _PollOptionRow({
+    required this.option,
+    required this.totalVotes,
+    required this.selected,
+    required this.isMine,
+    required this.scheme,
+    required this.textColor,
+    required this.mutedColor,
+    required this.onTap,
+  });
+
+  final ChatPollOption option;
+  final int totalVotes;
+  final bool selected;
+  final bool isMine;
+  final ColorScheme scheme;
+  final Color textColor;
+  final Color mutedColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final votes = option.voterIds.length;
+    final share = totalVotes == 0 ? 0.0 : votes / totalVotes;
+    final barColor = isMine
+        ? scheme.onPrimary.withValues(alpha: 0.22)
+        : scheme.primary.withValues(alpha: 0.16);
+    final fillColor = selected
+        ? (isMine
+              ? scheme.onPrimary.withValues(alpha: 0.26)
+              : scheme.primary.withValues(alpha: 0.14))
+        : (isMine
+              ? scheme.onPrimary.withValues(alpha: 0.1)
+              : scheme.surface.withValues(alpha: 0.6));
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 5),
+      child: Material(
+        color: fillColor,
+        borderRadius: BorderRadius.circular(10),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: share,
+                  child: ColoredBox(color: barColor),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 7, 8, 7),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            option.label,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: textColor,
+                              height: 1.2,
+                            ),
+                          ),
+                          if (option.hasPlace) ...[
+                            const SizedBox(height: 1),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.place_rounded,
+                                  size: 11,
+                                  color: mutedColor,
+                                ),
+                                const SizedBox(width: 2),
+                                Flexible(
+                                  child: Text(
+                                    option.placeLabel ?? 'Pinned place',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: mutedColor,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$votes',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: selected ? textColor : mutedColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (selected) ...[
+                      const SizedBox(width: 3),
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 15,
+                        color: isMine ? scheme.onPrimary : scheme.primary,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1680,6 +2043,7 @@ class _Composer extends StatelessWidget {
     required this.onSend,
     required this.onShareLocation,
     required this.onPickGif,
+    required this.onStartPoll,
   });
 
   final TextEditingController controller;
@@ -1696,6 +2060,7 @@ class _Composer extends StatelessWidget {
   final VoidCallback onSend;
   final VoidCallback onShareLocation;
   final VoidCallback onPickGif;
+  final VoidCallback onStartPoll;
 
   @override
   Widget build(BuildContext context) {
@@ -1764,6 +2129,12 @@ class _Composer extends StatelessWidget {
                   onPressed: sending || sharing ? null : onPickGif,
                   tooltip: 'Send a GIF',
                   icon: const Icon(Icons.gif_box_rounded, size: 19),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  onPressed: sending || sharing ? null : onStartPoll,
+                  tooltip: 'Start a vote',
+                  icon: const Icon(Icons.how_to_vote_rounded, size: 19),
                 ),
               ],
               const SizedBox(width: 8),

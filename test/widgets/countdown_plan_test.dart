@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pathfinders/features/chat/application/chat_providers.dart';
 import 'package:pathfinders/features/chat/domain/chat_message.dart';
+import 'package:pathfinders/features/chat/domain/chat_poll.dart';
 import 'package:pathfinders/features/chat/domain/chat_repository.dart';
 import 'package:pathfinders/features/location/domain/geo_point.dart';
 import 'package:pathfinders/features/milestones/application/milestones_providers.dart';
@@ -122,8 +123,9 @@ class _FakeChatRepository implements ChatRepository {
   Future<void> sendText({
     required String senderId,
     required String text,
-    String? replyToId,
+    ChatMessage? replyTo,
     List<String> mentionedUserIds = const [],
+    ChatSender? localEcho,
   }) async {
     sent.add(text);
   }
@@ -134,14 +136,31 @@ class _FakeChatRepository implements ChatRepository {
     required double latitude,
     required double longitude,
     String? placeLabel,
-    String? replyToId,
+    ChatMessage? replyTo,
+    ChatSender? localEcho,
   }) async {}
 
   @override
   Future<void> sendGif({
     required String senderId,
     required String url,
-    String? replyToId,
+    ChatMessage? replyTo,
+    ChatSender? localEcho,
+  }) async {}
+
+  @override
+  Future<void> createPoll({
+    required String senderId,
+    required String question,
+    required List<ChatPollDraftOption> options,
+    ChatMessage? replyTo,
+    ChatSender? localEcho,
+  }) async {}
+
+  @override
+  Future<void> castVote({
+    required String messageId,
+    required String optionId,
   }) async {}
 
   @override
