@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show Color;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -43,7 +44,7 @@ class NotificationPlugin {
 
   FlutterLocalNotificationsPlugin get plugin => _plugin;
 
-  bool get isSupported => Platform.isAndroid || Platform.isIOS;
+  bool get isSupported => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
   /// Payloads from notifications the member taps while the app is running.
   Stream<String> get taps => _taps.stream;

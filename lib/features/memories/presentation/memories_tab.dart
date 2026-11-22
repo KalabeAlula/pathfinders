@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/navigation/glass_dock.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../app/widgets/bento_card.dart';
+import '../../../app/widgets/content_frame.dart';
 import '../../../core/utils/time_format.dart';
 import '../../circle/domain/user_profile.dart';
 import '../../location/domain/geo_point.dart';
@@ -95,61 +96,63 @@ class _MemoriesTabState extends ConsumerState<MemoriesTab> {
         ref.watch(milestonesProvider(widget.circleId)).value ??
         const <SharedMilestone>[];
     final clock = widget.now ?? DateTime.now();
-    final upcoming =
-        [
-          for (final milestone in milestones)
-            if (milestone.daysFrom(clock) >= 0) milestone,
-        ]..sort((a, b) => a.sortKey.compareTo(b.sortKey));
+    final upcoming = [
+      for (final milestone in milestones)
+        if (milestone.daysFrom(clock) >= 0) milestone,
+    ]..sort((a, b) => a.sortKey.compareTo(b.sortKey));
 
     return SafeArea(
       bottom: false,
-      child: Stack(
-        children: [
-          memories.when(
-            data: (items) => _Gallery(
-              items: items,
-              circleName: widget.circleName,
-              authors: widget.authors,
-              now: clock,
-              milestoneNow: widget.now,
-              authorFilter: _authorFilter,
-              onSelectAuthor: _selectAuthor,
-              milestones: upcoming,
-              onAddMilestone: _addMilestone,
-              onOpenMilestone: _openMilestone,
-              onAddMemory: _addMemory,
-              onOpen: (memory) => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => MemoryDetailScreen(
-                    circleId: widget.circleId,
-                    currentUserId: widget.currentUserId,
-                    memory: memory,
-                    author: widget.authors[memory.authorId],
-                    now: clock,
+      child: ContentFrame(
+        maxWidth: ContentWidths.memories,
+        child: Stack(
+          children: [
+            memories.when(
+              data: (items) => _Gallery(
+                items: items,
+                circleName: widget.circleName,
+                authors: widget.authors,
+                now: clock,
+                milestoneNow: widget.now,
+                authorFilter: _authorFilter,
+                onSelectAuthor: _selectAuthor,
+                milestones: upcoming,
+                onAddMilestone: _addMilestone,
+                onOpenMilestone: _openMilestone,
+                onAddMemory: _addMemory,
+                onOpen: (memory) => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => MemoryDetailScreen(
+                      circleId: widget.circleId,
+                      currentUserId: widget.currentUserId,
+                      memory: memory,
+                      author: widget.authors[memory.authorId],
+                      now: clock,
+                    ),
                   ),
                 ),
               ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stack) => _GalleryError(
+                onRetry: () =>
+                    ref.invalidate(recentMemoriesProvider(widget.circleId)),
+              ),
             ),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, stack) => _GalleryError(
-              onRetry: () =>
-                  ref.invalidate(recentMemoriesProvider(widget.circleId)),
+            Positioned(
+              right: AppSpacing.xl,
+              bottom: AppSpacing.xl + ShellDock.contentInset(context),
+              child: FloatingActionButton.extended(
+                key: const ValueKey('new-memory-fab'),
+                onPressed: _addMemory,
+                icon: const Icon(Icons.add_a_photo_rounded, size: 20),
+                label: const Text('New memory'),
+                shape: const StadiumBorder(),
+                backgroundColor: scheme.primary,
+                foregroundColor: scheme.onPrimary,
+              ),
             ),
-          ),
-          Positioned(
-            right: AppSpacing.xl,
-            bottom: AppSpacing.xl + ShellDock.contentInset(context),
-            child: FloatingActionButton.extended(
-              key: const ValueKey('new-memory-fab'),
-              onPressed: _addMemory,
-              icon: const Icon(Icons.add_a_photo_rounded, size: 20),
-              label: const Text('New memory'),
-              shape: const StadiumBorder(),
-              backgroundColor: scheme.primary,
-              foregroundColor: scheme.onPrimary,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -223,10 +226,7 @@ class _Gallery extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Memories',
-                        style: theme.textTheme.headlineSmall,
-                      ),
+                      Text('Memories', style: theme.textTheme.headlineSmall),
                       const SizedBox(height: 2),
                       Text(
                         circleName == null
@@ -309,18 +309,15 @@ class _Gallery extends StatelessWidget {
                 crossAxisSpacing: AppSpacing.md,
                 childAspectRatio: 0.8,
               ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final memory = visible[index];
-                  return _MemoryTile(
-                    memory: memory,
-                    author: authors[memory.authorId],
-                    now: now,
-                    onTap: () => onOpen(memory),
-                  );
-                },
-                childCount: visible.length,
-              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final memory = visible[index];
+                return _MemoryTile(
+                  memory: memory,
+                  author: authors[memory.authorId],
+                  now: now,
+                  onTap: () => onOpen(memory),
+                );
+              }, childCount: visible.length),
             ),
           ),
         ],
@@ -506,17 +503,13 @@ class _AddMilestoneCard extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.add_circle_outline_rounded,
-                  color: scheme.primary,
-                ),
+                Icon(Icons.add_circle_outline_rounded, color: scheme.primary),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   'Add countdown',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
+                  style: Theme.of(context).textTheme.labelSmall
+                      ?.copyWith(color: scheme.onSurfaceVariant),
                 ),
               ],
             ),

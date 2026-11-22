@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
-import 'app_colors.dart';
+import 'app_palettes.dart';
 import 'app_tokens.dart';
 
 abstract final class AppTheme {
-  static ThemeData light() => _build(AppColors.lightScheme);
+  static ThemeData light([AppThemeId id = AppPalettes.defaultId]) =>
+      _build(AppPalettes.byId(id).light);
 
-  static ThemeData dark() => _build(AppColors.darkScheme);
+  static ThemeData dark([AppThemeId id = AppPalettes.defaultId]) =>
+      _build(AppPalettes.byId(id).dark);
 
   static ThemeData _build(ColorScheme scheme) {
     final base = ThemeData(

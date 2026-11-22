@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,15 +13,13 @@ import '../domain/warmth_notifier.dart';
 /// Only the mobile platforms have a notification shade; elsewhere the in-app
 /// banner stays the only surface.
 class LocalWarmthNotifier implements WarmthNotifier {
-  LocalWarmthNotifier(
-    this._preferences, {
-    NotificationPlugin? notifications,
-  }) : _notifications = notifications ?? NotificationPlugin.instance;
+  LocalWarmthNotifier(this._preferences, {NotificationPlugin? notifications})
+    : _notifications = notifications ?? NotificationPlugin.instance;
 
   final SharedPreferences _preferences;
   final NotificationPlugin _notifications;
 
-  bool get _isMobile => Platform.isAndroid || Platform.isIOS;
+  bool get _isMobile => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
   @override
   Future<void> ensurePermission() =>

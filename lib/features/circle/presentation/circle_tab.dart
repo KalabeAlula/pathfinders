@@ -6,6 +6,7 @@ import '../../../app/navigation/glass_dock.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../app/widgets/battery_badge.dart';
 import '../../../app/widgets/bento_card.dart';
+import '../../../app/widgets/content_frame.dart';
 import '../../../app/widgets/member_avatar.dart';
 import '../../../core/application/clock_provider.dart';
 import '../../location/application/telemetry_providers.dart';
@@ -39,10 +40,7 @@ class CircleTab extends ConsumerWidget {
   final CircleSnapshot snapshot;
   final String currentUserId;
 
-  void _openMember(
-    BuildContext context,
-    CircleMember member,
-  ) {
+  void _openMember(BuildContext context, CircleMember member) {
     showMemberDetailSheet(
       context,
       memberId: member.profile.id,
@@ -56,9 +54,8 @@ class CircleTab extends ConsumerWidget {
     final code = snapshot.circle.inviteCode;
     await Clipboard.setData(ClipboardData(text: code));
     if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Invite code $code copied.')));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('Invite code $code copied.')));
   }
 
   @override
@@ -108,209 +105,209 @@ class CircleTab extends ConsumerWidget {
 
     return SafeArea(
       bottom: false,
-      child: ListView(
-        padding: EdgeInsets.only(
-          top: AppSpacing.md,
-          bottom: AppSpacing.xxl + ShellDock.contentInset(context),
-        ),
-        children: [
-          // Hero: the one circle and its one companion.
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'ACTIVE CIRCLE',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    letterSpacing: 1.4,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        circle.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    GroupTypeBadge(type: circle.type, showIcon: true),
-                  ],
-                ),
-              ],
-            ),
+      child: ContentFrame(
+        maxWidth: ContentWidths.circle,
+        child: ListView(
+          padding: EdgeInsets.only(
+            top: AppSpacing.md,
+            bottom: AppSpacing.xxl + ShellDock.contentInset(context),
           ),
-          const SizedBox(height: AppSpacing.md),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (sharingNotice != null) ...[
-                  SharingNoticeBanner(
-                    notice: sharingNotice,
-                    onTap: () {
-                      final me = snapshot.memberById(currentUserId);
-                      if (me != null) _openMember(context, me);
-                    },
+          children: [
+            // Hero: the one circle and its one companion.
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ACTIVE CIRCLE',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      letterSpacing: 1.4,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                ],
-                BentoCard(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.lg,
-                    AppSpacing.lg,
-                    AppSpacing.lg,
-                    AppSpacing.md,
-                  ),
-                  child: Column(
+                  const SizedBox(height: 4),
+                  Row(
                     children: [
-                      Tooltip(
-                        message: 'Meet ${pet.name}',
-                        child: AnimatedPetSticker(
-                          pet: species,
-                          mood: mood,
-                          size: 112,
-                          onTap: openCompanion,
+                      Expanded(
+                        child: Text(
+                          circle.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        pet.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        '${mood.label} · Level ${pet.level}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.group_rounded,
-                            size: 15,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              '${snapshot.members.length} of '
-                              '${circle.capacity} members'
-                              ' • ${snapshot.onlineCount} active now',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          FilledButton.tonalIcon(
-                            key: const ValueKey('invite-copy'),
-                            onPressed: () => _copyInviteCode(context),
-                            icon: const Icon(
-                              Icons.person_add_alt_1_rounded,
-                              size: 16,
-                            ),
-                            label: const Text('Invite'),
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 8,
-                              ),
-                              visualDensity: VisualDensity.compact,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                          ),
-                        ],
-                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      GroupTypeBadge(type: circle.type, showIcon: true),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-            child: Row(
-              children: [
-                Text('Members', style: theme.textTheme.titleMedium),
-                const Spacer(),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          for (final member in snapshot.members)
+            const SizedBox(height: AppSpacing.md),
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.xl,
-                0,
-                AppSpacing.xl,
-                AppSpacing.sm,
-              ),
-              child: _MemberRow(
-                member: member,
-                isCurrentUser: member.profile.id == currentUserId,
-                isCreator: member.profile.id == circle.createdBy,
-                now: now,
-                warmthEmoji: member.profile.id == currentUserId
-                    ? null
-                    : quickEmoji,
-                onTap: () => _openMember(context, member),
-                onWarmth: () => quickWarmth(member),
-                onWarmthOptions: () => warmthOptions(member),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (sharingNotice != null) ...[
+                    SharingNoticeBanner(
+                      notice: sharingNotice,
+                      onTap: () {
+                        final me = snapshot.memberById(currentUserId);
+                        if (me != null) _openMember(context, me);
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                  BentoCard(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.lg,
+                      AppSpacing.lg,
+                      AppSpacing.lg,
+                      AppSpacing.md,
+                    ),
+                    child: Column(
+                      children: [
+                        Tooltip(
+                          message: 'Meet ${pet.name}',
+                          child: AnimatedPetSticker(
+                            pet: species,
+                            mood: mood,
+                            size: 112,
+                            onTap: openCompanion,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          pet.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          '${mood.label} · Level ${pet.level}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.group_rounded,
+                              size: 15,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                '${snapshot.members.length} of '
+                                '${circle.capacity} members'
+                                ' • ${snapshot.onlineCount} active now',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            FilledButton.tonalIcon(
+                              key: const ValueKey('invite-copy'),
+                              onPressed: () => _copyInviteCode(context),
+                              icon: const Icon(
+                                Icons.person_add_alt_1_rounded,
+                                size: 16,
+                              ),
+                              label: const Text('Invite'),
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 8,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-          const SizedBox(height: AppSpacing.xs),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                key: const ValueKey('circle-settings'),
-                onPressed: () => showCircleSettings(
-                  context,
-                  userId: currentUserId,
-                  snapshot: snapshot,
+            const SizedBox(height: AppSpacing.xl),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+              child: Row(
+                children: [
+                  Text('Members', style: theme.textTheme.titleMedium),
+                  const Spacer(),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            for (final member in snapshot.members)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  0,
+                  AppSpacing.xl,
+                  AppSpacing.sm,
                 ),
-                icon: const Icon(Icons.settings_outlined, size: 18),
-                label: const Text('Circle settings'),
+                child: _MemberRow(
+                  member: member,
+                  isCurrentUser: member.profile.id == currentUserId,
+                  isCreator: member.profile.id == circle.createdBy,
+                  now: now,
+                  warmthEmoji: member.profile.id == currentUserId
+                      ? null
+                      : quickEmoji,
+                  onTap: () => _openMember(context, member),
+                  onWarmth: () => quickWarmth(member),
+                  onWarmthOptions: () => warmthOptions(member),
+                ),
+              ),
+            const SizedBox(height: AppSpacing.xs),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const ValueKey('circle-settings'),
+                  onPressed: () => showCircleSettings(
+                    context,
+                    userId: currentUserId,
+                    snapshot: snapshot,
+                  ),
+                  icon: const Icon(Icons.settings_outlined, size: 18),
+                  label: const Text('Circle settings'),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-            child: Text(
-              'Switch circle',
-              style: theme.textTheme.titleMedium,
+            const SizedBox(height: AppSpacing.lg),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+              child: Text('Switch circle', style: theme.textTheme.titleMedium),
             ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          CircleSwitcher(
-            userId: currentUserId,
-            onAdd: addCircle,
-            activeMood: mood,
-          ),
-        ],
+            const SizedBox(height: AppSpacing.sm),
+            CircleSwitcher(
+              userId: currentUserId,
+              onAdd: addCircle,
+              activeMood: mood,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -461,10 +458,8 @@ class _Pill extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          fontSize: 9,
-          color: scheme.onSecondaryContainer,
-        ),
+        style: Theme.of(context).textTheme.labelSmall
+            ?.copyWith(fontSize: 9, color: scheme.onSecondaryContainer),
       ),
     );
   }

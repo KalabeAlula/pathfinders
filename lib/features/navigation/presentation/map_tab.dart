@@ -9,6 +9,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart'
 
 import '../../../app/navigation/glass_dock.dart';
 import '../../../app/theme/app_tokens.dart';
+import '../../../app/widgets/content_frame.dart';
 import '../../../core/application/app_visibility.dart';
 import '../../../core/config/mapbox_config.dart';
 import '../../chat/application/chat_providers.dart';
@@ -1369,16 +1370,24 @@ class _MapTabState extends ConsumerState<MapTab> {
                 top: MediaQuery.paddingOf(context).top + 8,
                 left: 12,
                 right: 12,
-                child: IgnorePointer(
-                  ignoring: tripActive,
-                  child: AnimatedOpacity(
-                    opacity: tripActive ? 0 : 1,
-                    duration: const Duration(milliseconds: 220),
-                    child: MapSearchBar(
-                      userId: widget.currentUserId,
-                      unreadCount: unread,
-                      onChat: _openChat,
-                      onPlaceSelected: _selectSuggestion,
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: ContentWidths.mapHud,
+                    ),
+                    child: IgnorePointer(
+                      ignoring: tripActive,
+                      child: AnimatedOpacity(
+                        opacity: tripActive ? 0 : 1,
+                        duration: const Duration(milliseconds: 220),
+                        child: MapSearchBar(
+                          userId: widget.currentUserId,
+                          unreadCount: unread,
+                          onChat: _openChat,
+                          onPlaceSelected: _selectSuggestion,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -1404,25 +1413,33 @@ class _MapTabState extends ConsumerState<MapTab> {
                   left: 12,
                   right: 12,
                   bottom: ShellDock.contentInset(context),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (configured)
-                        _LocateButton(
-                          onTap: () => unawaited(_goToMyLocation()),
-                        ),
-                      const SizedBox(height: AppSpacing.sm),
-                      _SelectionSheet(
-                        draft: draft,
-                        configured: configured,
-                        saving: _saving,
-                        error: _error,
-                        hasActiveDestination: false,
-                        onConfirm: _confirm,
-                        onEnd: _endNavigation,
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: ContentWidths.mapHud,
                       ),
-                    ],
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (configured)
+                            _LocateButton(
+                              onTap: () => unawaited(_goToMyLocation()),
+                            ),
+                          const SizedBox(height: AppSpacing.sm),
+                          _SelectionSheet(
+                            draft: draft,
+                            configured: configured,
+                            saving: _saving,
+                            error: _error,
+                            hasActiveDestination: false,
+                            onConfirm: _confirm,
+                            onEnd: _endNavigation,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
             ],

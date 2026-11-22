@@ -6,6 +6,7 @@ import '../core/application/app_visibility.dart';
 import '../features/auth/presentation/session_gate.dart';
 import 'navigation/notification_taps.dart';
 import 'theme/app_theme.dart';
+import 'theme/theme_providers.dart';
 
 class PathfindersApp extends ConsumerStatefulWidget {
   const PathfindersApp({super.key});
@@ -39,11 +40,13 @@ class _PathfindersAppState extends ConsumerState<PathfindersApp>
     // payload that cold-started the app from the shade.
     ref.watch(notificationTapDispatcherProvider);
 
+    final palette = ref.watch(appThemeProvider);
+
     return MaterialApp(
       title: 'Pathfinders',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: AppTheme.light(palette),
+      darkTheme: AppTheme.dark(palette),
       themeMode: ThemeMode.system,
       builder: (context, child) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -53,10 +56,8 @@ class _PathfindersAppState extends ConsumerState<PathfindersApp>
           animation: visibility,
           // A minimized app keeps no ticker running, so animations cost nothing
           // in the background.
-          builder: (context, overlay) => TickerMode(
-            enabled: visibility.isForeground,
-            child: overlay!,
-          ),
+          builder: (context, overlay) =>
+              TickerMode(enabled: visibility.isForeground, child: overlay!),
           child: AnnotatedRegion<SystemUiOverlayStyle>(
             value: SystemUiOverlayStyle(
               statusBarColor: Colors.transparent,

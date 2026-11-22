@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -33,7 +34,7 @@ class LocalCountdownReminderScheduler implements CountdownReminderScheduler {
   bool _armedThisRun = false;
   Future<void> _tail = Future<void>.value();
 
-  bool get _isMobile => Platform.isAndroid || Platform.isIOS;
+  bool get _isMobile => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
   @override
   Future<void> ensurePermission() =>
@@ -88,8 +89,7 @@ class LocalCountdownReminderScheduler implements CountdownReminderScheduler {
           android: AndroidNotificationDetails(
             NotificationPlugin.countdownChannelId,
             NotificationPlugin.countdownChannelName,
-            channelDescription:
-                NotificationPlugin.countdownChannelDescription,
+            channelDescription: NotificationPlugin.countdownChannelDescription,
             icon: NotificationPlugin.icon,
             importance: Importance.high,
             priority: Priority.high,
@@ -106,10 +106,9 @@ class LocalCountdownReminderScheduler implements CountdownReminderScheduler {
       );
     }
 
-    await _preferences.setStringList(
-      _slotsKey,
-      [for (final entry in current.entries) '${entry.key}:${entry.value}'],
-    );
+    await _preferences.setStringList(_slotsKey, [
+      for (final entry in current.entries) '${entry.key}:${entry.value}',
+    ]);
     _armedThisRun = true;
   }
 

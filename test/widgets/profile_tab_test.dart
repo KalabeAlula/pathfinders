@@ -3,13 +3,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pathfinders/app/theme/app_palettes.dart';
 import 'package:pathfinders/app/theme/app_theme.dart';
+import 'package:pathfinders/app/widgets/content_frame.dart';
+import 'package:pathfinders/core/storage/storage_providers.dart';
 import 'package:pathfinders/features/auth/application/auth_providers.dart';
 import 'package:pathfinders/features/auth/domain/auth_session.dart';
 import 'package:pathfinders/features/profile/application/profile_providers.dart';
 import 'package:pathfinders/features/profile/domain/profile_details.dart';
 import 'package:pathfinders/features/profile/domain/profile_repository.dart';
 import 'package:pathfinders/features/profile/presentation/profile_tab.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeProfileRepository implements ProfileRepository {
   final changes = StreamController<ProfileDetails>.broadcast();
@@ -53,9 +57,13 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
           profileRepositoryProvider('u1').overrideWithValue(repository),
           authSessionProvider.overrideWith(
             (_) => Stream.value(
@@ -102,6 +110,47 @@ void main() {
 
     expect(repository.names, ['Kaleab Tesfaye']);
     expect(find.text('Name saved.'), findsOneWidget);
+  });
+
+  testWidgets('every palette tile draws its three swatch bands', (
+    tester,
+  ) async {
+    await pumpProfile(tester);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('theme-kaffa')),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    for (final id in AppThemeId.values) {
+      final bands = find.descendant(
+        of: find.byKey(ValueKey('theme-${id.name}')),
+        matching: find.byType(ColoredBox),
+      );
+      expect(bands, findsNWidgets(3), reason: '${id.name} should show 6:3:1');
+      for (var i = 0; i < 3; i++) {
+        expect(
+          tester.getSize(bands.at(i)).height,
+          greaterThan(10),
+          reason: '${id.name} band $i collapsed',
+        );
+      }
+    }
+  });
+
+  testWidgets('keeps the column readable on a desktop-width window', (
+    tester,
+  ) async {
+    await pumpProfile(tester);
+
+    tester.view.physicalSize = const Size(1600, 1200);
+    tester.view.devicePixelRatio = 1;
+    await tester.pump();
+
+    final list = find.byType(ListView).first;
+    expect(tester.getSize(list).width, ContentWidths.profile);
+    expect(tester.getTopLeft(list).dx, (1600 - ContentWidths.profile) / 2);
   });
 
   testWidgets('selecting an animal enables and runs the avatar save', (

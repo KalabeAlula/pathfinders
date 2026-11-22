@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -22,7 +23,7 @@ class LocalChatNotifier implements ChatNotifier {
   final NotificationPlugin _notifications;
   final Map<String, List<ChatNotification>> _groups = {};
 
-  bool get _isSupported => Platform.isAndroid || Platform.isIOS;
+  bool get _isSupported => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
   @override
   Future<void> ensurePermission() =>

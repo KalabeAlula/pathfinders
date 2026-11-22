@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
@@ -55,11 +56,18 @@ class _BootGateState extends State<BootGate> {
     final preferencesReady = SharedPreferences.getInstance();
     // The three initializations are independent, so they run together and the
     // wait is the slowest one instead of their sum.
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-    // Chat pushes are data-only, so the app renders the notification itself.
-    // Registering the handler early is what lets a push that wakes a stopped
-    // process be handled instead of dropped.
-    FirebaseMessaging.onBackgroundMessage(chatPushHandler);
+    //
+    // Only the phone builds have Firebase configuration. A browser tab gets
+    // chat over the live socket and skips FCM instead of failing to boot.
+    if (!kIsWeb) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      // Chat pushes are data-only, so the app renders the notification itself.
+      // Registering the handler early is what lets a push that wakes a stopped
+      // process be handled instead of dropped.
+      FirebaseMessaging.onBackgroundMessage(chatPushHandler);
+    }
     await supabaseReady;
     if (MapboxConfig.isConfigured) {
       MapboxOptions.setAccessToken(MapboxConfig.accessToken);

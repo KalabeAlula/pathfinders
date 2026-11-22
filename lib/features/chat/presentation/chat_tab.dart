@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/navigation/glass_dock.dart';
 import '../../../app/theme/app_tokens.dart';
+import '../../../app/widgets/content_frame.dart';
 import '../../../app/widgets/member_avatar.dart';
 import '../../../core/application/app_visibility.dart';
 import '../../../core/utils/time_format.dart';
@@ -641,113 +642,118 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
       color: scheme.surface,
       child: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            _ChatHeader(
-              subtitle: messages.value?.isEmpty ?? true
-                  ? 'Say hi or share where you are'
-                  : '${messages.value!.length} message'
-                        '${messages.value!.length == 1 ? '' : 's'} in the thread',
-            ),
-            Expanded(
-              child: messages.when(
-                data: (items) => items.isEmpty
-                    ? const _EmptyThread()
-                    : ListView.builder(
-                        controller: _scroll,
-                        reverse: true,
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                        itemCount: items.length,
-                        itemBuilder: (context, index) {
-                          final message = items[items.length - 1 - index];
-                          return _MessageItem(
-                            key: _keyFor(message.id),
-                            highlighted: message.id == _highlightedId,
-                            mentioned: message.mentions(widget.currentUserId),
-                            onReply: () => _startReply(message),
-                            onLongPress: () => _showMessageActions(message),
-                            child: message.isDestinationUpdate
-                                ? _DestinationUpdateRow(
-                                    message: message,
-                                    onTap: message.hasLocation
-                                        ? () => _showOnMap(message)
-                                        : null,
-                                    onShowQuote: message.replyTo == null
-                                        ? null
-                                        : () => _scrollToMessage(
-                                            message.replyTo!.id,
-                                          ),
-                                  )
-                                : _MessageRow(
-                                    message: message,
-                                    isMine:
-                                        message.senderId ==
-                                        widget.currentUserId,
-                                    currentUserId: widget.currentUserId,
-                                    members: _memberProfiles,
-                                    applyingDestination: _applying.contains(
-                                      message.id,
+        child: ContentFrame(
+          maxWidth: ContentWidths.chat,
+          child: Column(
+            children: [
+              _ChatHeader(
+                subtitle: messages.value?.isEmpty ?? true
+                    ? 'Say hi or share where you are'
+                    : '${messages.value!.length} message'
+                          '${messages.value!.length == 1 ? '' : 's'} in the thread',
+              ),
+              Expanded(
+                child: messages.when(
+                  data: (items) => items.isEmpty
+                      ? const _EmptyThread()
+                      : ListView.builder(
+                          controller: _scroll,
+                          reverse: true,
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                          itemCount: items.length,
+                          itemBuilder: (context, index) {
+                            final message = items[items.length - 1 - index];
+                            return _MessageItem(
+                              key: _keyFor(message.id),
+                              highlighted: message.id == _highlightedId,
+                              mentioned: message.mentions(widget.currentUserId),
+                              onReply: () => _startReply(message),
+                              onLongPress: () => _showMessageActions(message),
+                              child: message.isDestinationUpdate
+                                  ? _DestinationUpdateRow(
+                                      message: message,
+                                      onTap: message.hasLocation
+                                          ? () => _showOnMap(message)
+                                          : null,
+                                      onShowQuote: message.replyTo == null
+                                          ? null
+                                          : () => _scrollToMessage(
+                                              message.replyTo!.id,
+                                            ),
+                                    )
+                                  : _MessageRow(
+                                      message: message,
+                                      isMine:
+                                          message.senderId ==
+                                          widget.currentUserId,
+                                      currentUserId: widget.currentUserId,
+                                      members: _memberProfiles,
+                                      applyingDestination: _applying.contains(
+                                        message.id,
+                                      ),
+                                      onVote: (optionId) =>
+                                          _vote(message, optionId),
+                                      onMakeDestination: (option) =>
+                                          _makeDestination(message, option),
+                                      onShowLocation: message.hasLocation
+                                          ? () => _showOnMap(message)
+                                          : null,
+                                      onShowQuote: message.replyTo == null
+                                          ? null
+                                          : () => _scrollToMessage(
+                                              message.replyTo!.id,
+                                            ),
                                     ),
-                                    onVote: (optionId) =>
-                                        _vote(message, optionId),
-                                    onMakeDestination: (option) =>
-                                        _makeDestination(message, option),
-                                    onShowLocation: message.hasLocation
-                                        ? () => _showOnMap(message)
-                                        : null,
-                                    onShowQuote: message.replyTo == null
-                                        ? null
-                                        : () => _scrollToMessage(
-                                            message.replyTo!.id,
-                                          ),
-                                  ),
-                          );
-                        },
-                      ),
-                loading: () => const Center(
-                  child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                            );
+                          },
+                        ),
+                  loading: () => const Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                  error: (_, _) => _ThreadError(
+                    onRetry: () =>
+                        ref.invalidate(circleMessagesProvider(widget.circleId)),
                   ),
                 ),
-                error: (_, _) => _ThreadError(
-                  onRetry: () =>
-                      ref.invalidate(circleMessagesProvider(widget.circleId)),
-                ),
               ),
-            ),
-            if (_error != null)
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+                  child: Text(
+                    _error!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.error,
+                    ),
+                  ),
+                ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
-                child: Text(
-                  _error!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: scheme.error,
-                  ),
+                padding: EdgeInsets.only(
+                  bottom: ShellDock.contentInset(context),
+                ),
+                child: _Composer(
+                  controller: _text,
+                  focusNode: _composerFocus,
+                  sending: _sending,
+                  sharing: _sharing,
+                  replyingTo: _replyTo,
+                  editing: _editing,
+                  mentionDraft: _mention,
+                  onlineUserIds: _onlineIds,
+                  onCancelReply: () => setState(() => _replyTo = null),
+                  onCancelEdit: _leaveEditMode,
+                  onMentionSelected: _applyMention,
+                  onSend: _send,
+                  onShareLocation: _shareLocation,
+                  onPickGif: _pickGif,
+                  onStartPoll: _startPoll,
                 ),
               ),
-            Padding(
-              padding: EdgeInsets.only(bottom: ShellDock.contentInset(context)),
-              child: _Composer(
-                controller: _text,
-                focusNode: _composerFocus,
-                sending: _sending,
-                sharing: _sharing,
-                replyingTo: _replyTo,
-                editing: _editing,
-                mentionDraft: _mention,
-                onlineUserIds: _onlineIds,
-                onCancelReply: () => setState(() => _replyTo = null),
-                onCancelEdit: _leaveEditMode,
-                onMentionSelected: _applyMention,
-                onSend: _send,
-                onShareLocation: _shareLocation,
-                onPickGif: _pickGif,
-                onStartPoll: _startPoll,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

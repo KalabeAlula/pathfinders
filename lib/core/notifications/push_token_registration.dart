@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -20,7 +21,7 @@ part 'push_token_registration.g.dart';
 /// handler cannot show anything without it.
 @riverpod
 Future<void> pushTokenRegistration(Ref ref, String userId) async {
-  if (!Platform.isAndroid && !Platform.isIOS) return;
+  if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) return;
 
   final messaging = FirebaseMessaging.instance;
   final client = Supabase.instance.client;
