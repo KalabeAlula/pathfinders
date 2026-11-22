@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../firebase/firebase_web_config.dart';
 import '../storage/storage_providers.dart';
 import 'notification_plugin.dart';
 
@@ -21,7 +22,8 @@ part 'push_token_registration.g.dart';
 /// handler cannot show anything without it.
 @riverpod
 Future<void> pushTokenRegistration(Ref ref, String userId) async {
-  if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) return;
+  if (kIsWeb) return _registerWeb(ref, userId);
+  if (!Platform.isAndroid && !Platform.isIOS) return;
 
   final messaging = FirebaseMessaging.instance;
   final client = Supabase.instance.client;
@@ -63,5 +65,52 @@ Future<void> pushTokenRegistration(Ref ref, String userId) async {
     await messaging.register();
   } catch (_) {
     // The next launch retries; a signed-out shell disposes this provider.
+  }
+}
+
+/// Browser equivalent: asks for the notification permission, then hands Chrome
+/// the push certificate and the worker that renders data-only chat pushes.
+Future<void> _registerWeb(Ref ref, String userId) async {
+  if (!FirebaseWebConfig.isConfigured) return;
+
+  final messaging = FirebaseMessaging.instance;
+  final client = Supabase.instance.client;
+  String? registered;
+
+  final settings = await messaging.requestPermission();
+  if (settings.authorizationStatus != AuthorizationStatus.authorized) return;
+
+  Future<void> save(String target) async {
+    registered = target;
+    await client.from('device_push_tokens').upsert({
+      'user_id': userId,
+      'token': target,
+      'platform': 'web',
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'user_id,token');
+  }
+
+  final refresh = messaging.onRegistered.listen((target) {
+    save(target).ignore();
+  });
+  ref.onDispose(() {
+    refresh.cancel();
+    final target = registered;
+    if (target == null) return;
+    client
+        .from('device_push_tokens')
+        .delete()
+        .eq('user_id', userId)
+        .eq('token', target)
+        .ignore();
+  });
+
+  try {
+    await messaging.register(
+      vapidKey: FirebaseWebConfig.vapidKey,
+      serviceWorkerScriptPath: '/firebase-messaging-sw.js',
+    );
+  } catch (_) {
+    // A blocked worker or an unsupported browser; the next load retries.
   }
 }

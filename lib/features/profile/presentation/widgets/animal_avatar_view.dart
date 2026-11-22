@@ -22,33 +22,41 @@ class AnimalAvatarView extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final avatar = AnimalAvatar.byId(avatarId);
-    final pixels = (size * MediaQuery.devicePixelRatioOf(context)).round();
+    final dpr = MediaQuery.devicePixelRatioOf(context);
 
-    return SizedBox(
-      width: size,
-      height: size,
-      child: ClipOval(
-        child: Image.asset(
-          avatar.assetPath,
-          width: size,
-          height: size,
-          cacheWidth: pixels,
-          fit: BoxFit.cover,
-          semanticLabel: avatar.name,
-          errorBuilder: (_, _, _) => ColoredBox(
-            color: scheme.surfaceContainerHighest,
-            child: Center(
-              child: Text(
-                fallbackInitials,
-                style: TextStyle(
-                  color: scheme.onSurfaceVariant,
-                  fontSize: size * 0.32,
-                  fontWeight: FontWeight.w700,
+    return ClipOval(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Decode at the size the parent actually gives the avatar: the
+          // picker stretches it to its grid tile, which is much larger than
+          // the nominal [size], and a 56 px decode upscaled there is blurry.
+          final side =
+              constraints.hasBoundedWidth && constraints.hasBoundedHeight
+              ? constraints.biggest.shortestSide
+              : size;
+          final pixels = (side * dpr).round();
+          return Image.asset(
+            avatar.assetPath,
+            width: side,
+            height: side,
+            cacheWidth: pixels,
+            fit: BoxFit.cover,
+            semanticLabel: avatar.name,
+            errorBuilder: (_, _, _) => ColoredBox(
+              color: scheme.surfaceContainerHighest,
+              child: Center(
+                child: Text(
+                  fallbackInitials,
+                  style: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: size * 0.32,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

@@ -308,25 +308,25 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final columns = constraints.maxWidth >= 620 ? 5 : 4;
-                      return GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: AnimalAvatar.catalog.length,
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: columns,
-                          mainAxisSpacing: AppSpacing.md,
-                          crossAxisSpacing: AppSpacing.sm,
-                          childAspectRatio: 0.82,
-                        ),
-                        itemBuilder: (context, index) {
-                          final avatar = AnimalAvatar.catalog[index];
-                          return _AvatarTile(
-                            avatar: avatar,
-                            selected: avatar.id == selectedAvatarId,
-                            onTap: () =>
-                                setState(() => _draftAvatarId = avatar.id),
-                          );
-                        },
+                      final tileWidth =
+                          (constraints.maxWidth -
+                              AppSpacing.sm * (columns - 1)) /
+                          columns;
+                      return Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.md,
+                        children: [
+                          for (final avatar in AnimalAvatar.catalog)
+                            SizedBox(
+                              width: tileWidth,
+                              child: _AvatarTile(
+                                avatar: avatar,
+                                selected: avatar.id == selectedAvatarId,
+                                onTap: () =>
+                                    setState(() => _draftAvatarId = avatar.id),
+                              ),
+                            ),
+                        ],
                       );
                     },
                   ),
@@ -436,25 +436,25 @@ class _ThemePicker extends ConsumerWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final columns = constraints.maxWidth >= 620 ? 4 : 2;
-          return GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: AppPalettes.all.length,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: columns,
-              mainAxisSpacing: AppSpacing.sm,
-              crossAxisSpacing: AppSpacing.sm,
-              childAspectRatio: 1.35,
-            ),
-            itemBuilder: (context, index) {
-              final palette = AppPalettes.all[index];
-              return _ThemeTile(
-                palette: palette,
-                selected: palette.id == selected,
-                onTap: () =>
-                    ref.read(appThemeProvider.notifier).select(palette.id),
-              );
-            },
+          final tileWidth =
+              (constraints.maxWidth - AppSpacing.sm * (columns - 1)) / columns;
+          final tileHeight = tileWidth / 1.35;
+          return Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              for (final palette in AppPalettes.all)
+                SizedBox(
+                  width: tileWidth,
+                  height: tileHeight,
+                  child: _ThemeTile(
+                    palette: palette,
+                    selected: palette.id == selected,
+                    onTap: () =>
+                        ref.read(appThemeProvider.notifier).select(palette.id),
+                  ),
+                ),
+            ],
           );
         },
       ),
@@ -627,49 +627,48 @@ class _AvatarTile extends StatelessWidget {
         button: true,
         label: avatar.name,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: AspectRatio(
-                aspectRatio: 1,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: selected
-                        ? scheme.primaryContainer
-                        : Colors.transparent,
-                    border: Border.all(
-                      color: selected ? scheme.primary : Colors.transparent,
-                      width: 2.5,
-                    ),
+            AspectRatio(
+              aspectRatio: 1,
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected
+                      ? scheme.primaryContainer
+                      : Colors.transparent,
+                  border: Border.all(
+                    color: selected ? scheme.primary : Colors.transparent,
+                    width: 2.5,
                   ),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      AnimalAvatarView(avatarId: avatar.id, size: 56),
-                      if (selected)
-                        Positioned(
-                          right: 0,
-                          bottom: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: scheme.primary,
-                              border: Border.all(
-                                color: scheme.surfaceContainerLowest,
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Icon(
-                              Icons.check_rounded,
-                              size: 11,
-                              color: scheme.onPrimary,
+                ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    AnimalAvatarView(avatarId: avatar.id),
+                    if (selected)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: scheme.primary,
+                            border: Border.all(
+                              color: scheme.surfaceContainerLowest,
+                              width: 1.5,
                             ),
                           ),
+                          child: Icon(
+                            Icons.check_rounded,
+                            size: 11,
+                            color: scheme.onPrimary,
+                          ),
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
               ),
             ),

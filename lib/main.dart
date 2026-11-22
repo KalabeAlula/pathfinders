@@ -12,6 +12,7 @@ import 'app/theme/app_theme.dart';
 import 'core/config/mapbox_config.dart';
 import 'core/config/supabase_config.dart';
 import 'core/firebase/firebase_options.dart';
+import 'core/firebase/firebase_web_config.dart';
 import 'core/storage/storage_providers.dart';
 import 'features/chat/data/chat_push_handler.dart';
 
@@ -54,12 +55,17 @@ class _BootGateState extends State<BootGate> {
       realtimeLifecycleOptions: const RealtimeLifecycleOptions.manual(),
     );
     final preferencesReady = SharedPreferences.getInstance();
-    // The three initializations are independent, so they run together and the
-    // wait is the slowest one instead of their sum.
+    // Only the phone builds have a background handler; the browser lets its
+    // service worker draw pushes instead.
     //
-    // Only the phone builds have Firebase configuration. A browser tab gets
-    // chat over the live socket and skips FCM instead of failing to boot.
-    if (!kIsWeb) {
+    // The browser tab initializes Firebase only once the web app and its push
+    // certificate are configured, and until then chat arrives over the live
+    // socket alone.
+    if (kIsWeb) {
+      if (FirebaseWebConfig.isConfigured) {
+        await Firebase.initializeApp(options: FirebaseWebConfig.options);
+      }
+    } else {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );

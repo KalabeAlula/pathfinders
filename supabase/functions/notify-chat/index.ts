@@ -176,6 +176,8 @@ function sendTo(
           token: target,
           data,
           android: { priority: "HIGH", ttl: "86400s" },
+          // Browsers stay data-only too: the service worker draws the card.
+          webpush: { headers: { TTL: "86400", Urgency: "high" } },
         },
       }),
     },

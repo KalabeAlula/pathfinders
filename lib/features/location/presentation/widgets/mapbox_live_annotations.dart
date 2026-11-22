@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -75,8 +76,9 @@ class MapRouteLine {
 
 /// Draws members, routes, and the shared destination on a Mapbox map.
 ///
-/// Mapbox's annotation managers are unavailable on web, so the layer simply
-/// stays inert there and the Flutter chrome still renders.
+/// Phones use the annotation managers. Web's annotation managers are stubs,
+/// so the browser draws the same snapshot with a GeoJSON source and style
+/// layers instead; the GL JS render loop keeps them glued to the basemap.
 class MapboxLiveAnnotations {
   MapboxLiveAnnotations(this._map, {this.iconScale = 0.46});
 
@@ -88,6 +90,13 @@ class MapboxLiveAnnotations {
   PolylineAnnotationManager? _routes;
   Cancelable? _memberTaps;
   ValueChanged<String>? onMemberTapped;
+
+  /// Web-only: the sources and images behind the layers, so a style reload
+  /// (which drops both) cannot leave syncs pointing at stale ids.
+  String? _memberSourceId;
+  String? _routeSourceId;
+  String? _destinationSourceId;
+  final Set<String> _webImages = {};
 
   bool _ready = false;
   bool _disposed = false;
@@ -105,10 +114,11 @@ class MapboxLiveAnnotations {
   );
 
   /// True when this platform can draw annotations at all.
-  bool get isSupported => !kIsWeb && !_disposed;
+  bool get isSupported => !_disposed;
 
   Future<void> initialize() async {
-    if (kIsWeb || _disposed) return;
+    if (_disposed) return;
+    if (kIsWeb) return _initializeWeb();
     final generation = ++_generation;
     try {
       _routes = await _map.annotations.createPolylineAnnotationManager(
@@ -135,7 +145,7 @@ class MapboxLiveAnnotations {
       );
       _ready = true;
     } catch (_) {
-      // A web build or a style swap that raced the factory.
+      // A style swap that raced the factory.
       _ready = false;
       return;
     }
@@ -174,6 +184,11 @@ class MapboxLiveAnnotations {
     _inFlightSignature = signature;
 
     try {
+      if (kIsWeb) {
+        await _applyWeb(snapshot);
+        _appliedSignature = signature;
+        return;
+      }
       final members = snapshot.members;
       final memberOptions = await Future.wait([
         for (final pin in members)
@@ -293,6 +308,219 @@ class MapboxLiveAnnotations {
       ..write(snapshot.destinationColor.toARGB32());
     return buffer.toString();
   }
+
+  /// Browser path: GL JS draws what the native annotation managers draw, using
+  /// one GeoJSON source per snapshot plus symbol and line layers.
+  Future<void> _initializeWeb() async {
+    final suffix = '-${++_generation}';
+    final style = _map;
+    final members = 'live-members-src$suffix';
+    final routes = 'live-routes-src$suffix';
+    final destination = 'live-destination-src$suffix';
+    try {
+      for (final id in [members, routes, destination]) {
+        await style.addStyleSource(
+          id,
+          '{"type":"geojson","data":{"type":"FeatureCollection",'
+          '"features":[]}}',
+        );
+      }
+      // The border is a wider white stroke under each route, mirroring the
+      // native line-border the SDK paints around the member colour.
+      await style.addStyleLayer(
+        jsonEncode({
+          'id': 'live-routes-border$suffix',
+          'type': 'line',
+          'source': routes,
+          'layout': {'line-cap': 'round', 'line-join': 'round'},
+          'paint': {
+            'line-color': 'rgba(255,255,255,0.9)',
+            'line-width': [
+              '+',
+              ['get', 'width'],
+              [
+                '*',
+                ['get', 'border'],
+                2,
+              ],
+            ],
+            // Standard's night preset lights runtime layers; emissive keeps
+            // the member colours from going black.
+            'line-emissive-strength': 1,
+          },
+        }),
+        null,
+      );
+      await style.addStyleLayer(
+        jsonEncode({
+          'id': 'live-routes$suffix',
+          'type': 'line',
+          'source': routes,
+          'layout': {'line-cap': 'round', 'line-join': 'round'},
+          'paint': {
+            'line-color': ['get', 'color'],
+            'line-width': ['get', 'width'],
+            'line-emissive-strength': 1,
+          },
+        }),
+        null,
+      );
+      await style.addStyleLayer(
+        jsonEncode({
+          'id': 'live-members$suffix',
+          'type': 'symbol',
+          'source': members,
+          'layout': {
+            'icon-image': ['get', 'image'],
+            'icon-size': ['get', 'size'],
+            'icon-anchor': 'bottom',
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true,
+          },
+        }),
+        null,
+      );
+      await style.addStyleLayer(
+        jsonEncode({
+          'id': 'live-destination$suffix',
+          'type': 'symbol',
+          'source': destination,
+          'layout': {
+            'icon-image': ['get', 'image'],
+            'icon-size': 0.5,
+            'icon-anchor': 'bottom',
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true,
+          },
+        }),
+        null,
+      );
+    } catch (_) {
+      _ready = false;
+      return;
+    }
+    _memberSourceId = members;
+    _routeSourceId = routes;
+    _destinationSourceId = destination;
+    _webImages.clear();
+    _ready = true;
+    _appliedSignature = null;
+    await _apply();
+  }
+
+  Future<void> _applyWeb(_Snapshot snapshot) async {
+    final style = _map;
+
+    final memberFeatures = <Map<String, Object?>>[];
+    for (final pin in snapshot.members) {
+      final imageId = _webMemberImageId(pin);
+      await _ensureWebImage(
+        imageId,
+        () => MapMarkerImages.memberAvatar(
+          avatarId: pin.avatarId,
+          initials: pin.initials,
+          accent: pin.accent,
+          background: pin.background,
+          approximate: pin.approximate,
+          isCurrentUser: pin.isCurrentUser,
+        ),
+      );
+      memberFeatures.add({
+        'type': 'Feature',
+        'geometry': {
+          'type': 'Point',
+          'coordinates': [pin.longitude, pin.latitude],
+        },
+        'properties': {
+          'image': imageId,
+          'size': pin.isCurrentUser ? iconScale * 1.08 : iconScale,
+          'memberId': pin.id,
+        },
+      });
+    }
+    await style.setStyleSourceProperty(
+      _memberSourceId!,
+      'data',
+      _featureCollection(memberFeatures),
+    );
+
+    await style.setStyleSourceProperty(
+      _routeSourceId!,
+      'data',
+      _featureCollection([
+        for (final route in snapshot.routes)
+          if (route.points.length > 1)
+            {
+              'type': 'Feature',
+              'geometry': {
+                'type': 'LineString',
+                'coordinates': [
+                  for (final point in route.points)
+                    [point.longitude, point.latitude],
+                ],
+              },
+              'properties': {
+                'color': _hex(route.color),
+                'width': route.width,
+                'border': route.borderWidth,
+              },
+            },
+      ]),
+    );
+
+    final destination = snapshot.destination;
+    if (destination == null) {
+      await style.setStyleSourceProperty(
+        _destinationSourceId!,
+        'data',
+        _featureCollection(const []),
+      );
+      return;
+    }
+    final imageId = 'pf-d:${snapshot.destinationColor.toARGB32()}';
+    await _ensureWebImage(
+      imageId,
+      () => MapMarkerImages.destination(color: snapshot.destinationColor),
+    );
+    await style.setStyleSourceProperty(
+      _destinationSourceId!,
+      'data',
+      _featureCollection([
+        {
+          'type': 'Feature',
+          'geometry': {
+            'type': 'Point',
+            'coordinates': [destination.longitude, destination.latitude],
+          },
+          'properties': {'image': imageId},
+        },
+      ]),
+    );
+  }
+
+  /// Uploads each avatar or pin bitmap once per style; re-adding an existing
+  /// image id is what GL JS rejects, so the presence check stays.
+  Future<void> _ensureWebImage(
+    String imageId,
+    Future<Uint8List> Function() bytes,
+  ) async {
+    if (!_webImages.add(imageId)) return;
+    final style = _map;
+    if (await style.hasStyleImage(imageId)) {
+      await style.removeStyleImage(imageId);
+    }
+    await style.addImage(imageId, 1, StyleImageBytes(await bytes()));
+  }
+
+  static String _webMemberImageId(MapMemberPin pin) =>
+      'pf-m:${pin.avatarId}:${pin.initials}:${pin.accent.toARGB32()}:'
+      '${pin.background.toARGB32()}:${pin.approximate}:${pin.isCurrentUser}';
+
+  static String _featureCollection(List<Map<String, Object?>> features) =>
+      jsonEncode({'type': 'FeatureCollection', 'features': features});
+
+  static String _hex(Color color) =>
+      '#${(color.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
 
   void dispose() {
     _disposed = true;
