@@ -118,7 +118,7 @@ void main() {
     await pumpProfile(tester);
 
     await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('theme-kaffa')),
+      find.byKey(ValueKey('theme-${AppThemeId.values.last.name}')),
       400,
       scrollable: find.byType(Scrollable).first,
     );
