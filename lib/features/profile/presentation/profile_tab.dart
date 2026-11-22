@@ -352,10 +352,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
               ),
             ),
             const SizedBox(height: AppSpacing.xl),
-            const _SectionLabel(
-              title: 'Appearance',
-              helper: '60% backdrop · 30% support · 10% accent',
-            ),
+            const _SectionLabel(title: 'Appearance'),
             const SizedBox(height: AppSpacing.sm),
             const _ThemePicker(),
             const SizedBox(height: AppSpacing.xl),
