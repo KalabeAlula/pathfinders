@@ -151,6 +151,24 @@ void main() {
     // The banner floats above a full-bleed shell rather than pushing it down.
     expect(tester.getTopLeft(find.byType(IndexedStack)).dy, 0);
   });
+
+  testWidgets('resizes body when keyboard inset appears', (tester) async {
+    tester.view.physicalSize = const Size(411, 869);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const _ShellHarness());
+
+    final bodyBefore = tester.getSize(find.byType(IndexedStack));
+    expect(bodyBefore.height, 869);
+
+    // Simulate keyboard open (336dp)
+    tester.view.viewInsets = const FakeViewPadding(bottom: 336);
+    await tester.pump();
+
+    final bodyAfter = tester.getSize(find.byType(IndexedStack));
+    expect(bodyAfter.height, 869 - 336);
+  });
 }
 
 class _ShellHarness extends StatefulWidget {

@@ -24,12 +24,6 @@ abstract final class ShellDock {
 
   /// Room bottom-anchored tab content keeps under itself for the dock.
   ///
-  /// Scaffold pins the dock to the window bottom, so while the keyboard is up
-  /// the IME covers it; reserving its height then leaves a dead band above the
-  /// keyboard. The body's own MediaQuery has the inset stripped, so read it
-  /// from the view.
-  /// Room bottom-anchored tab content keeps under itself for the dock.
-  ///
   /// While the keyboard is up Scaffold gives the body the keyboard's space
   /// instead, so the dock sits behind the IME and is reported as zero padding
   /// here; reserving its height then leaves a dead band above the keyboard.
@@ -73,6 +67,7 @@ class GlassDock extends StatelessWidget {
       ),
       child: Align(
         alignment: Alignment.bottomCenter,
+        heightFactor: 1.0,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: ShellDock.maxWidth),
           child: DecoratedBox(
