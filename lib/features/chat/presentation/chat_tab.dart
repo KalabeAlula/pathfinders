@@ -732,7 +732,13 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
                 ),
               Padding(
                 padding: EdgeInsets.only(
-                  bottom: ShellDock.contentInset(context),
+                  // ShellDock.contentInset gives clearance above the glass pill.
+                  // On web the Scaffold does not shrink the body for the IME
+                  // (extendBody bypasses that resize path), so we add the raw
+                  // viewInsets.bottom here. On Android native the Scaffold has
+                  // already consumed that inset and viewInsetsOf returns 0.
+                  bottom: ShellDock.contentInset(context) +
+                      MediaQuery.viewInsetsOf(context).bottom,
                 ),
                 child: _Composer(
                   controller: _text,

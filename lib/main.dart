@@ -23,7 +23,10 @@ void main() {
   // flags; on Samsung Android 12 the window then neither resizes for the IME
   // nor reports viewInsets, so the keyboard covers composers. Edge-to-edge
   // mode delivers viewInsets and lets Scaffold resize (verified on device).
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  // SystemChrome is a no-op on web so we guard explicitly to be clear.
+  if (!kIsWeb) {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  }
   // Thumbnails decode at display size, so a lean cache is enough and keeps
   // low-end devices away from the 100 MB default budget.
   PaintingBinding.instance.imageCache
