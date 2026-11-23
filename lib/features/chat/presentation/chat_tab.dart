@@ -638,6 +638,11 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
       _markSeen();
     });
 
+    // TEMP debug instrumentation for the keyboard-inset bug.
+    debugPrint(
+      'KBDBG-CHAT insets=${MediaQuery.viewInsetsOf(context).bottom.toStringAsFixed(0)} '
+      'size=${MediaQuery.sizeOf(context).height.toStringAsFixed(0)}',
+    );
     return ColoredBox(
       color: scheme.surface,
       child: SafeArea(

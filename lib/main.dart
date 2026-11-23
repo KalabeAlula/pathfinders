@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,6 +19,11 @@ import 'features/chat/data/chat_push_handler.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // Without edge-to-edge the engine only sets the legacy LAYOUT_FULLSCREEN
+  // flags; on Samsung Android 12 the window then neither resizes for the IME
+  // nor reports viewInsets, so the keyboard covers composers. Edge-to-edge
+  // mode delivers viewInsets and lets Scaffold resize (verified on device).
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   // Thumbnails decode at display size, so a lean cache is enough and keeps
   // low-end devices away from the 100 MB default budget.
   PaintingBinding.instance.imageCache

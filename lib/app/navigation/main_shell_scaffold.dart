@@ -36,6 +36,11 @@ class MainShellScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // TEMP debug instrumentation for the keyboard-inset bug.
+    debugPrint(
+      'KBDBG-SHELL insets=${MediaQuery.viewInsetsOf(context).bottom.toStringAsFixed(0)} '
+      'size=${MediaQuery.sizeOf(context).height.toStringAsFixed(0)}',
+    );
     final scheme = Theme.of(context).colorScheme;
 
     final scaffold = Scaffold(
