@@ -24,13 +24,21 @@ abstract final class ShellDock {
 
   /// Room bottom-anchored tab content keeps under itself for the dock.
   ///
-  /// While the keyboard is up Scaffold gives the body the keyboard's space
-  /// instead, so the dock sits behind the IME and is reported as zero padding
-  /// here; reserving its height then leaves a dead band above the keyboard.
-  static double contentInset(BuildContext context) =>
-      MediaQuery.paddingOf(context).bottom <= 0
-      ? AppSpacing.md
-      : bottomGap(context) + height + 12;
+  /// `Scaffold.extendBody` injects the full dock height (bottomGap + pill
+  /// height) as `padding.bottom` into the body's MediaQuery, but strips
+  /// `viewPadding.bottom` to zero — so reading `viewPaddingOf` here would
+  /// always return 0 and undercount the gap. Using `paddingOf` instead gives
+  /// the real dock footprint; we add [AppSpacing.lg] (16 dp) of breathing room
+  /// above the pill.
+  ///
+  /// While the keyboard is up Scaffold zeroes out that padding and gives the
+  /// body the keyboard's space instead, so the dock sits behind the IME and
+  /// padding is reported as zero here; reserving dock height then would leave
+  /// a dead band above the keyboard.
+  static double contentInset(BuildContext context) {
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    return bottom <= 0 ? AppSpacing.md : bottom + AppSpacing.lg;
+  }
 }
 
 /// A floating, frosted pill holding the five destinations.

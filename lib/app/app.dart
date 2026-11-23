@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,25 +15,12 @@ class PathfindersApp extends ConsumerStatefulWidget {
   ConsumerState<PathfindersApp> createState() => _PathfindersAppState();
 }
 
-final GlobalKey<NavigatorState> kbDebugNavKey = GlobalKey<NavigatorState>();
-
 class _PathfindersAppState extends ConsumerState<PathfindersApp>
     with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // TEMP debug instrumentation for the keyboard-inset bug.
-    Timer.periodic(const Duration(seconds: 1), (_) {
-      final ctx = kbDebugNavKey.currentContext;
-      if (ctx == null) return;
-      final mq = MediaQuery.of(ctx);
-      debugPrint(
-        'KBDBG insets=${mq.viewInsets.bottom.toStringAsFixed(0)} '
-        'pad=${mq.padding.bottom.toStringAsFixed(0)} '
-        'size=${mq.size.height.toStringAsFixed(0)}',
-      );
-    });
   }
 
   @override
@@ -88,7 +73,6 @@ class _PathfindersAppState extends ConsumerState<PathfindersApp>
         );
       },
       home: const SessionGate(),
-      navigatorKey: kbDebugNavKey,
     );
   }
 }

@@ -1412,7 +1412,7 @@ class _MapTabState extends ConsumerState<MapTab> {
                 Positioned(
                   left: 12,
                   right: 12,
-                  bottom: ShellDock.contentInset(context) + AppSpacing.md,
+                  bottom: ShellDock.contentInset(context),
                   child: Align(
                     alignment: Alignment.bottomCenter,
                     child: ConstrainedBox(
