@@ -677,12 +677,7 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
           maxWidth: ContentWidths.chat,
           child: Column(
             children: [
-              _ChatHeader(
-                subtitle: messages.value?.isEmpty ?? true
-                    ? 'Say hi or share where you are'
-                    : '${messages.value!.length} message'
-                          '${messages.value!.length == 1 ? '' : 's'} in the thread',
-              ),
+              const _ChatHeader(),
               Expanded(
                 child: messages.when(
                   data: (items) => items.isEmpty
@@ -809,9 +804,7 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
 }
 
 class _ChatHeader extends StatelessWidget {
-  const _ChatHeader({required this.subtitle});
-
-  final String subtitle;
+  const _ChatHeader();
 
   @override
   Widget build(BuildContext context) {
@@ -842,23 +835,7 @@ class _ChatHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Crew chat', style: theme.textTheme.titleLarge),
-                const SizedBox(height: 1),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          Expanded(child: Text('Crew chat', style: theme.textTheme.titleLarge)),
         ],
       ),
     );
