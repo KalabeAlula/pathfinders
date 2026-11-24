@@ -352,9 +352,12 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
               ),
             ),
             const SizedBox(height: AppSpacing.xl),
-            const _SectionLabel(title: 'Appearance'),
+            const _SectionLabel(
+              title: 'Appearance',
+              helper: 'Pick a theme that fits your style.',
+            ),
             const SizedBox(height: AppSpacing.sm),
-            const _ThemePicker(),
+            const _ThemePickerCompact(),
             const SizedBox(height: AppSpacing.xl),
             _SectionLabel(title: 'Account'),
             const SizedBox(height: AppSpacing.sm),
@@ -421,46 +424,143 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
   }
 }
 
-class _ThemePicker extends ConsumerWidget {
-  const _ThemePicker();
+class _ThemePickerCompact extends ConsumerWidget {
+  const _ThemePickerCompact();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selected = ref.watch(appThemeProvider);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     return BentoCard(
       padding: const EdgeInsets.all(AppSpacing.md),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final columns = constraints.maxWidth >= 620 ? 4 : 2;
-          final tileWidth =
-              (constraints.maxWidth - AppSpacing.sm * (columns - 1)) / columns;
-          final tileHeight = tileWidth / 1.35;
-          return Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              for (final palette in AppPalettes.all)
-                SizedBox(
-                  width: tileWidth,
-                  height: tileHeight,
-                  child: _ThemeTile(
-                    palette: palette,
-                    selected: palette.id == selected,
-                    onTap: () =>
-                        ref.read(appThemeProvider.notifier).select(palette.id),
-                  ),
-                ),
-            ],
-          );
-        },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 110,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: AppPalettes.all.length,
+              separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
+              itemBuilder: (context, index) {
+                final palette = AppPalettes.all[index];
+                return _ThemeTileCompact(
+                  palette: palette,
+                  selected: palette.id == selected,
+                  onTap: () =>
+                      ref.read(appThemeProvider.notifier).select(palette.id),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => _showFullThemePicker(context, ref),
+              icon: Icon(
+                Icons.palette_outlined,
+                size: 16,
+                color: scheme.primary,
+              ),
+              label: const Text('View all themes'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFullThemePicker(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) =>
+            _ThemePickerSheet(scrollController: scrollController),
       ),
     );
   }
 }
 
-class _ThemeTile extends StatelessWidget {
-  const _ThemeTile({
+class _ThemePickerSheet extends ConsumerWidget {
+  const _ThemePickerSheet({required this.scrollController});
+
+  final ScrollController scrollController;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(appThemeProvider);
+    final theme = Theme.of(context);
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          0,
+          AppSpacing.lg,
+          AppSpacing.lg,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: Text(
+                'Choose your theme',
+                style: theme.textTheme.headlineSmall,
+              ),
+            ),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 620 ? 3 : 2;
+                  final tileWidth =
+                      (constraints.maxWidth - AppSpacing.md * (columns - 1)) /
+                      columns;
+                  final tileHeight = tileWidth * 1.1;
+                  return GridView.builder(
+                    controller: scrollController,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
+                      mainAxisSpacing: AppSpacing.md,
+                      crossAxisSpacing: AppSpacing.md,
+                      childAspectRatio: tileWidth / tileHeight,
+                    ),
+                    itemCount: AppPalettes.all.length,
+                    itemBuilder: (context, index) {
+                      final palette = AppPalettes.all[index];
+                      return _ThemeTileFullPreview(
+                        palette: palette,
+                        selected: palette.id == selected,
+                        onTap: () {
+                          ref
+                              .read(appThemeProvider.notifier)
+                              .select(palette.id);
+                          Navigator.pop(context);
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ThemeTileCompact extends StatelessWidget {
+  const _ThemeTileCompact({
     required this.palette,
     required this.selected,
     required this.onTap,
@@ -473,10 +573,10 @@ class _ThemeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final background = selected
-        ? scheme.primaryContainer
-        : scheme.surfaceContainerHigh;
+    final currentScheme = theme.colorScheme;
+
+    // Use the theme's light scheme for the preview
+    final previewScheme = palette.light;
 
     return Semantics(
       button: true,
@@ -487,80 +587,370 @@ class _ThemeTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.tile),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(AppSpacing.sm + 2),
+          width: 85,
           decoration: BoxDecoration(
-            color: background,
             borderRadius: BorderRadius.circular(AppRadius.tile),
             border: Border.all(
-              color: selected ? scheme.primary : scheme.outlineVariant,
-              width: selected ? 1.6 : 1,
+              color: selected
+                  ? currentScheme.primary
+                  : currentScheme.outlineVariant,
+              width: selected ? 2 : 1,
             ),
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // The 60-30-10 split, drawn at the same ratio.
+              // Mini UI Preview
               Expanded(
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(9),
-                  child: Row(
-                    // Stretch, or the childless boxes collapse to zero height.
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        flex: 6,
-                        child: ColoredBox(color: palette.backdrop),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: ColoredBox(color: palette.support),
-                      ),
-                      Expanded(
-                        flex: 1,
-                        child: ColoredBox(color: palette.accent),
-                      ),
-                    ],
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppRadius.tile - 1),
                   ),
+                  child: _MiniUIPreview(scheme: previewScheme),
                 ),
               ),
-              const SizedBox(height: AppSpacing.sm),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      palette.id.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: selected
-                            ? scheme.onPrimaryContainer
-                            : scheme.onSurface,
+              // Theme name and check
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? currentScheme.primaryContainer
+                      : currentScheme.surfaceContainerHigh,
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(AppRadius.tile - 1),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        palette.id.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: selected
+                              ? currentScheme.onPrimaryContainer
+                              : currentScheme.onSurface,
+                        ),
                       ),
                     ),
-                  ),
-                  if (selected)
-                    Icon(
-                      Icons.check_circle_rounded,
-                      size: 16,
-                      color: scheme.primary,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 1),
-              Text(
-                palette.id.tagline,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  fontSize: 10,
-                  color: selected
-                      ? scheme.onPrimaryContainer.withValues(alpha: 0.75)
-                      : scheme.onSurfaceVariant,
+                    if (selected)
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 12,
+                        color: currentScheme.primary,
+                      ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ThemeTileFullPreview extends StatelessWidget {
+  const _ThemeTileFullPreview({
+    required this.palette,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AppPalette palette;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final currentScheme = theme.colorScheme;
+
+    // Use the theme's light scheme for the preview
+    final previewScheme = palette.light;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${palette.id.label} theme',
+      child: InkWell(
+        key: ValueKey('theme-full-${palette.id.name}'),
+        borderRadius: BorderRadius.circular(AppRadius.tile),
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.tile),
+            border: Border.all(
+              color: selected
+                  ? currentScheme.primary
+                  : currentScheme.outlineVariant,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Check in top-right corner
+              Expanded(
+                child: Stack(
+                  children: [
+                    // Mini UI Preview
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(AppRadius.tile - 1),
+                      ),
+                      child: SizedBox.expand(
+                        child: _MiniUIPreview(scheme: previewScheme),
+                      ),
+                    ),
+                    if (selected)
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: currentScheme.primary,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.2),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.check_rounded,
+                            size: 14,
+                            color: currentScheme.onPrimary,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              // Theme name and tagline
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? currentScheme.primaryContainer
+                      : currentScheme.surfaceContainerHigh,
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(AppRadius.tile - 1),
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      palette.id.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: selected
+                            ? currentScheme.onPrimaryContainer
+                            : currentScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      palette.id.tagline,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontSize: 9,
+                        color: selected
+                            ? currentScheme.onPrimaryContainer.withValues(
+                                alpha: 0.75,
+                              )
+                            : currentScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A mini UI mockup showing what the theme looks like with actual surfaces,
+/// chat bubbles, and text elements.
+class _MiniUIPreview extends StatelessWidget {
+  const _MiniUIPreview({required this.scheme});
+
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: scheme.surface,
+      padding: const EdgeInsets.all(6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Top bar placeholder
+          Container(
+            height: 8,
+            margin: const EdgeInsets.only(bottom: 6),
+            decoration: BoxDecoration(
+              color: scheme.onSurface.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(2),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: Container(
+                    margin: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: scheme.onSurface.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 2),
+                Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: scheme.onSurface.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Incoming message bubble (surface card)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 50),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 2.5,
+                          decoration: BoxDecoration(
+                            color: scheme.onSurface.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(1),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          width: 20,
+                          height: 2,
+                          decoration: BoxDecoration(
+                            color: scheme.onSurface.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(1),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                // Outgoing message bubble (primary)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 45),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: scheme.primary,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 25,
+                          height: 2.5,
+                          decoration: BoxDecoration(
+                            color: scheme.onPrimary.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(1),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          width: 18,
+                          height: 2,
+                          decoration: BoxDecoration(
+                            color: scheme.onPrimary.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(1),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Bottom bar / composer placeholder
+          const SizedBox(height: 4),
+          Container(
+            height: 8,
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 3),
+                Expanded(
+                  child: Container(
+                    height: 2,
+                    decoration: BoxDecoration(
+                      color: scheme.onSurface.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 3),
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: scheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 2),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
