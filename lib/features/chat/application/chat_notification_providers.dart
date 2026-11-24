@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/storage/storage_providers.dart';
@@ -38,6 +39,7 @@ class ChatNotificationRouter {
   void handlePayload(String payload) {
     final circleId = chatCircleFromPayload(payload);
     if (circleId == null) return;
+    debugPrint('[ChatNotificationRouter] tap → circleId=$circleId');
     _target.open(circleId);
     unawaited(_notifier.clearCircle(circleId));
   }

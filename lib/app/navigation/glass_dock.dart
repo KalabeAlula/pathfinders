@@ -63,7 +63,6 @@ class GlassDock extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final media = MediaQuery.of(context);
     final radius = BorderRadius.circular(AppRadius.sheet);
 
     return Padding(
@@ -104,108 +103,112 @@ class GlassDock extends StatelessWidget {
                     ),
                   ),
                   // NavigationBar folds the OS inset into its height. The dock
-                  // owns that spacing, so strip it from the inner copy.
-                  child: MediaQuery(
-                    data: media.copyWith(
-                      padding: media.padding.copyWith(bottom: 0),
-                      viewPadding: media.viewPadding.copyWith(bottom: 0),
-                    ),
-                    child: NavigationBarTheme(
-                      data: NavigationBarThemeData(
-                        backgroundColor: Colors.transparent,
-                        surfaceTintColor: Colors.transparent,
-                        indicatorColor: scheme.primaryContainer.withValues(
-                          alpha: 0.55,
+                  // owns that spacing, so strip it from the inner copy. Use
+                  // MediaQuery.removePadding and removeViewPadding instead of
+                  // MediaQueryData(...) to preserve size, DPR, textScaler, etc.
+                  child: MediaQuery.removePadding(
+                    context: context,
+                    removeBottom: true,
+                    child: MediaQuery.removeViewPadding(
+                      context: context,
+                      removeBottom: true,
+                      child: NavigationBarTheme(
+                        data: NavigationBarThemeData(
+                          backgroundColor: Colors.transparent,
+                          surfaceTintColor: Colors.transparent,
+                          indicatorColor: scheme.primaryContainer.withValues(
+                            alpha: 0.55,
+                          ),
+                          elevation: 0,
+                          height: ShellDock.height,
+                          labelTextStyle: WidgetStateProperty.resolveWith((
+                            states,
+                          ) {
+                            final selected = states.contains(
+                              WidgetState.selected,
+                            );
+                            return theme.textTheme.labelSmall?.copyWith(
+                              fontWeight: selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w600,
+                              color: selected
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant,
+                            );
+                          }),
+                          iconTheme: WidgetStateProperty.resolveWith((states) {
+                            final selected = states.contains(
+                              WidgetState.selected,
+                            );
+                            return IconThemeData(
+                              size: 24,
+                              color: selected
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant,
+                            );
+                          }),
                         ),
-                        elevation: 0,
-                        height: ShellDock.height,
-                        labelTextStyle: WidgetStateProperty.resolveWith((
-                          states,
-                        ) {
-                          final selected = states.contains(
-                            WidgetState.selected,
-                          );
-                          return theme.textTheme.labelSmall?.copyWith(
-                            fontWeight: selected
-                                ? FontWeight.w700
-                                : FontWeight.w600,
-                            color: selected
-                                ? scheme.primary
-                                : scheme.onSurfaceVariant,
-                          );
-                        }),
-                        iconTheme: WidgetStateProperty.resolveWith((states) {
-                          final selected = states.contains(
-                            WidgetState.selected,
-                          );
-                          return IconThemeData(
-                            size: 24,
-                            color: selected
-                                ? scheme.primary
-                                : scheme.onSurfaceVariant,
-                          );
-                        }),
-                      ),
-                      child: NavigationBar(
-                        selectedIndex: index,
-                        onDestinationSelected: onSelect,
-                        labelBehavior:
-                            NavigationDestinationLabelBehavior.alwaysShow,
-                        destinations: [
-                          _destination(
-                            key: 'tab-circle',
-                            label: 'Group',
-                            icon: _glyph(
-                              ShellGlyphs.circle,
-                              accent: scheme.tertiary,
+                        child: NavigationBar(
+                          selectedIndex: index,
+                          onDestinationSelected: onSelect,
+                          labelBehavior:
+                              NavigationDestinationLabelBehavior.alwaysShow,
+                          destinations: [
+                            _destination(
+                              key: 'tab-circle',
+                              label: 'Group',
+                              icon: _glyph(
+                                ShellGlyphs.circle,
+                                accent: scheme.tertiary,
+                              ),
+                              selectedIcon: _glyph(ShellGlyphs.circleSelected),
                             ),
-                            selectedIcon: _glyph(ShellGlyphs.circleSelected),
-                          ),
-                          _destination(
-                            key: 'tab-chat',
-                            label: 'Chat',
-                            icon: _glyph(
-                              ShellGlyphs.chat,
-                              accent: scheme.tertiary,
-                              badge: unreadChats,
+                            _destination(
+                              key: 'tab-chat',
+                              label: 'Chat',
+                              icon: _glyph(
+                                ShellGlyphs.chat,
+                                accent: scheme.tertiary,
+                                badge: unreadChats,
+                              ),
+                              selectedIcon: _glyph(
+                                ShellGlyphs.chatSelected,
+                                badge: unreadChats,
+                              ),
                             ),
-                            selectedIcon: _glyph(
-                              ShellGlyphs.chatSelected,
-                              badge: unreadChats,
+                            _destination(
+                              key: 'tab-map',
+                              label: 'Map',
+                              icon: _glyph(
+                                ShellGlyphs.map,
+                                accent: scheme.tertiary,
+                              ),
+                              selectedIcon: _glyph(ShellGlyphs.mapSelected),
                             ),
-                          ),
-                          _destination(
-                            key: 'tab-map',
-                            label: 'Map',
-                            icon: _glyph(
-                              ShellGlyphs.map,
-                              accent: scheme.tertiary,
+                            _destination(
+                              key: 'tab-memories',
+                              label: 'Memories',
+                              icon: _glyph(
+                                ShellGlyphs.memories,
+                                accent: scheme.tertiary,
+                                badge: newMemories,
+                              ),
+                              selectedIcon: _glyph(
+                                ShellGlyphs.memoriesSelected,
+                                badge: newMemories,
+                              ),
                             ),
-                            selectedIcon: _glyph(ShellGlyphs.mapSelected),
-                          ),
-                          _destination(
-                            key: 'tab-memories',
-                            label: 'Memories',
-                            icon: _glyph(
-                              ShellGlyphs.memories,
-                              accent: scheme.tertiary,
-                              badge: newMemories,
+                            _destination(
+                              key: 'tab-profile',
+                              label: 'Profile',
+                              icon: _glyph(
+                                ShellGlyphs.profile,
+                                accent: scheme.tertiary,
+                              ),
+                              selectedIcon: _glyph(ShellGlyphs.profileSelected),
                             ),
-                            selectedIcon: _glyph(
-                              ShellGlyphs.memoriesSelected,
-                              badge: newMemories,
-                            ),
-                          ),
-                          _destination(
-                            key: 'tab-profile',
-                            label: 'Profile',
-                            icon: _glyph(
-                              ShellGlyphs.profile,
-                              accent: scheme.tertiary,
-                            ),
-                            selectedIcon: _glyph(ShellGlyphs.profileSelected),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),

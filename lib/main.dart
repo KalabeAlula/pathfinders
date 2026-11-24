@@ -14,6 +14,7 @@ import 'core/config/mapbox_config.dart';
 import 'core/config/supabase_config.dart';
 import 'core/firebase/firebase_options.dart';
 import 'core/firebase/firebase_web_config.dart';
+import 'core/notifications/notification_plugin.dart';
 import 'core/storage/storage_providers.dart';
 import 'features/chat/data/chat_push_handler.dart';
 
@@ -82,6 +83,10 @@ class _BootGateState extends State<BootGate> {
       // Registering the handler early is what lets a push that wakes a stopped
       // process be handled instead of dropped.
       FirebaseMessaging.onBackgroundMessage(chatPushHandler);
+      // Route FCM notification taps (background resume) through the same tap
+      // stream that flutter_local_notifications uses. Must be called after
+      // Firebase.initializeApp.
+      NotificationPlugin.instance.listenToFcmTaps();
     }
     await supabaseReady;
     if (MapboxConfig.isConfigured) {

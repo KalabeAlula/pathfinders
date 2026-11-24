@@ -17,6 +17,11 @@ class ChatSender {
 abstract interface class ChatRepository {
   Stream<List<ChatMessage>> watchMessages();
 
+  /// Forces an immediate re-fetch of the thread, bypassing the realtime
+  /// debounce. Call this after the app returns to the foreground so any
+  /// messages missed while the WebSocket was suspended are loaded.
+  void forceRefresh();
+
   /// [localEcho] shows the message immediately; the server copy replaces it
   /// once the insert lands.
   Future<void> sendText({

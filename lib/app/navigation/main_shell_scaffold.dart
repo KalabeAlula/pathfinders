@@ -42,6 +42,10 @@ class MainShellScaffold extends StatelessWidget {
       backgroundColor: scheme.surface,
       // The dock floats over the tabs so the frosted glass has content to blur.
       extendBody: true,
+      // Don't resize the IndexedStack when the keyboard opens — that would force
+      // all 5 tabs (including heavy hidden tabs like MemoriesTab and MapTab) to
+      // re-layout on every keyboard frame. ChatTab handles viewInsets manually.
+      resizeToAvoidBottomInset: false,
       body: IndexedStack(
         index: index,
         children: [
@@ -59,11 +63,18 @@ class MainShellScaffold extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           child: IgnorePointer(
             ignoring: !dockVisible,
-            child: GlassDock(
-              index: index,
-              onSelect: onSelect,
-              unreadChats: unreadChats,
-              newMemories: newMemories,
+            // Unmount GlassDock (and its expensive BackdropFilter) when hidden.
+            // This prevents full-screen blur shaders from running during keyboard
+            // animation. The slide/fade animations complete before the widget is
+            // removed from the tree.
+            child: Offstage(
+              offstage: !dockVisible,
+              child: GlassDock(
+                index: index,
+                onSelect: onSelect,
+                unreadChats: unreadChats,
+                newMemories: newMemories,
+              ),
             ),
           ),
         ),

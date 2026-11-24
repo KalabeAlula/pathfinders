@@ -117,6 +117,9 @@ class _FakeChatRepository implements ChatRepository {
   final sent = <String>[];
 
   @override
+  void forceRefresh() {}
+
+  @override
   Stream<List<ChatMessage>> watchMessages() => Stream.value(const []);
 
   @override

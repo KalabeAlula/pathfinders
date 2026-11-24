@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show Color;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -50,6 +51,26 @@ class NotificationPlugin {
   Stream<String> get taps => _taps.stream;
 
   Future<void> ensureInitialized() => _ready ??= _initialize();
+
+  /// Hooks into [FirebaseMessaging.onMessageOpenedApp] so that tapping an FCM
+  /// notification while the app is backgrounded routes through the same [taps]
+  /// stream as a local-notification tap.
+  ///
+  /// Call once, after Firebase is initialized. Safe to call on web (no-op).
+  void listenToFcmTaps() {
+    if (kIsWeb) return;
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      final circleId = message.data['circle_id'];
+      if (circleId is! String || circleId.isEmpty) return;
+      // Build the same JSON payload that LocalChatNotifier embeds so the
+      // ChatNotificationRouter can parse it without a separate code path.
+      final payload = '{"kind":"chat","circle_id":"$circleId"}';
+      debugPrint(
+        '[FCM] onMessageOpenedApp → circle=$circleId payload=$payload',
+      );
+      _taps.add(payload);
+    });
+  }
 
   /// The payload that cold-started the app, read at most once.
   Future<String?> takeLaunchPayload() async {

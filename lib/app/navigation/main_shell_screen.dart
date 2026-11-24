@@ -88,12 +88,24 @@ class MainShellScreen extends ConsumerWidget {
             ref.read(circlesProvider(currentUserId)).value ?? const [];
         if (!memberships.any((circle) => circle.id == target)) return;
 
+        debugPrint(
+          '[MainShellScreen] notification tap → opening chat for circle=$target',
+        );
+
         unawaited(
           ref
               .read(activeCircleControllerProvider(currentUserId).notifier)
               .select(target),
         );
         ref.read(activeTabControllerProvider.notifier).select(AppTab.chat);
+
+        // Force a re-fetch so messages that arrived while backgrounded are
+        // shown immediately when the thread opens, without waiting for the
+        // next Supabase broadcast event.
+        debugPrint(
+          '[MainShellScreen] notification tap → forceRefresh for circle=$target',
+        );
+        ref.read(chatRepositoryProvider(target)).forceRefresh();
       });
     }
 

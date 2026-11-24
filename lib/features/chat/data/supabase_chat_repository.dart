@@ -42,6 +42,11 @@ class SupabaseChatRepository implements ChatRepository {
   /// id; the value is the chosen option, or null when the vote was cleared.
   final Map<String, String?> _voteOverrides = {};
 
+  /// Set to true inside [watchMessages] once a full fetch is needed. Lifted to
+  /// instance level so [forceRefresh] can mark a full re-fetch from outside the
+  /// stream closure (e.g. after the app returns to the foreground).
+  bool _needsFullFetch = true;
+
   static const _cursorOverlap = Duration(seconds: 5);
   static const _refreshDebounce = Duration(milliseconds: 250);
 
@@ -58,13 +63,27 @@ class SupabaseChatRepository implements ChatRepository {
       'sender:profiles!chat_messages_sender_id_fkey(display_name)';
 
   @override
+  void forceRefresh() {
+    // A full fetch ensures any messages that arrived while the WebSocket was
+    // suspended (app backgrounded) are loaded, not just an incremental diff.
+    _needsFullFetch = true;
+    developer.log(
+      'forceRefresh requested — will do a full fetch on next wake',
+      name: 'pathfinders.chat',
+    );
+    _wake.add(null);
+  }
+
+  @override
   Stream<List<ChatMessage>> watchMessages() {
     final out = StreamController<List<ChatMessage>>();
     Timer? debounce;
     sb.RealtimeChannel? channel;
     StreamSubscription<void>? wake;
     var thread = const <ChatMessage>[];
-    var needsFullFetch = true;
+    // _needsFullFetch is an instance field so forceRefresh() can set it
+    // from outside this closure (e.g. on AppLifecycleState.resumed).
+    _needsFullFetch = true;
     var fetching = false;
     var fetchAgain = false;
 
@@ -78,12 +97,20 @@ class SupabaseChatRepository implements ChatRepository {
         do {
           fetchAgain = false;
           try {
-            thread = needsFullFetch
+            developer.log(
+              'refresh: needsFullFetch=$_needsFullFetch cursor=$_cursor',
+              name: 'pathfinders.chat',
+            );
+            thread = _needsFullFetch
                 ? await _fetch()
                 : await _fetchSince(thread);
-            needsFullFetch = false;
+            _needsFullFetch = false;
             _dropConfirmed(thread);
             _lastThread = thread;
+            developer.log(
+              'refresh: loaded ${thread.length} messages',
+              name: 'pathfinders.chat',
+            );
             final me = _client.auth.currentUser?.id;
             _settleVotes(thread, me);
             if (!out.isClosed) {
@@ -122,7 +149,7 @@ class SupabaseChatRepository implements ChatRepository {
       final messageInsert =
           message['event'] == 'INSERT' &&
           (table == null || table == 'chat_messages');
-      if (!messageInsert) needsFullFetch = true;
+      if (!messageInsert) _needsFullFetch = true;
       scheduleRefresh();
     }
 

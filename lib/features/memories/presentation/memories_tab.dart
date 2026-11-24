@@ -191,8 +191,6 @@ class _Gallery extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final width = MediaQuery.sizeOf(context).width;
-    final columns = width >= 700 ? 3 : 2;
 
     final authorIds = <String>[];
     for (final memory in items) {
@@ -210,118 +208,129 @@ class _Gallery extends StatelessWidget {
               if (memory.authorId == selected) memory,
           ];
 
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.xl,
-              AppSpacing.md,
-              AppSpacing.xl,
-              AppSpacing.md,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Memories', style: theme.textTheme.headlineSmall),
-                      const SizedBox(height: 2),
-                      Text(
-                        circleName == null
-                            ? 'The little moments you keep together'
-                            : 'Little moments with $circleName',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Use LayoutBuilder instead of MediaQuery.sizeOf to avoid unnecessary
+        // rebuilds when unrelated MediaQuery properties change.
+        final columns = constraints.maxWidth >= 700 ? 3 : 2;
+
+        return CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.md,
+                  AppSpacing.xl,
+                  AppSpacing.md,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Memories',
+                            style: theme.textTheme.headlineSmall,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            circleName == null
+                                ? 'The little moments you keep together'
+                                : 'Little moments with $circleName',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    Icon(
+                      Icons.photo_library_rounded,
+                      size: 22,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ],
                 ),
-                Icon(
-                  Icons.photo_library_rounded,
-                  size: 22,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ],
-            ),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: _MilestoneStrip(
-            milestones: milestones,
-            pinnedNow: milestoneNow,
-            onAdd: onAddMilestone,
-            onOpen: onOpenMilestone,
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.xl,
-              AppSpacing.xl,
-              AppSpacing.xl,
-              AppSpacing.sm,
-            ),
-            child: Row(
-              children: [
-                Text('Moments', style: theme.textTheme.titleMedium),
-                const Spacer(),
-                Text(
-                  '${visible.length} '
-                  '${visible.length == 1 ? 'memory' : 'memories'}',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (items.isEmpty)
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: _EmptyGallery(onAdd: onAddMemory),
-          )
-        else ...[
-          SliverToBoxAdapter(
-            child: _AuthorFilter(
-              authorIds: authorIds,
-              authors: authors,
-              selectedAuthorId: selected,
-              onSelect: onSelectAuthor,
-            ),
-          ),
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.xl,
-              AppSpacing.md,
-              AppSpacing.xl,
-              104 + ShellDock.contentInset(context),
-            ),
-            sliver: SliverGrid(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: columns,
-                mainAxisSpacing: AppSpacing.md,
-                crossAxisSpacing: AppSpacing.md,
-                childAspectRatio: 0.8,
               ),
-              delegate: SliverChildBuilderDelegate((context, index) {
-                final memory = visible[index];
-                return _MemoryTile(
-                  memory: memory,
-                  author: authors[memory.authorId],
-                  now: now,
-                  onTap: () => onOpen(memory),
-                );
-              }, childCount: visible.length),
             ),
-          ),
-        ],
-      ],
+            SliverToBoxAdapter(
+              child: _MilestoneStrip(
+                milestones: milestones,
+                pinnedNow: milestoneNow,
+                onAdd: onAddMilestone,
+                onOpen: onOpenMilestone,
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.xl,
+                  AppSpacing.xl,
+                  AppSpacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    Text('Moments', style: theme.textTheme.titleMedium),
+                    const Spacer(),
+                    Text(
+                      '${visible.length} '
+                      '${visible.length == 1 ? 'memory' : 'memories'}',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (items.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _EmptyGallery(onAdd: onAddMemory),
+              )
+            else ...[
+              SliverToBoxAdapter(
+                child: _AuthorFilter(
+                  authorIds: authorIds,
+                  authors: authors,
+                  selectedAuthorId: selected,
+                  onSelect: onSelectAuthor,
+                ),
+              ),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.md,
+                  AppSpacing.xl,
+                  104 + ShellDock.contentInset(context),
+                ),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    mainAxisSpacing: AppSpacing.md,
+                    crossAxisSpacing: AppSpacing.md,
+                    childAspectRatio: 0.8,
+                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final memory = visible[index];
+                    return _MemoryTile(
+                      memory: memory,
+                      author: authors[memory.authorId],
+                      now: now,
+                      onTap: () => onOpen(memory),
+                    );
+                  }, childCount: visible.length),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }

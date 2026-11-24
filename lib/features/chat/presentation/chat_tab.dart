@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -68,7 +69,9 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
   String? _error;
   ChatMessage? _replyTo;
   ChatMessage? _editing;
-  ChatMentionDraft? _mention;
+  // Mention draft is now managed by a ValueNotifier so text changes don't
+  // trigger a full ChatTab rebuild — only the mention popover rebuilds.
+  final _mention = ValueNotifier<ChatMentionDraft?>(null);
   String? _highlightedId;
   Timer? _highlightTimer;
 
@@ -109,15 +112,35 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
   void didUpdateWidget(ChatTab oldWidget) {
     super.didUpdateWidget(oldWidget);
     _text.members = _memberProfiles;
-    if (widget.active && !oldWidget.active) _markSeenAfterFrame();
+    if (widget.active && !oldWidget.active) {
+      debugPrint(
+        '[ChatTab] became active — marking seen and forcing re-fetch for ${widget.circleId}',
+      );
+      _markSeenAfterFrame();
+      // The tab may have been inactive (not on screen) while backgrounded, so
+      // the lifecycle observer's forceRefresh would not have fired. Trigger it
+      // here too, so switching to the chat tab always shows the latest messages.
+      ref.read(chatRepositoryProvider(widget.circleId)).forceRefresh();
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    debugPrint(
+      '[ChatTab] AppLifecycleState → $state (active=${widget.active})',
+    );
     // Returning to a thread that was already open clears the notifications
     // posted while the app was away.
     if (state == AppLifecycleState.resumed && widget.active) {
       _markSeenAfterFrame();
+      // The Supabase Realtime WebSocket may have been suspended while the app
+      // was backgrounded. Force a full re-fetch so messages that arrived in
+      // the gap are shown immediately without waiting for the next broadcast
+      // event (which may never arrive if the channel needs to reconnect).
+      debugPrint(
+        '[ChatTab] Resuming — forcing chat re-fetch for ${widget.circleId}',
+      );
+      ref.read(chatRepositoryProvider(widget.circleId)).forceRefresh();
     }
   }
 
@@ -137,6 +160,7 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _highlightTimer?.cancel();
+    _mention.dispose();
     _text.dispose();
     _scroll.dispose();
     _composerFocus.dispose();
@@ -144,6 +168,7 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
   }
 
   /// Follows the caret so the suggestion popover tracks the `@` being typed.
+  /// Uses ValueNotifier to avoid rebuilding the entire ChatTab on every keystroke.
   void _onTextChanged() {
     final value = _text.value;
     final selection = value.selection;
@@ -155,14 +180,15 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
             excludeUserId: widget.currentUserId,
           )
         : null;
-    if (draft?.start == _mention?.start && draft?.query == _mention?.query) {
+    final current = _mention.value;
+    if (draft?.start == current?.start && draft?.query == current?.query) {
       return;
     }
-    setState(() => _mention = draft);
+    _mention.value = draft;
   }
 
   void _applyMention(UserProfile member) {
-    final draft = _mention;
+    final draft = _mention.value;
     if (draft == null) return;
 
     final completed = completeMention(_text.text, draft, member.displayName);
@@ -172,7 +198,7 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
       selection: TextSelection.collapsed(offset: completed.caret),
     );
     _composerFocus.requestFocus();
-    setState(() => _mention = null);
+    _mention.value = null;
   }
 
   Future<void> _send() async {
@@ -208,8 +234,8 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
       _text.clear();
       setState(() {
         _replyTo = null;
-        _mention = null;
       });
+      _mention.value = null;
 
       await ref
           .read(chatRepositoryProvider(widget.circleId))
@@ -426,8 +452,8 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
     setState(() {
       _replyTo = message;
       _editing = null;
-      _mention = null;
     });
+    _mention.value = null;
     if (wasEditing) _text.clear();
     _composerFocus.requestFocus();
   }
@@ -437,8 +463,8 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
     setState(() {
       _editing = message;
       _replyTo = null;
-      _mention = null;
     });
+    _mention.value = null;
     final body = message.text ?? '';
     _text.value = TextEditingValue(
       text: body,
@@ -629,7 +655,12 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
     final scheme = theme.colorScheme;
     final messages = ref.watch(circleMessagesProvider(widget.circleId));
 
-    ref.listen(circleMessagesProvider(widget.circleId), (_, _) {
+    ref.listen(circleMessagesProvider(widget.circleId), (_, next) {
+      debugPrint(
+        '[ChatTab] circleMessages update → '
+        '${next.value?.length ?? 0} messages, '
+        'active=${widget.active}, foreground=${ref.read(appVisibilityProvider).isForeground}',
+      );
       // A message that lands while the app is away still belongs in the shade;
       // only a visible thread counts as having read it.
       if (!widget.active || !ref.read(appVisibilityProvider).isForeground) {
@@ -663,47 +694,51 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
                           itemCount: items.length,
                           itemBuilder: (context, index) {
                             final message = items[items.length - 1 - index];
-                            return _MessageItem(
-                              key: _keyFor(message.id),
-                              highlighted: message.id == _highlightedId,
-                              mentioned: message.mentions(widget.currentUserId),
-                              onReply: () => _startReply(message),
-                              onLongPress: () => _showMessageActions(message),
-                              child: message.isDestinationUpdate
-                                  ? _DestinationUpdateRow(
-                                      message: message,
-                                      onTap: message.hasLocation
-                                          ? () => _showOnMap(message)
-                                          : null,
-                                      onShowQuote: message.replyTo == null
-                                          ? null
-                                          : () => _scrollToMessage(
-                                              message.replyTo!.id,
-                                            ),
-                                    )
-                                  : _MessageRow(
-                                      message: message,
-                                      isMine:
-                                          message.senderId ==
-                                          widget.currentUserId,
-                                      currentUserId: widget.currentUserId,
-                                      members: _memberProfiles,
-                                      applyingDestination: _applying.contains(
-                                        message.id,
+                            return RepaintBoundary(
+                              child: _MessageItem(
+                                key: _keyFor(message.id),
+                                highlighted: message.id == _highlightedId,
+                                mentioned: message.mentions(
+                                  widget.currentUserId,
+                                ),
+                                onReply: () => _startReply(message),
+                                onLongPress: () => _showMessageActions(message),
+                                child: message.isDestinationUpdate
+                                    ? _DestinationUpdateRow(
+                                        message: message,
+                                        onTap: message.hasLocation
+                                            ? () => _showOnMap(message)
+                                            : null,
+                                        onShowQuote: message.replyTo == null
+                                            ? null
+                                            : () => _scrollToMessage(
+                                                message.replyTo!.id,
+                                              ),
+                                      )
+                                    : _MessageRow(
+                                        message: message,
+                                        isMine:
+                                            message.senderId ==
+                                            widget.currentUserId,
+                                        currentUserId: widget.currentUserId,
+                                        members: _memberProfiles,
+                                        applyingDestination: _applying.contains(
+                                          message.id,
+                                        ),
+                                        onVote: (optionId) =>
+                                            _vote(message, optionId),
+                                        onMakeDestination: (option) =>
+                                            _makeDestination(message, option),
+                                        onShowLocation: message.hasLocation
+                                            ? () => _showOnMap(message)
+                                            : null,
+                                        onShowQuote: message.replyTo == null
+                                            ? null
+                                            : () => _scrollToMessage(
+                                                message.replyTo!.id,
+                                              ),
                                       ),
-                                      onVote: (optionId) =>
-                                          _vote(message, optionId),
-                                      onMakeDestination: (option) =>
-                                          _makeDestination(message, option),
-                                      onShowLocation: message.hasLocation
-                                          ? () => _showOnMap(message)
-                                          : null,
-                                      onShowQuote: message.replyTo == null
-                                          ? null
-                                          : () => _scrollToMessage(
-                                              message.replyTo!.id,
-                                            ),
-                                    ),
+                              ),
                             );
                           },
                         ),
@@ -732,13 +767,20 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
                 ),
               Padding(
                 padding: EdgeInsets.only(
-                  // ShellDock.contentInset gives clearance above the glass pill.
-                  // On web the Scaffold does not shrink the body for the IME
-                  // (extendBody bypasses that resize path), so we add the raw
-                  // viewInsets.bottom here. On Android native the Scaffold has
-                  // already consumed that inset and viewInsetsOf returns 0.
-                  bottom: ShellDock.contentInset(context) +
-                      MediaQuery.viewInsetsOf(context).bottom,
+                  // MainShellScaffold has resizeToAvoidBottomInset: false to
+                  // prevent all 5 tabs from re-layouting during keyboard animation.
+                  // ChatTab manually adds viewInsets.bottom here so the composer
+                  // stays above the keyboard.
+                  //
+                  // When the keyboard is open, use viewInsets.bottom (keyboard height).
+                  // When the keyboard is closed, use ShellDock.contentInset (dock footprint).
+                  // Use max() instead of adding them together to avoid double-counting:
+                  // with the dock Offstaged, paddingOf(context).bottom does not always
+                  // return 0, so adding it to viewInsets creates a large empty gap.
+                  bottom: math.max(
+                    ShellDock.contentInset(context),
+                    MediaQuery.viewInsetsOf(context).bottom,
+                  ),
                 ),
                 child: _Composer(
                   controller: _text,
@@ -963,8 +1005,9 @@ class _SenderAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = message.senderAvatarUrl;
     if (url != null && url.trim().isNotEmpty) {
-      final avatarPixels = (28 * MediaQuery.devicePixelRatioOf(context))
-          .round();
+      // Cache DPR once instead of re-reading MediaQuery on every avatar build.
+      // DPR doesn't change during the session.
+      final avatarPixels = (28 * View.of(context).devicePixelRatio).round();
       return CircleAvatar(
         radius: 14,
         backgroundImage: ResizeImage(
@@ -2187,7 +2230,7 @@ class _Composer extends StatelessWidget {
   final bool sharing;
   final ChatMessage? replyingTo;
   final ChatMessage? editing;
-  final ChatMentionDraft? mentionDraft;
+  final ValueNotifier<ChatMentionDraft?> mentionDraft;
   final Set<String> onlineUserIds;
   final VoidCallback onCancelReply;
   final VoidCallback onCancelEdit;
@@ -2235,13 +2278,18 @@ class _Composer extends StatelessWidget {
             duration: const Duration(milliseconds: 160),
             curve: Curves.easeOutCubic,
             alignment: Alignment.bottomCenter,
-            child: mentionDraft == null
-                ? const SizedBox(width: double.infinity)
-                : _MentionPopover(
-                    draft: mentionDraft!,
-                    onlineUserIds: onlineUserIds,
-                    onSelect: onMentionSelected,
-                  ),
+            child: ValueListenableBuilder<ChatMentionDraft?>(
+              valueListenable: mentionDraft,
+              builder: (context, draft, _) {
+                return draft == null
+                    ? const SizedBox(width: double.infinity)
+                    : _MentionPopover(
+                        draft: draft,
+                        onlineUserIds: onlineUserIds,
+                        onSelect: onMentionSelected,
+                      );
+              },
+            ),
           ),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,

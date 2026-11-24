@@ -49,6 +49,9 @@ class _FakeChatRepository implements ChatRepository {
   final votes = <({String messageId, String optionId})>[];
 
   @override
+  void forceRefresh() {}
+
+  @override
   Stream<List<ChatMessage>> watchMessages() => Stream.value(messages);
 
   @override
