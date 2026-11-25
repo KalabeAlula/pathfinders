@@ -2284,58 +2284,78 @@ class _Composer extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  minLines: 1,
-                  maxLines: 4,
-                  textCapitalization: TextCapitalization.sentences,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => onSend(),
-                  decoration: InputDecoration(
-                    hintText: editingMessage != null
-                        ? 'Edit your message'
-                        : replyingTo == null
-                        ? 'Message the crew'
-                        : 'Write a reply',
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    filled: true,
-                    fillColor: scheme.surfaceContainerHigh,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.pill),
-                      borderSide: BorderSide.none,
-                    ),
-                    // A GIF replaces the draft, so the picker stays out of
-                    // edit mode.
-                    suffixIcon: editingMessage == null
-                        ? Padding(
-                            padding: const EdgeInsets.only(right: 5),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _BarAction(
-                                  icon: Icons.gif_box_rounded,
-                                  tooltip: 'Send a GIF',
-                                  onPressed: sending || sharing
-                                      ? null
-                                      : onPickGif,
-                                ),
-                                _BarAction(
-                                  icon: Icons.how_to_vote_rounded,
-                                  tooltip: 'Start a vote',
-                                  onPressed: sending || sharing
-                                      ? null
-                                      : onStartPoll,
-                                ),
-                              ],
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          minLines: 1,
+                          maxLines: 6,
+                          textCapitalization: TextCapitalization.sentences,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => onSend(),
+                          decoration: InputDecoration(
+                            hintText: editingMessage != null
+                                ? 'Edit your message'
+                                : replyingTo == null
+                                ? 'Message the crew'
+                                : 'Write a reply',
+                            isDense: true,
+                            contentPadding: const EdgeInsets.fromLTRB(
+                              0,
+                              6,
+                              8,
+                              6,
                             ),
-                          )
-                        : null,
-                    suffixIconConstraints: const BoxConstraints(),
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+                      // A GIF replaces the draft, so the picker stays out of
+                      // edit mode. Collapse attachment actions while typing so
+                      // the text field gets full width like Telegram.
+                      if (editingMessage == null)
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: controller,
+                          builder: (context, value, child) {
+                            return AnimatedSize(
+                              duration: const Duration(milliseconds: 160),
+                              curve: Curves.easeOutCubic,
+                              alignment: Alignment.centerRight,
+                              child: value.text.isEmpty
+                                  ? child!
+                                  : const SizedBox.shrink(),
+                            );
+                          },
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _BarAction(
+                                icon: Icons.gif_box_rounded,
+                                tooltip: 'Send a GIF',
+                                onPressed: sending || sharing
+                                    ? null
+                                    : onPickGif,
+                              ),
+                              _BarAction(
+                                icon: Icons.how_to_vote_rounded,
+                                tooltip: 'Start a vote',
+                                onPressed: sending || sharing
+                                    ? null
+                                    : onStartPoll,
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
