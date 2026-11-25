@@ -33,6 +33,8 @@ class PetStickerAssets {
   }
 
   /// All bundled expression paths for [petId] in [mood].
+  ///
+  /// Returns 3 paths for every known pet × mood combination, synchronously.
   static List<String> expressionsFor(String petId, PetMood mood) {
     if (!_bundledPets.contains(petId)) return const [];
     return [

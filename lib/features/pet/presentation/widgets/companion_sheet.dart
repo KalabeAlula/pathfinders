@@ -5,6 +5,7 @@ import '../../../../app/theme/app_tokens.dart';
 import '../../../../core/application/clock_provider.dart';
 import '../../../circle/application/circle_providers.dart';
 import '../../../circle/domain/circle.dart';
+import '../../application/pet_mood_providers.dart';
 import '../../application/pet_providers.dart';
 import '../../domain/pet_care_action.dart';
 import '../../../circle/domain/group_type.dart';
@@ -69,6 +70,11 @@ class CompanionCard extends ConsumerWidget {
   ) async {
     try {
       await ref.read(petRepositoryProvider(circleId)).care(action);
+      // Trigger loved mood for 5 s and show floating XP badge.
+      ref.read(lovedStateProvider(circleId).notifier).trigger();
+      if (context.mounted) {
+        PetXpOverlay.show(context, xp: SharedPet.xpFor(action));
+      }
     } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -155,12 +161,35 @@ class CompanionCard extends ConsumerWidget {
                               ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          '${pet.amharicName} · ${mood.label}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: scheme.onSurfaceVariant),
+                        // Dynamic mood line: emoji + label.
+                        Row(
+                          children: [
+                            Text(
+                              '${mood.emoji} ${mood.label}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: mood.accent(scheme),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ],
+                        ),
+                        // Contextual thought-bubble subtitle.
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: Text(
+                            key: ValueKey(mood),
+                            mood.messageFor(name),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                  height: 1.3,
+                                ),
+                          ),
                         ),
                       ],
                     ),

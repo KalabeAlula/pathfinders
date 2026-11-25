@@ -88,9 +88,8 @@ class CircleSwitcher extends ConsumerWidget {
                       : 'Could not load your circles.',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.error,
-                  ),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: scheme.error),
                 ),
               ),
               TextButton(
@@ -232,6 +231,10 @@ class _MoodDot extends StatelessWidget {
       PetMood.traveling => scheme.primary,
       PetMood.celebrating => scheme.tertiary,
       PetMood.sleeping => const Color(0xFF7B83B8),
+      PetMood.hyped => const Color(0xFFE87A1E),
+      PetMood.curious => const Color(0xFF5BA8A0),
+      PetMood.hungry => const Color(0xFFD4572A),
+      PetMood.loved => const Color(0xFFE0507A),
       PetMood.idle => scheme.outlineVariant,
     };
     return Tooltip(

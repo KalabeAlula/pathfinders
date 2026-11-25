@@ -87,7 +87,7 @@ final class PushTokenRegistrationProvider
 }
 
 String _$pushTokenRegistrationHash() =>
-    r'7b9acfec2ba9545347d246ec05eaa4193d455181';
+    r'5487cb1f67bff4c3d6d670f45e9b679df72f47b3';
 
 /// Keeps this device reachable by cloud push for the signed-in member.
 ///

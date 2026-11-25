@@ -13,6 +13,7 @@ enum EthiopianPet {
     avatarAsset: 'assets/pets/fox.png',
     defaultName: 'Foxy',
     emoji: '🦊',
+    tapReply: 'Hehe! 🦊',
   ),
   seagull(
     id: 'seagull',
@@ -24,6 +25,7 @@ enum EthiopianPet {
     avatarAsset: 'assets/pets/seagull.png',
     defaultName: 'Gulliver',
     emoji: '🕊️',
+    tapReply: 'Squawk! 🕊️',
   ),
   dog(
     id: 'dog',
@@ -35,6 +37,7 @@ enum EthiopianPet {
     avatarAsset: 'assets/pets/dog.png',
     defaultName: 'Salchicha',
     emoji: '🐶',
+    tapReply: 'Woof! 🐾',
   ),
   orangutan(
     id: 'orangutan',
@@ -46,6 +49,7 @@ enum EthiopianPet {
     avatarAsset: 'assets/pets/orangutan.png',
     defaultName: 'Bobo',
     emoji: '🦧',
+    tapReply: 'Ooh-ooh! 🦧',
   );
 
   const EthiopianPet({
@@ -58,6 +62,7 @@ enum EthiopianPet {
     required this.avatarAsset,
     required this.defaultName,
     required this.emoji,
+    required this.tapReply,
   });
 
   final String id;
@@ -71,6 +76,9 @@ enum EthiopianPet {
 
   /// Fallback used when the badge asset cannot be decoded.
   final String emoji;
+
+  /// Short speech-bubble reply shown when the sticker is tapped.
+  final String tapReply;
 
   static const fallback = fox;
 

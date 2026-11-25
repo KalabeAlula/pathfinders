@@ -26,6 +26,9 @@ class SharedPet {
   static const int experiencePerLevel = 100;
   static const Duration playingWindow = Duration(minutes: 2);
 
+  /// XP gained from [action], used by the floating XP overlay.
+  static int xpFor(PetCareAction action) => action.experience;
+
   /// Builds the live companion state stored alongside the circle. Callers
   /// should apply [decayed] up to the current time before rendering.
   factory SharedPet.fromCircle(Circle circle) {

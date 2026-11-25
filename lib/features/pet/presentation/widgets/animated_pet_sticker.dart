@@ -15,7 +15,7 @@ import 'pet_avatar.dart';
 /// win when [TickerMode] is active and animations are enabled. Offscreen tabs
 /// or reduced-motion settings fall back to the static [PetAvatar] PNG so
 /// hidden tabs use zero decode CPU. Tapping cycles through expressions for the
-/// current [mood].
+/// current [mood] with a bouncy scale animation + medium haptic.
 class AnimatedPetSticker extends StatefulWidget {
   const AnimatedPetSticker({
     super.key,
@@ -52,6 +52,9 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
   late final AnimationController _reaction;
   bool _celebrated = false;
   int _expressionIndex = 0;
+
+  // Speech bubble shown briefly after a tap.
+  bool _showBubble = false;
 
   @override
   void initState() {
@@ -90,13 +93,20 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
   }
 
   void _react() {
-    HapticFeedback.lightImpact();
-    setState(() => _expressionIndex++);
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _expressionIndex++;
+      _showBubble = true;
+    });
     _celebrate();
     widget.onTap?.call();
+    // Hide the speech bubble after 1.4 s.
+    Future.delayed(const Duration(milliseconds: 1400), () {
+      if (mounted) setState(() => _showBubble = false);
+    });
   }
 
-  /// The arrival payoff: hearts lift before the user touches anything.
+  /// The arrival payoff / tap answer: squash-and-stretch bounce + heart burst.
   void _celebrate() {
     if (MediaQuery.disableAnimationsOf(context)) return;
     _reaction.forward(from: 0);
@@ -129,6 +139,11 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
                 progress: reaction.burst,
                 size: widget.size,
                 color: accent,
+              ),
+            if (_showBubble)
+              _SpeechBubble(
+                label: widget.pet.tapReply,
+                size: widget.size,
               ),
           ],
         );
@@ -172,33 +187,24 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
       accent: accent,
     );
 
-    final String? resolvedAsset;
-    if (!animate) {
-      resolvedAsset = null;
-    } else if (widget.stickerAsset != null) {
-      resolvedAsset = widget.stickerAsset;
-    } else {
-      final expressions = PetStickerAssets.expressionsFor(pet.id, widget.mood);
-      resolvedAsset = expressions.isEmpty
-          ? null
-          : expressions[_expressionIndex % expressions.length];
-    }
-
-    // TEMP debug instrumentation to verify pet animation state on device.
-    debugPrint(
-      'PETDBG pet=${pet.id} mood=${widget.mood.name} '
-      'asset=$resolvedAsset ticker=$tickerEnabled '
-      'disableAnimations=$disableAnimations',
-    );
-
     // Pause animated decoding when hidden (e.g. offscreen IndexedStack tab)
-    // or when reduced-motion is enabled by showing the static PNG portrait.
+    // or when reduced-motion is enabled — show the static PNG portrait.
     if (!animate) {
       return PetAvatar(
         key: ValueKey('${pet.id}-paused'),
         pet: pet,
         size: widget.size,
       );
+    }
+
+    final String? resolvedAsset;
+    if (widget.stickerAsset != null) {
+      resolvedAsset = widget.stickerAsset;
+    } else {
+      final expressions = PetStickerAssets.expressionsFor(pet.id, widget.mood);
+      resolvedAsset = expressions.isEmpty
+          ? null
+          : expressions[_expressionIndex % expressions.length];
     }
 
     if (resolvedAsset == null) {
@@ -233,6 +239,182 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
   }
 }
 
+// ---------------------------------------------------------------------------
+// Floating XP overlay — call [PetXpOverlay.show] from care buttons.
+// ---------------------------------------------------------------------------
+
+/// A self-removing "+XP" overlay that floats upward and fades out.
+///
+/// Usage:
+/// ```dart
+/// PetXpOverlay.show(context, xp: 8);
+/// ```
+class PetXpOverlay {
+  PetXpOverlay._();
+
+  static OverlayEntry? _entry;
+
+  static void show(BuildContext context, {required int xp}) {
+    _entry?.remove();
+    final overlay = Overlay.of(context);
+    final box = context.findRenderObject() as RenderBox?;
+    final center = box == null
+        ? const Offset(0, 0)
+        : box.localToGlobal(box.size.center(Offset.zero));
+
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (_) => _XpBadge(
+        center: center,
+        xp: xp,
+        onDone: () {
+          entry.remove();
+          if (_entry == entry) _entry = null;
+        },
+      ),
+    );
+    _entry = entry;
+    overlay.insert(entry);
+  }
+}
+
+class _XpBadge extends StatefulWidget {
+  const _XpBadge({
+    required this.center,
+    required this.xp,
+    required this.onDone,
+  });
+
+  final Offset center;
+  final int xp;
+  final VoidCallback onDone;
+
+  @override
+  State<_XpBadge> createState() => _XpBadgeState();
+}
+
+class _XpBadgeState extends State<_XpBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _dy;
+  late final Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _dy = Tween<double>(begin: 0, end: -52).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
+    );
+    _opacity = TweenSequence([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0, end: 1)
+            .chain(CurveTween(curve: Curves.easeIn)),
+        weight: 20,
+      ),
+      TweenSequenceItem(tween: ConstantTween(1.0), weight: 50),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1, end: 0)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 30,
+      ),
+    ]).animate(_ctrl);
+
+    _ctrl.forward().whenComplete(widget.onDone);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) => Positioned(
+        left: widget.center.dx - 20,
+        top: widget.center.dy + _dy.value - 20,
+        child: IgnorePointer(
+          child: Opacity(
+            opacity: _opacity.value,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                '+${widget.xp} XP',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Speech bubble
+// ---------------------------------------------------------------------------
+
+class _SpeechBubble extends StatelessWidget {
+  const _SpeechBubble({required this.label, required this.size});
+
+  final String label;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Positioned(
+      top: -size * 0.42,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.10),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context)
+              .textTheme
+              .labelMedium
+              ?.copyWith(color: scheme.onSurface),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Animated WebP image
+// ---------------------------------------------------------------------------
+
 class _AnimatedImageSticker extends StatelessWidget {
   const _AnimatedImageSticker({
     super.key,
@@ -265,6 +447,10 @@ class _AnimatedImageSticker extends StatelessWidget {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Procedural sticker fallback (shown when WebP isn't available / off-screen)
+// ---------------------------------------------------------------------------
 
 class _ProceduralSticker extends StatefulWidget {
   const _ProceduralSticker({
@@ -327,7 +513,6 @@ class _ProceduralStickerState extends State<_ProceduralSticker>
   @override
   Widget build(BuildContext context) {
     final size = widget.size;
-    // The portrait is built once and only transformed on every frame.
     final portrait = Container(
       width: size,
       height: size,
@@ -393,7 +578,10 @@ class _ProceduralStickerState extends State<_ProceduralSticker>
   }
 }
 
-/// The tap answer: a quick squash-and-stretch bounce, then settle.
+// ---------------------------------------------------------------------------
+// Tap reaction: squash-and-stretch bounce + heart burst.
+// ---------------------------------------------------------------------------
+
 class _Reaction {
   const _Reaction({
     required this.scaleX,
@@ -413,8 +601,8 @@ class _Reaction {
     }
     final wave = math.sin(t * math.pi * 2.4) * math.exp(-3.2 * t);
     return _Reaction(
-      scaleX: 1 + wave * 0.12,
-      scaleY: 1 - wave * 0.12,
+      scaleX: 1 + wave * 0.18,
+      scaleY: 1 - wave * 0.18,
       lift: math.sin(t * math.pi) * 0.06,
       burst: t < 0.8 ? t / 0.8 : 0,
     );
@@ -472,6 +660,10 @@ class _HeartBurst extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Motion — per-mood procedural animation parameters.
+// ---------------------------------------------------------------------------
+
 class _Motion {
   const _Motion({
     this.lift = 0,
@@ -490,6 +682,11 @@ class _Motion {
     PetMood.traveling => const Duration(milliseconds: 1100),
     PetMood.celebrating => const Duration(milliseconds: 1500),
     PetMood.sleeping => const Duration(milliseconds: 4200),
+    // New moods — snappy energetic motions.
+    PetMood.hyped => const Duration(milliseconds: 700),
+    PetMood.curious => const Duration(milliseconds: 2800),
+    PetMood.hungry => const Duration(milliseconds: 2500),
+    PetMood.loved => const Duration(milliseconds: 2000),
   };
 
   static _Motion of(PetMood mood, double t, double size) {
@@ -497,7 +694,6 @@ class _Motion {
     return switch (mood) {
       PetMood.idle => _Motion(
         lift: math.sin(turn) * size * 0.008,
-        // A slow 1.0 → 1.05 breath, with a quick blink late in the cycle.
         scale: 1 + (0.5 + 0.5 * math.sin(turn)) * 0.05,
         tilt: math.sin(turn) * 0.012,
         squash: _blink(t),
@@ -527,18 +723,48 @@ class _Motion {
         scale: 1 + math.sin(turn * 0.5) * 0.018,
         tilt: 0.10 + math.sin(turn * 0.5) * 0.008,
       ),
+      // Hyped: fast vibrating bounce.
+      PetMood.hyped => () {
+        final bounce = (t * 4) % 1;
+        final hop = bounce * math.pi;
+        return _Motion(
+          lift: -math.sin(hop) * size * 0.12,
+          scale: 1 + math.sin(hop) * 0.07,
+          squash: 1 - math.sin(hop) * 0.06,
+          tilt: math.sin(turn * 6) * 0.12,
+        );
+      }(),
+      // Curious: gentle head-tilt bob.
+      PetMood.curious => _Motion(
+        lift: math.sin(turn * 0.75) * size * 0.012,
+        scale: 1 + math.sin(turn * 0.75) * 0.03,
+        tilt: 0.08 * math.sin(turn * 0.5),
+      ),
+      // Hungry: slow droopy sway.
+      PetMood.hungry => _Motion(
+        lift: math.sin(turn * 0.6) * size * 0.015,
+        scale: 1 + math.sin(turn * 0.6) * 0.02,
+        tilt: math.sin(turn * 0.6) * 0.06,
+      ),
+      // Loved: gentle float + pulse.
+      PetMood.loved => _Motion(
+        lift: math.sin(turn) * size * 0.025,
+        scale: 1 + math.sin(turn) * 0.045,
+        tilt: math.sin(turn * 0.5) * 0.025,
+      ),
     };
   }
 
-  /// A quick eyelid squash late in each idle cycle.
   static double _blink(double t) {
     final progress = ((t - 0.84) / 0.05).clamp(0.0, 1.0);
     return 1 - math.sin(progress * math.pi) * 0.10;
   }
 }
 
-/// Mood accents that drift around the portrait: hearts and stars for a
-/// celebration, soft z's for a nap.
+// ---------------------------------------------------------------------------
+// Mood particles — celebration ✨, sleeping z's, hyped ⚡, loved ♥.
+// ---------------------------------------------------------------------------
+
 class _Particles extends StatelessWidget {
   const _Particles({
     required this.mood,
@@ -561,6 +787,18 @@ class _Particles extends StatelessWidget {
     (angle: 0.3, offset: 0.8, icon: Icons.auto_awesome_rounded),
   ];
 
+  static const _hyped = [
+    (angle: -1.9, offset: 0.0, icon: Icons.bolt_rounded),
+    (angle: -1.2, offset: 0.4, icon: Icons.bolt_rounded),
+    (angle: -0.5, offset: 0.7, icon: Icons.star_rounded),
+  ];
+
+  static const _loved = [
+    (angle: -2.0, offset: 0.0, icon: Icons.favorite_rounded),
+    (angle: -1.57, offset: 0.3, icon: Icons.favorite_border_rounded),
+    (angle: -1.1, offset: 0.6, icon: Icons.favorite_rounded),
+  ];
+
   @override
   Widget build(BuildContext context) {
     if (mood == PetMood.celebrating) {
@@ -569,16 +807,12 @@ class _Particles extends StatelessWidget {
           alignment: Alignment.center,
           clipBehavior: Clip.none,
           children: [
-            for (final particle in _celebration)
+            for (final p in _celebration)
               _float(
-                progress: (t + particle.offset) % 1,
-                angle: particle.angle,
+                progress: (t + p.offset) % 1,
+                angle: p.angle,
                 spread: 0.9,
-                child: Icon(
-                  particle.icon,
-                  size: size * 0.14,
-                  color: color,
-                ),
+                child: Icon(p.icon, size: size * 0.14, color: color),
               ),
           ],
         ),
@@ -603,6 +837,40 @@ class _Particles extends StatelessWidget {
                     color: color.withValues(alpha: 0.8),
                   ),
                 ),
+              ),
+          ],
+        ),
+      );
+    }
+    if (mood == PetMood.hyped) {
+      return IgnorePointer(
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            for (final p in _hyped)
+              _float(
+                progress: (t + p.offset) % 1,
+                angle: p.angle,
+                spread: 0.7,
+                child: Icon(p.icon, size: size * 0.12, color: color),
+              ),
+          ],
+        ),
+      );
+    }
+    if (mood == PetMood.loved) {
+      return IgnorePointer(
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            for (final p in _loved)
+              _float(
+                progress: (t + p.offset) % 1,
+                angle: p.angle,
+                spread: 0.6,
+                child: Icon(p.icon, size: size * 0.11, color: color),
               ),
           ],
         ),

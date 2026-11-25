@@ -94,7 +94,7 @@ void main() {
       );
 
       expect(circle.type, GroupType.family);
-      expect(circle.petId, 'lion');
+      expect(circle.petId, 'fox'); // lion → fox migration
       expect(circle.petName, 'Biscuit');
       expect(circle.petLevel, 5);
       expect(circle.petMood, 'happy');
@@ -135,8 +135,8 @@ void main() {
       }, memberIds: const []);
 
       expect(circle.type, GroupType.friends);
-      expect(circle.petId, 'gelada');
-      expect(circle.petName, 'Chele');
+      expect(circle.petId, 'fox'); // New fallback
+      expect(circle.petName, 'Foxy'); // fox default name
       expect(circle.petLevel, 1);
       expect(circle.petMood, 'content');
       expect(circle.petExperience, 0);
@@ -162,7 +162,7 @@ void main() {
       expect(summary.type, GroupType.couple);
       expect(summary.isFull, isTrue);
       expect(summary.openSeats, 0);
-      expect(summary.petId, 'ethiopian_wolf');
+      expect(summary.petId, 'seagull'); // ethiopian_wolf → seagull migration
       expect(summary.petName, 'Rusty');
       expect(summary.petLevel, 2);
     });

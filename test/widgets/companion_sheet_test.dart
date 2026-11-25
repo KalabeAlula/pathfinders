@@ -63,7 +63,9 @@ Future<List<PetCareAction>> pumpCard(WidgetTester tester) async {
       overrides: [
         appClockProvider.overrideWith((_) => Stream.value(_now)),
         circleSnapshotProvider('u1').overrideWith(
-          (_) => Stream.value(CircleSnapshot(circle: _circle(), members: const [])),
+          (_) => Stream.value(
+            CircleSnapshot(circle: _circle(), members: const []),
+          ),
         ),
         petRepositoryProvider('c1').overrideWithValue(repository),
       ],
@@ -93,7 +95,9 @@ void main() {
 
     expect(find.text('Walia'), findsOneWidget);
     expect(find.text('Dachshund'), findsOneWidget);
-    expect(find.text('ውሻ · Resting'), findsOneWidget);
+    // New mood format: emoji + label on one line, message on another.
+    expect(find.text('😌 Resting'), findsOneWidget);
+    expect(find.textContaining('Walia is keeping watch'), findsOneWidget);
     expect(find.text('Native to Every cozy home'), findsOneWidget);
     expect(find.text('FAMILY'), findsOneWidget);
     expect(find.text(EthiopianPet.dog.funFact), findsOneWidget);

@@ -191,12 +191,17 @@ class CircleTab extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(height: 1),
-                        Text(
-                          '${mood.label} · Level ${pet.level}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: Text(
+                            key: ValueKey(mood),
+                            '${mood.emoji} ${mood.label} · Level ${pet.level}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: mood.accent(scheme),
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                         const SizedBox(height: AppSpacing.md),
