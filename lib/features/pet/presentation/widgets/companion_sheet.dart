@@ -13,7 +13,6 @@ import '../../domain/ethiopian_pet.dart';
 import '../../domain/pet_mood.dart';
 import '../../domain/shared_pet.dart';
 import '../pet_mood_visuals.dart';
-import '../pet_visuals.dart';
 import 'animated_pet_sticker.dart';
 
 Future<void> showCompanionCard(

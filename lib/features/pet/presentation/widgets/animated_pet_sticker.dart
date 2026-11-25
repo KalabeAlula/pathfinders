@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -9,13 +10,24 @@ import '../pet_mood_visuals.dart';
 import '../sticker_assets.dart';
 import 'pet_avatar.dart';
 
+// Conditional imports for web-only APIs
+import 'animated_pet_sticker_stub.dart'
+    if (dart.library.js_interop) 'animated_pet_sticker_web.dart';
+
 /// A companion portrait that moves with the circle's mood.
 ///
 /// Bundled animated WebP expressions (`assets/pets/<id>/<mood>_<n>.webp`)
 /// win when [TickerMode] is active and animations are enabled. Offscreen tabs
 /// or reduced-motion settings fall back to the static [PetAvatar] PNG so
-/// hidden tabs use zero decode CPU. Tapping cycles through expressions for the
-/// current [mood] with a bouncy scale animation + medium haptic.
+/// hidden tabs use zero decode CPU.
+///
+/// **Web:** Flutter Web's CanvasKit only decodes frame 0 of animated WebPs.
+/// We use native browser `<img>` elements (via HtmlElementView) for 60fps
+/// animation with zero CanvasKit overhead. `pointer-events: none` preserves
+/// Flutter's tap gesture handling.
+///
+/// Tapping cycles through expressions for the current [mood] with a bouncy
+/// scale animation + medium haptic.
 class AnimatedPetSticker extends StatefulWidget {
   const AnimatedPetSticker({
     super.key,
@@ -80,8 +92,7 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
     if (oldWidget.pet != widget.pet || oldWidget.mood != widget.mood) {
       _expressionIndex = 0;
     }
-    if (oldWidget.mood != widget.mood &&
-        widget.mood == PetMood.celebrating) {
+    if (oldWidget.mood != widget.mood && widget.mood == PetMood.celebrating) {
       _celebrate();
     }
   }
@@ -141,10 +152,7 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
                 color: accent,
               ),
             if (_showBubble)
-              _SpeechBubble(
-                label: widget.pet.tapReply,
-                size: widget.size,
-              ),
+              _SpeechBubble(label: widget.pet.tapReply, size: widget.size),
           ],
         );
       },
@@ -178,6 +186,18 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
     final animate = tickerEnabled && !disableAnimations;
     final bundle = DefaultAssetBundle.of(context);
 
+    // DEBUG: Log animation state on Web
+    if (kIsWeb && kDebugMode) {
+      debugPrint(
+        '🔍 AnimatedPetSticker._switcher: '
+        'tickerEnabled=$tickerEnabled, '
+        'disableAnimations=$disableAnimations, '
+        'animate=$animate, '
+        'pet=${pet.id}, '
+        'mood=${widget.mood.name}',
+      );
+    }
+
     final fallback = _ProceduralSticker(
       key: ValueKey('${pet.id}-${widget.mood.name}-fallback'),
       pet: pet,
@@ -190,6 +210,9 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
     // Pause animated decoding when hidden (e.g. offscreen IndexedStack tab)
     // or when reduced-motion is enabled — show the static PNG portrait.
     if (!animate) {
+      if (kIsWeb && kDebugMode) {
+        debugPrint('⚠️  Returning PetAvatar (animate=false)');
+      }
       return PetAvatar(
         key: ValueKey('${pet.id}-paused'),
         pet: pet,
@@ -208,7 +231,14 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
     }
 
     if (resolvedAsset == null) {
+      if (kIsWeb && kDebugMode) {
+        debugPrint('⚠️  No resolvedAsset, returning fallback');
+      }
       return _crossFade(fallback);
+    }
+
+    if (kIsWeb && kDebugMode) {
+      debugPrint('✅ Returning _AnimatedImageSticker: asset=$resolvedAsset');
     }
 
     return _crossFade(
@@ -306,19 +336,24 @@ class _XpBadgeState extends State<_XpBadge>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
-    _dy = Tween<double>(begin: 0, end: -52).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
-    );
+    _dy = Tween<double>(
+      begin: 0,
+      end: -52,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
     _opacity = TweenSequence([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 0, end: 1)
-            .chain(CurveTween(curve: Curves.easeIn)),
+        tween: Tween<double>(
+          begin: 0,
+          end: 1,
+        ).chain(CurveTween(curve: Curves.easeIn)),
         weight: 20,
       ),
       TweenSequenceItem(tween: ConstantTween(1.0), weight: 50),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1, end: 0)
-            .chain(CurveTween(curve: Curves.easeOut)),
+        tween: Tween<double>(
+          begin: 1,
+          end: 0,
+        ).chain(CurveTween(curve: Curves.easeOut)),
         weight: 30,
       ),
     ]).animate(_ctrl);
@@ -401,9 +436,7 @@ class _SpeechBubble extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: Theme.of(context)
-              .textTheme
-              .labelMedium
+          style: Theme.of(context).textTheme.labelMedium
               ?.copyWith(color: scheme.onSurface),
         ),
       ),
@@ -431,6 +464,25 @@ class _AnimatedImageSticker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // On Flutter Web, CanvasKit only decodes frame 0 of animated WebPs.
+    // Use native browser <img> element for 60fps animation with zero overhead.
+    if (kIsWeb) {
+      if (kDebugMode) {
+        debugPrint(
+          '🌐 _AnimatedImageSticker: kIsWeb=true, using WebNativeImageSticker',
+        );
+      }
+      return WebNativeImageSticker(
+        asset: asset,
+        size: size,
+        fallback: fallback,
+      );
+    }
+
+    if (kDebugMode) {
+      debugPrint('📱 _AnimatedImageSticker: kIsWeb=false, using Image.asset');
+    }
+
     return SizedBox(
       width: size,
       height: size,
@@ -628,9 +680,7 @@ class _HeartBurst extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         clipBehavior: Clip.none,
-        children: [
-          for (var i = 0; i < _angles.length; i++) _heart(i),
-        ],
+        children: [for (var i = 0; i < _angles.length; i++) _heart(i)],
       ),
     );
   }
@@ -893,10 +943,7 @@ class _Particles extends StatelessWidget {
       ),
       child: Opacity(
         opacity: math.sin(progress * math.pi).clamp(0.0, 1.0),
-        child: Transform.scale(
-          scale: 0.55 + progress * 0.6,
-          child: child,
-        ),
+        child: Transform.scale(scale: 0.55 + progress * 0.6, child: child),
       ),
     );
   }
