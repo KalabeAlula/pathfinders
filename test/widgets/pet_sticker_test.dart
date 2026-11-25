@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -51,12 +49,12 @@ Widget _app({
 }
 
 void main() {
-  testWidgets('falls back to the procedural portrait when no art ships', (
+  testWidgets('falls back to the procedural portrait when art fails to load', (
     tester,
   ) async {
-    await tester.pumpWidget(_app(bundle: _EmptyManifestBundle()));
+    await tester.pumpWidget(_app(stickerAsset: 'assets/pets/missing.webp'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.byType(PetAvatar), findsOneWidget);
     expect(
@@ -158,7 +156,7 @@ void main() {
   testWidgets('a hidden sticker pauses to static portrait and stops frames', (
     tester,
   ) async {
-    await tester.pumpWidget(_app(bundle: _EmptyManifestBundle()));
+    await tester.pumpWidget(_app(stickerAsset: 'assets/pets/missing.webp'));
     await tester.pump(const Duration(milliseconds: 100));
     expect(tester.binding.hasScheduledFrame, isTrue);
 
@@ -211,21 +209,6 @@ class _FakeBundle extends CachingAssetBundle {
     final asset = assets[key];
     if (asset != null) {
       return Future.value(ByteData.view(asset.buffer));
-    }
-    return rootBundle.load(key);
-  }
-}
-
-class _EmptyManifestBundle extends CachingAssetBundle {
-  @override
-  Future<ByteData> load(String key) {
-    if (key == 'AssetManifest.bin') {
-      final empty = const StandardMessageCodec().encodeMessage(<Object, Object>{})!;
-      return Future.value(empty);
-    }
-    if (key == 'AssetManifest.json') {
-      final bytes = Uint8List.fromList(utf8.encode('{}'));
-      return Future.value(ByteData.view(bytes.buffer));
     }
     return rootBundle.load(key);
   }

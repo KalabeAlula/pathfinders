@@ -13,31 +13,35 @@ void main() {
 
   for (final pet in pets) {
     testWidgets('$pet static portrait decodes', (tester) async {
-      final bytes = await rootBundle.load('assets/pets/$pet.png');
-      final codec = await ui.instantiateImageCodec(bytes.buffer.asUint8List());
-      final frame = await codec.getNextFrame();
+      await tester.runAsync(() async {
+        final bytes = await rootBundle.load('assets/pets/$pet.png');
+        final codec = await ui.instantiateImageCodec(bytes.buffer.asUint8List());
+        final frame = await codec.getNextFrame();
 
-      expect(frame.image.width, 256);
-      expect(frame.image.height, 256);
-      frame.image.dispose();
-      codec.dispose();
+        expect(frame.image.width, 256);
+        expect(frame.image.height, 256);
+        frame.image.dispose();
+        codec.dispose();
+      });
     });
 
     for (final mood in moods) {
       for (var i = 1; i <= 3; i++) {
         testWidgets('$pet ${mood}_$i animated WebP decodes', (tester) async {
-          final bytes = await rootBundle.load(
-            'assets/pets/$pet/${mood}_$i.webp',
-          );
-          final codec = await ui.instantiateImageCodec(
-            bytes.buffer.asUint8List(),
-          );
-          expect(codec.frameCount, greaterThan(1));
-          final frame = await codec.getNextFrame();
-          expect(frame.image.width, 256);
-          expect(frame.image.height, 256);
-          frame.image.dispose();
-          codec.dispose();
+          await tester.runAsync(() async {
+            final bytes = await rootBundle.load(
+              'assets/pets/$pet/${mood}_$i.webp',
+            );
+            final codec = await ui.instantiateImageCodec(
+              bytes.buffer.asUint8List(),
+            );
+            expect(codec.frameCount, greaterThan(1));
+            final frame = await codec.getNextFrame();
+            expect(frame.image.width, 256);
+            expect(frame.image.height, 256);
+            frame.image.dispose();
+            codec.dispose();
+          });
         });
       }
     }

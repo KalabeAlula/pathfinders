@@ -221,7 +221,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Pick a companion'), findsOneWidget);
-    await tester.tap(find.text('Black-maned Ethiopian Lion'));
+    await tester.tap(find.text('Dachshund'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('pet-name')), 'Saba');
     await tester.tap(find.text('Create group'));
@@ -230,7 +230,7 @@ void main() {
     expect(repository.created, hasLength(1));
     expect(repository.created.single.name, 'Entoto House');
     expect(repository.created.single.type, GroupType.family);
-    expect(repository.created.single.petId, 'lion');
+    expect(repository.created.single.petId, 'dog');
     expect(repository.created.single.petName, 'Saba');
     expect(find.text('“Entoto House” is ready'), findsOneWidget);
     expect(find.text('ABC234'), findsOneWidget);

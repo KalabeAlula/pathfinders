@@ -50,7 +50,6 @@ class AnimatedPetSticker extends StatefulWidget {
 class _AnimatedPetStickerState extends State<AnimatedPetSticker>
     with SingleTickerProviderStateMixin {
   late final AnimationController _reaction;
-  Future<Set<String>>? _assets;
   bool _celebrated = false;
   int _expressionIndex = 0;
 
@@ -66,7 +65,6 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _assets ??= PetStickerAssets.of(DefaultAssetBundle.of(context));
     if (!_celebrated && widget.mood == PetMood.celebrating) {
       _celebrated = true;
       _celebrate();
@@ -160,9 +158,38 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
 
   Widget _switcher(Color accent) {
     final pet = widget.pet;
-    final animate =
-        TickerMode.valuesOf(context).enabled &&
-        !MediaQuery.disableAnimationsOf(context);
+    final tickerEnabled = TickerMode.valuesOf(context).enabled;
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+    final animate = tickerEnabled && !disableAnimations;
+    final bundle = DefaultAssetBundle.of(context);
+
+    final fallback = _ProceduralSticker(
+      key: ValueKey('${pet.id}-${widget.mood.name}-fallback'),
+      pet: pet,
+      mood: widget.mood,
+      size: widget.size,
+      showParticles: widget.showParticles,
+      accent: accent,
+    );
+
+    final String? resolvedAsset;
+    if (!animate) {
+      resolvedAsset = null;
+    } else if (widget.stickerAsset != null) {
+      resolvedAsset = widget.stickerAsset;
+    } else {
+      final expressions = PetStickerAssets.expressionsFor(pet.id, widget.mood);
+      resolvedAsset = expressions.isEmpty
+          ? null
+          : expressions[_expressionIndex % expressions.length];
+    }
+
+    // TEMP debug instrumentation to verify pet animation state on device.
+    debugPrint(
+      'PETDBG pet=${pet.id} mood=${widget.mood.name} '
+      'asset=$resolvedAsset ticker=$tickerEnabled '
+      'disableAnimations=$disableAnimations',
+    );
 
     // Pause animated decoding when hidden (e.g. offscreen IndexedStack tab)
     // or when reduced-motion is enabled by showing the static PNG portrait.
@@ -174,52 +201,18 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
       );
     }
 
-    final bundle = DefaultAssetBundle.of(context);
-    final fallback = _ProceduralSticker(
-      key: ValueKey('${pet.id}-${widget.mood.name}-fallback'),
-      pet: pet,
-      mood: widget.mood,
-      size: widget.size,
-      showParticles: widget.showParticles,
-      accent: accent,
-    );
-
-    final pinned = widget.stickerAsset;
-    if (pinned != null) {
-      return _crossFade(
-        _AnimatedImageSticker(
-          key: ValueKey(pinned),
-          asset: pinned,
-          size: widget.size,
-          bundle: bundle,
-          fallback: fallback,
-        ),
-      );
+    if (resolvedAsset == null) {
+      return _crossFade(fallback);
     }
 
-    return FutureBuilder<Set<String>>(
-      future: _assets,
-      builder: (context, snapshot) {
-        final manifest = snapshot.data;
-        if (manifest == null) return fallback;
-        final expressions = PetStickerAssets.expressionsFor(
-          manifest,
-          pet.id,
-          widget.mood,
-        );
-        if (expressions.isEmpty) return _crossFade(fallback);
-
-        final path = expressions[_expressionIndex % expressions.length];
-        return _crossFade(
-          _AnimatedImageSticker(
-            key: ValueKey(path),
-            asset: path,
-            size: widget.size,
-            bundle: bundle,
-            fallback: fallback,
-          ),
-        );
-      },
+    return _crossFade(
+      _AnimatedImageSticker(
+        key: ValueKey(resolvedAsset),
+        asset: resolvedAsset,
+        size: widget.size,
+        bundle: bundle,
+        fallback: fallback,
+      ),
     );
   }
 

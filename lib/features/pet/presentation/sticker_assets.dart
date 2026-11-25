@@ -7,13 +7,22 @@ import '../domain/pet_mood.dart';
 String petStickerAssetPath(String petId, PetMood mood, {int index = 1}) =>
     'assets/pets/$petId/${mood.name}_$index.webp';
 
-/// Which sticker files this build actually ships.
+/// Which sticker files this build ships.
 ///
-/// Resolution reads the asset manifest instead of a hand-written list, so
-/// dropping additional `<mood>_<n>.webp` expressions under `assets/pets/<id>/`
-/// lights them up with no code change.
+/// Synchronous lookup for the bundled 3-expression-per-mood WebP packs so
+/// [AnimatedPetSticker] renders the animated asset on frame 1 without waiting
+/// for an async manifest parse.
 class PetStickerAssets {
   PetStickerAssets._();
+
+  static const Set<String> _bundledPets = {
+    'fox',
+    'seagull',
+    'dog',
+    'orangutan',
+  };
+
+  static const int _expressionsPerMood = 3;
 
   static final Expando<Future<Set<String>>> _index = Expando();
 
@@ -23,17 +32,12 @@ class PetStickerAssets {
         .catchError((Object _) => <String>{});
   }
 
-  /// All bundled expression paths for [petId] in [mood], sorted cleanly.
-  static List<String> expressionsFor(
-    Set<String> manifest,
-    String petId,
-    PetMood mood,
-  ) {
-    final prefix = 'assets/pets/$petId/${mood.name}_';
-    final matches = manifest
-        .where((path) => path.startsWith(prefix) && path.endsWith('.webp'))
-        .toList()
-      ..sort();
-    return matches;
+  /// All bundled expression paths for [petId] in [mood].
+  static List<String> expressionsFor(String petId, PetMood mood) {
+    if (!_bundledPets.contains(petId)) return const [];
+    return [
+      for (var i = 1; i <= _expressionsPerMood; i++)
+        petStickerAssetPath(petId, mood, index: i),
+    ];
   }
 }

@@ -13,7 +13,6 @@ import 'package:pathfinders/features/navigation/domain/navigation_repository.dar
 import 'package:pathfinders/features/navigation/presentation/widgets/arrival_card.dart';
 import 'package:pathfinders/features/pet/domain/pet_mood.dart';
 import 'package:pathfinders/features/pet/presentation/widgets/animated_pet_sticker.dart';
-import 'package:pathfinders/features/pet/presentation/widgets/pet_avatar.dart';
 
 class _FakeRepository implements NavigationRepository {
   int clears = 0;
@@ -99,8 +98,8 @@ void main() {
       find.byType(AnimatedPetSticker),
     );
     expect(sticker.mood, PetMood.celebrating);
-    expect(sticker.pet.id, 'gelada');
-    expect(find.byType(PetAvatar), findsOneWidget);
+    expect(sticker.pet.id, 'orangutan');
+    expect(find.byType(Image), findsOneWidget);
   });
 
   testWidgets('stays hidden until the crew arrives', (tester) async {
