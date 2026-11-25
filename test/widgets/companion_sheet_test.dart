@@ -14,6 +14,10 @@ import 'package:pathfinders/features/pet/domain/pet_repository.dart';
 import 'package:pathfinders/features/pet/domain/shared_pet.dart';
 import 'package:pathfinders/features/pet/presentation/widgets/companion_sheet.dart';
 
+// NOTE: CompanionSheet is deprecated. Care controls are now inline in circle_tab.dart.
+// These tests remain to verify the legacy sheet still works if opened directly,
+// but the main UI no longer uses it.
+
 final _now = DateTime(2026, 11, 3, 9);
 
 class _FakePetRepository implements PetRepository {

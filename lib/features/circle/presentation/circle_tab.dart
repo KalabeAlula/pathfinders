@@ -14,11 +14,12 @@ import '../../location/presentation/widgets/sharing_notice_banner.dart';
 import '../../nudges/domain/nudge.dart';
 import '../../nudges/presentation/warmth_actions.dart';
 import '../../pet/application/pet_mood_providers.dart';
+import '../../pet/application/pet_providers.dart';
 import '../../pet/domain/ethiopian_pet.dart';
+import '../../pet/domain/pet_care_action.dart';
 import '../../pet/domain/shared_pet.dart';
 import '../../pet/presentation/pet_mood_visuals.dart';
 import '../../pet/presentation/widgets/animated_pet_sticker.dart';
-import '../../pet/presentation/widgets/companion_sheet.dart';
 import '../domain/circle_member.dart';
 import '../domain/circle_snapshot.dart';
 import 'member_status_label.dart';
@@ -73,14 +74,91 @@ class CircleTab extends ConsumerWidget {
     final quickEmoji = NudgeWarmth.defaultFor(circle.type).emoji;
     final mood = ref.watch(petMoodProvider(circle.id));
 
-    void openCompanion() {
-      showCompanionCard(
-        context,
-        circleId: circle.id,
-        currentUserId: currentUserId,
-        pet: species,
-        mood: mood,
-        groupType: circle.type,
+    // Care action handler (inline, no modal sheet)
+    Future<void> care(PetCareAction action) async {
+      try {
+        await ref.read(petRepositoryProvider(circle.id)).care(action);
+        ref.read(lovedStateProvider(circle.id).notifier).trigger();
+        if (context.mounted) {
+          PetXpOverlay.show(context, xp: SharedPet.xpFor(action));
+        }
+      } catch (_) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not reach your companion.')),
+        );
+      }
+    }
+
+    void showSpeciesInfo() {
+      showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text(species.commonName),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                species.scientificName,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontStyle: FontStyle.italic,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    Icons.landscape_rounded,
+                    size: 16,
+                    color: scheme.secondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Native to ${species.habitat}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: scheme.tertiaryContainer.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 16,
+                      color: scheme.onTertiaryContainer,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        species.funFact,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onTertiaryContainer,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
       );
     }
 
@@ -172,25 +250,38 @@ class CircleTab extends ConsumerWidget {
                     ),
                     child: Column(
                       children: [
-                        Tooltip(
-                          message: 'Meet ${pet.name}',
-                          child: AnimatedPetSticker(
-                            pet: species,
-                            mood: mood,
-                            size: 112,
-                            onTap: openCompanion,
-                          ),
-                        ),
+                        // Interactive pet sticker
+                        AnimatedPetSticker(pet: species, mood: mood, size: 112),
                         const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          pet.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+                        // Pet name with info button
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              pet.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.info_outline,
+                                size: 18,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                              onPressed: showSpeciesInfo,
+                              tooltip: 'About ${species.commonName}',
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                              padding: const EdgeInsets.all(4),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 1),
+                        // Dynamic mood line
                         AnimatedSwitcher(
                           duration: const Duration(milliseconds: 300),
                           child: Text(
@@ -204,7 +295,36 @@ class CircleTab extends ConsumerWidget {
                             ),
                           ),
                         ),
+                        const SizedBox(height: AppSpacing.sm),
+                        // Compact stats row
+                        _CompactStatsRow(
+                          energy: pet.energy,
+                          xpToNextLevel:
+                              SharedPet.experiencePerLevel - pet.xpIntoLevel,
+                          nextLevel: pet.level + 1,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        // Care action buttons
+                        Row(
+                          children: [
+                            for (
+                              var i = 0;
+                              i < PetCareAction.values.length;
+                              i++
+                            ) ...[
+                              if (i > 0) const SizedBox(width: AppSpacing.xs),
+                              Expanded(
+                                child: _CareButton(
+                                  action: PetCareAction.values[i],
+                                  petName: pet.name,
+                                  onTap: () => care(PetCareAction.values[i]),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                         const SizedBox(height: AppSpacing.md),
+                        // Member count + invite
                         Row(
                           children: [
                             Icon(
@@ -505,6 +625,121 @@ class _WarmthPill extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
             child: Text(emoji, style: const TextStyle(fontSize: 13)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact stats row showing energy and XP progress
+class _CompactStatsRow extends StatelessWidget {
+  const _CompactStatsRow({
+    required this.energy,
+    required this.xpToNextLevel,
+    required this.nextLevel,
+  });
+
+  final double energy;
+  final int xpToNextLevel;
+  final int nextLevel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Row(
+      children: [
+        // Energy stat
+        Icon(Icons.bolt_rounded, size: 13, color: scheme.primary),
+        const SizedBox(width: 4),
+        Text(
+          'Energy ${energy.round()}%',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(width: 12),
+        // XP progress
+        Expanded(
+          child: Row(
+            children: [
+              Icon(Icons.star_rounded, size: 13, color: scheme.tertiary),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  '$xpToNextLevel XP to Lv $nextLevel',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Compact pill care button
+class _CareButton extends StatelessWidget {
+  const _CareButton({
+    required this.action,
+    required this.petName,
+    required this.onTap,
+  });
+
+  final PetCareAction action;
+  final String petName;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final icon = switch (action) {
+      PetCareAction.feed => Icons.restaurant_rounded,
+      PetCareAction.clean => Icons.water_drop_rounded,
+      PetCareAction.play => Icons.sports_esports_rounded,
+    };
+    final color = switch (action) {
+      PetCareAction.feed => const Color(0xFFD98548),
+      PetCareAction.clean => const Color(0xFF6C93A8),
+      PetCareAction.play => scheme.primary,
+    };
+
+    return Tooltip(
+      message: '${action.label} $petName (+${action.experience} XP)',
+      child: Material(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              border: Border.all(color: scheme.outlineVariant),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 14, color: color),
+                const SizedBox(width: 4),
+                Text(
+                  action.label,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

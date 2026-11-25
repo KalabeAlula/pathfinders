@@ -103,6 +103,8 @@ class SharedPet {
 
   /// Applies the slow drift that happens while nobody is caring for the pet.
   /// Rates are per hour; [now] becomes the new reference point.
+  ///
+  /// Energy RECOVERS at +20/hour (passive regeneration while resting).
   SharedPet decayed(Duration elapsed, DateTime now) {
     if (elapsed <= Duration.zero) return this;
     final hours = elapsed.inSeconds / 3600;
@@ -112,7 +114,7 @@ class SharedPet {
       level: level,
       experience: experience,
       hunger: _clamp(hunger - hours * 6),
-      energy: _clamp(energy - hours * 4),
+      energy: _clamp(energy + hours * 20), // CHANGED: +20/hour (was -4/hour)
       hygiene: _clamp(hygiene - hours * 3),
       happiness: _clamp(happiness - hours * 2.5),
       updatedAt: now,

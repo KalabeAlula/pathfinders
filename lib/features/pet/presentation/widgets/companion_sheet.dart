@@ -58,7 +58,10 @@ class CompanionCard extends ConsumerWidget {
   final PetMood mood;
 
   Circle? _circleOf(WidgetRef ref) {
-    final circle = ref.watch(circleSnapshotProvider(currentUserId)).value?.circle;
+    final circle = ref
+        .watch(circleSnapshotProvider(currentUserId))
+        .value
+        ?.circle;
     if (circle == null || circle.id != circleId) return null;
     return circle;
   }
@@ -92,6 +95,11 @@ class CompanionCard extends ConsumerWidget {
     final petState = state?.decayed(now.difference(state.updatedAt), now);
     final name = petState?.name ?? pet.defaultName;
 
+    // Watch live mood from provider (matches CircleTab)
+    final liveMood = circle == null
+        ? mood
+        : ref.watch(petMoodProvider(circle.id));
+
     return Container(
       decoration: BoxDecoration(
         color: scheme.surface,
@@ -124,7 +132,7 @@ class CompanionCard extends ConsumerWidget {
               const SizedBox(height: AppSpacing.lg),
               Row(
                 children: [
-                  AnimatedPetSticker(pet: pet, mood: mood, size: 84),
+                  AnimatedPetSticker(pet: pet, mood: liveMood, size: 84),
                   const SizedBox(width: AppSpacing.lg),
                   Expanded(
                     child: Column(
@@ -161,16 +169,16 @@ class CompanionCard extends ConsumerWidget {
                               ),
                         ),
                         const SizedBox(height: 4),
-                        // Dynamic mood line: emoji + label.
+                        // Dynamic mood line: emoji + label (live from provider)
                         Row(
                           children: [
                             Text(
-                              '${mood.emoji} ${mood.label}',
+                              '${liveMood.emoji} ${liveMood.label}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: mood.accent(scheme),
+                                    color: liveMood.accent(scheme),
                                     fontWeight: FontWeight.w600,
                                   ),
                             ),
@@ -180,8 +188,8 @@ class CompanionCard extends ConsumerWidget {
                         AnimatedSwitcher(
                           duration: const Duration(milliseconds: 300),
                           child: Text(
-                            key: ValueKey(mood),
-                            mood.messageFor(name),
+                            key: ValueKey(liveMood),
+                            liveMood.messageFor(name),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodySmall
@@ -228,9 +236,18 @@ class CompanionCard extends ConsumerWidget {
               ),
               if (petState != null) ...[
                 const SizedBox(height: AppSpacing.lg),
+                // Energy stat (clear label, no confusion with mood)
+                _StatBar(
+                  icon: Icons.bolt_rounded,
+                  label: 'Energy',
+                  value: petState.energy,
+                  color: const Color(0xFFE87A1E),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                // Happiness stat
                 _StatBar(
                   icon: Icons.favorite_rounded,
-                  label: petState.careMoodAt(now).label,
+                  label: 'Happiness',
                   value: petState.happiness,
                   color: scheme.primary,
                 ),
