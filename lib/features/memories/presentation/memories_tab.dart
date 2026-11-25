@@ -367,6 +367,16 @@ class _MilestoneStrip extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              if (milestones.length > 2)
+                TextButton(
+                  onPressed: () => _showAllCountdowns(context),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    foregroundColor: scheme.onSurfaceVariant,
+                  ),
+                  child: const Text('See all'),
+                ),
               if (milestones.isNotEmpty)
                 TextButton.icon(
                   onPressed: onAdd,
@@ -383,29 +393,109 @@ class _MilestoneStrip extends StatelessWidget {
         if (milestones.isEmpty)
           _EmptyMilestoneRail(onAdd: onAdd)
         else
-          SizedBox(
-            height: 124,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-              itemCount: milestones.length + 1,
-              separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
-              itemBuilder: (context, index) {
-                if (index == milestones.length) {
-                  return _AddMilestoneCard(onTap: onAdd);
-                }
-                return SizedBox(
-                  width: 292,
-                  child: CountdownCard(
-                    milestone: milestones[index],
-                    now: pinnedNow,
-                    onTap: () => onOpen(milestones[index]),
-                  ),
-                );
-              },
-            ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Fit two cards comfortably side-by-side with the 3rd peeking.
+              final cardWidth =
+                  ((constraints.maxWidth - AppSpacing.xl * 2 - AppSpacing.md) *
+                          0.47)
+                      .clamp(156.0, 220.0);
+              return SizedBox(
+                height: 132,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                  itemCount: milestones.length + 1,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(width: AppSpacing.md),
+                  itemBuilder: (context, index) {
+                    if (index == milestones.length) {
+                      return _AddMilestoneCard(onTap: onAdd);
+                    }
+                    return SizedBox(
+                      width: cardWidth,
+                      child: CountdownCard(
+                        milestone: milestones[index],
+                        now: pinnedNow,
+                        compact: true,
+                        onTap: () => onOpen(milestones[index]),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
           ),
       ],
+    );
+  }
+
+  void _showAllCountdowns(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (_, controller) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 4, 16, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Upcoming countdowns',
+                      style: theme.textTheme.titleLarge,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.of(sheetContext).pop();
+                      onAdd();
+                    },
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Add'),
+                  ),
+                ],
+              ),
+            ),
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: scheme.outlineVariant.withValues(alpha: 0.4),
+            ),
+            Expanded(
+              child: ListView.separated(
+                controller: controller,
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                itemCount: milestones.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
+                itemBuilder: (_, index) {
+                  final milestone = milestones[index];
+                  return SizedBox(
+                    height: 124,
+                    child: CountdownCard(
+                      milestone: milestone,
+                      now: pinnedNow,
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        onOpen(milestone);
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

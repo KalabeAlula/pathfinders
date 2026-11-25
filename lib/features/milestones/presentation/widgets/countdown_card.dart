@@ -15,6 +15,7 @@ class CountdownCard extends ConsumerWidget {
     required this.milestone,
     this.now,
     this.onTap,
+    this.compact = false,
   });
 
   final SharedMilestone milestone;
@@ -22,6 +23,7 @@ class CountdownCard extends ConsumerWidget {
   /// Pinned clock for tests; the card follows the app clock otherwise.
   final DateTime? now;
   final VoidCallback? onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -42,7 +44,7 @@ class CountdownCard extends ConsumerWidget {
           '${milestoneWhenLine(milestone, clock)}'
           '${place == null ? '' : ', $place'}',
       child: BentoCard(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(compact ? 12 : 16),
         onTap: onTap,
         semanticLabel: 'Plan ${milestone.title}.',
         gradient: LinearGradient(
@@ -51,7 +53,15 @@ class CountdownCard extends ConsumerWidget {
           end: Alignment.bottomRight,
         ),
         borderColor: Colors.white.withValues(alpha: 0.14),
-        child: Row(
+        child: compact
+            ? _CompactBody(
+                milestone: milestone,
+                days: displayDays,
+                kind: kind,
+                white: white,
+                faded: faded,
+              )
+            : Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
@@ -154,6 +164,110 @@ class CountdownCard extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _CompactBody extends StatelessWidget {
+  const _CompactBody({
+    required this.milestone,
+    required this.days,
+    required this.kind,
+    required this.white,
+    required this.faded,
+  });
+
+  final SharedMilestone milestone;
+  final int days;
+  final MilestoneKind kind;
+  final Color white;
+  final Color faded;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final place = milestone.place;
+    final pillLabel = days <= 0 ? 'Today' : '${days}d';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(kind.icon, size: 12, color: faded),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                kind.label.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: faded,
+                  fontSize: 8.5,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                pillLabel,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const Spacer(),
+        Text(
+          milestone.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: white,
+            fontWeight: FontWeight.w700,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          formatMilestoneDate(milestone.date),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: faded,
+            fontSize: 10.5,
+          ),
+        ),
+        if (place != null) ...[
+          const SizedBox(height: 2),
+          Row(
+            children: [
+              Icon(Icons.place_rounded, size: 11, color: faded),
+              const SizedBox(width: 3),
+              Expanded(
+                child: Text(
+                  place,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: faded,
+                    fontSize: 10.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }
