@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:lottie/lottie.dart';
 
 import '../../domain/ethiopian_pet.dart';
 import '../../domain/pet_mood.dart';
@@ -12,9 +11,11 @@ import 'pet_avatar.dart';
 
 /// A companion portrait that moves with the circle's mood.
 ///
-/// A shipped sticker file (`assets/pets/<id>/<mood>.json`) wins when one
-/// exists. Otherwise the portrait animates procedurally, so a pet without art
-/// still breathes, hops or naps instead of going blank.
+/// Bundled animated WebP expressions (`assets/pets/<id>/<mood>_<n>.webp`)
+/// win when [TickerMode] is active and animations are enabled. Offscreen tabs
+/// or reduced-motion settings fall back to the static [PetAvatar] PNG so
+/// hidden tabs use zero decode CPU. Tapping cycles through expressions for the
+/// current [mood].
 class AnimatedPetSticker extends StatefulWidget {
   const AnimatedPetSticker({
     super.key,
@@ -24,7 +25,7 @@ class AnimatedPetSticker extends StatefulWidget {
     this.showParticles = true,
     this.interactive = true,
     this.onTap,
-    this.lottieAsset,
+    this.stickerAsset,
   });
 
   final EthiopianPet pet;
@@ -39,8 +40,8 @@ class AnimatedPetSticker extends StatefulWidget {
 
   final VoidCallback? onTap;
 
-  /// Pins one sticker file instead of resolving it from the bundle.
-  final String? lottieAsset;
+  /// Pins one sticker file instead of resolving expressions from the bundle.
+  final String? stickerAsset;
 
   @override
   State<AnimatedPetSticker> createState() => _AnimatedPetStickerState();
@@ -51,6 +52,7 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
   late final AnimationController _reaction;
   Future<Set<String>>? _assets;
   bool _celebrated = false;
+  int _expressionIndex = 0;
 
   @override
   void initState() {
@@ -74,6 +76,9 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
   @override
   void didUpdateWidget(covariant AnimatedPetSticker oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.pet != widget.pet || oldWidget.mood != widget.mood) {
+      _expressionIndex = 0;
+    }
     if (oldWidget.mood != widget.mood &&
         widget.mood == PetMood.celebrating) {
       _celebrate();
@@ -88,6 +93,7 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
 
   void _react() {
     HapticFeedback.lightImpact();
+    setState(() => _expressionIndex++);
     _celebrate();
     widget.onTap?.call();
   }
@@ -154,6 +160,20 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
 
   Widget _switcher(Color accent) {
     final pet = widget.pet;
+    final animate =
+        TickerMode.valuesOf(context).enabled &&
+        !MediaQuery.disableAnimationsOf(context);
+
+    // Pause animated decoding when hidden (e.g. offscreen IndexedStack tab)
+    // or when reduced-motion is enabled by showing the static PNG portrait.
+    if (!animate) {
+      return PetAvatar(
+        key: ValueKey('${pet.id}-paused'),
+        pet: pet,
+        size: widget.size,
+      );
+    }
+
     final bundle = DefaultAssetBundle.of(context);
     final fallback = _ProceduralSticker(
       key: ValueKey('${pet.id}-${widget.mood.name}-fallback'),
@@ -164,11 +184,11 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
       accent: accent,
     );
 
-    final pinned = widget.lottieAsset;
+    final pinned = widget.stickerAsset;
     if (pinned != null) {
       return _crossFade(
-        _LottieSticker(
-          key: ValueKey('$pinned-lottie'),
+        _AnimatedImageSticker(
+          key: ValueKey(pinned),
           asset: pinned,
           size: widget.size,
           bundle: bundle,
@@ -180,20 +200,24 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
     return FutureBuilder<Set<String>>(
       future: _assets,
       builder: (context, snapshot) {
-        final path = petStickerAssetPath(pet.id, widget.mood);
-        final bundled = snapshot.data?.contains(path) ?? false;
-        // When the manifest resolves without a sticker the same keyed fallback
-        // stays mounted, so nothing re-runs as the future completes.
+        final manifest = snapshot.data;
+        if (manifest == null) return fallback;
+        final expressions = PetStickerAssets.expressionsFor(
+          manifest,
+          pet.id,
+          widget.mood,
+        );
+        if (expressions.isEmpty) return _crossFade(fallback);
+
+        final path = expressions[_expressionIndex % expressions.length];
         return _crossFade(
-          bundled
-              ? _LottieSticker(
-                  key: ValueKey('${pet.id}-${widget.mood.name}-lottie'),
-                  asset: path,
-                  size: widget.size,
-                  bundle: bundle,
-                  fallback: fallback,
-                )
-              : fallback,
+          _AnimatedImageSticker(
+            key: ValueKey(path),
+            asset: path,
+            size: widget.size,
+            bundle: bundle,
+            fallback: fallback,
+          ),
         );
       },
     );
@@ -216,8 +240,8 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
   }
 }
 
-class _LottieSticker extends StatelessWidget {
-  const _LottieSticker({
+class _AnimatedImageSticker extends StatelessWidget {
+  const _AnimatedImageSticker({
     super.key,
     required this.asset,
     required this.size,
@@ -235,14 +259,13 @@ class _LottieSticker extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: Lottie.asset(
+      child: Image.asset(
         asset,
         bundle: bundle,
         width: size,
         height: size,
         fit: BoxFit.contain,
-        repeat: true,
-        animate: !MediaQuery.disableAnimationsOf(context),
+        gaplessPlayback: true,
         filterQuality: FilterQuality.medium,
         errorBuilder: (context, error, stackTrace) => fallback,
       ),

@@ -3,24 +3,28 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lottie/lottie.dart';
 import 'package:pathfinders/features/pet/domain/ethiopian_pet.dart';
 import 'package:pathfinders/features/pet/domain/pet_mood.dart';
 import 'package:pathfinders/features/pet/presentation/pet_mood_visuals.dart';
 import 'package:pathfinders/features/pet/presentation/widgets/animated_pet_sticker.dart';
 import 'package:pathfinders/features/pet/presentation/widgets/pet_avatar.dart';
 
-const _stickerPath = 'assets/pets/lovebird/idle.json';
+const _stickerPath = 'assets/pets/fox/idle_1.webp';
 
-/// A Lottie file with no layers: enough to prove the engine mounted.
-const _fixtureSticker =
-    '{"v":"5.7.4","fr":30,"ip":0,"op":60,"w":100,"h":100,'
-    '"nm":"fixture","ddd":0,"assets":[],"layers":[]}';
+// 1x1 transparent PNG bytes for testing the image sticker slot.
+final _transparentPngBytes = Uint8List.fromList([
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+  0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
+  0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+  0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+  0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+]);
 
 Widget _app({
   PetMood mood = PetMood.idle,
   VoidCallback? onTap,
-  String? lottieAsset,
+  String? stickerAsset,
   AssetBundle? bundle,
   bool ticker = true,
   bool particles = true,
@@ -33,10 +37,10 @@ Widget _app({
           child: TickerMode(
             enabled: ticker,
             child: AnimatedPetSticker(
-              pet: EthiopianPet.lovebird,
+              pet: EthiopianPet.fox,
               mood: mood,
               onTap: onTap,
-              lottieAsset: lottieAsset,
+              stickerAsset: stickerAsset,
               showParticles: particles,
             ),
           ),
@@ -50,18 +54,17 @@ void main() {
   testWidgets('falls back to the procedural portrait when no art ships', (
     tester,
   ) async {
-    await tester.pumpWidget(_app());
+    await tester.pumpWidget(_app(bundle: _EmptyManifestBundle()));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byType(PetAvatar), findsOneWidget);
-    expect(find.byType(Lottie), findsNothing);
     expect(
       find.byWidgetPredicate(
         (widget) =>
             widget is Semantics &&
             widget.properties.label ==
-                '${EthiopianPet.lovebird.commonName}, ${PetMood.idle.label}',
+                '${EthiopianPet.fox.commonName}, ${PetMood.idle.label}',
       ),
       findsOneWidget,
     );
@@ -152,14 +155,17 @@ void main() {
     expect(find.byIcon(Icons.favorite_rounded), findsNothing);
   });
 
-  testWidgets('a hidden sticker stops scheduling frames', (tester) async {
-    await tester.pumpWidget(_app());
+  testWidgets('a hidden sticker pauses to static portrait and stops frames', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_app(bundle: _EmptyManifestBundle()));
     await tester.pump(const Duration(milliseconds: 100));
     expect(tester.binding.hasScheduledFrame, isTrue);
 
     await tester.pumpWidget(_app(ticker: false));
     await tester.pump(const Duration(milliseconds: 100));
 
+    expect(find.byType(PetAvatar), findsOneWidget);
     expect(tester.binding.hasScheduledFrame, isFalse);
   });
 
@@ -168,8 +174,8 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _app(
-        lottieAsset: _stickerPath,
-        bundle: _FakeBundle(const {_stickerPath: '{"v": "5.7.4",'}),
+        stickerAsset: _stickerPath,
+        bundle: _FakeBundle({_stickerPath: Uint8List.fromList([1, 2, 3, 4])}),
       ),
     );
     await tester.pump();
@@ -182,8 +188,8 @@ void main() {
   testWidgets('a shipped sticker file replaces the portrait', (tester) async {
     await tester.pumpWidget(
       _app(
-        lottieAsset: _stickerPath,
-        bundle: _FakeBundle(const {_stickerPath: _fixtureSticker}),
+        stickerAsset: _stickerPath,
+        bundle: _FakeBundle({_stickerPath: _transparentPngBytes}),
       ),
     );
     for (var i = 0; i < 6; i++) {
@@ -191,23 +197,36 @@ void main() {
     }
 
     expect(tester.takeException(), isNull);
-    expect(find.byType(Lottie), findsOneWidget);
+    expect(find.byType(Image), findsOneWidget);
   });
 }
 
 class _FakeBundle extends CachingAssetBundle {
   _FakeBundle(this.assets);
 
-  final Map<String, String> assets;
+  final Map<String, Uint8List> assets;
 
   @override
   Future<ByteData> load(String key) {
     final asset = assets[key];
     if (asset != null) {
-      final bytes = Uint8List.fromList(utf8.encode(asset));
+      return Future.value(ByteData.view(asset.buffer));
+    }
+    return rootBundle.load(key);
+  }
+}
+
+class _EmptyManifestBundle extends CachingAssetBundle {
+  @override
+  Future<ByteData> load(String key) {
+    if (key == 'AssetManifest.bin') {
+      final empty = const StandardMessageCodec().encodeMessage(<Object, Object>{})!;
+      return Future.value(empty);
+    }
+    if (key == 'AssetManifest.json') {
+      final bytes = Uint8List.fromList(utf8.encode('{}'));
       return Future.value(ByteData.view(bytes.buffer));
     }
-    // Everything else (avatars, manifests) still comes from the app bundle.
     return rootBundle.load(key);
   }
 }

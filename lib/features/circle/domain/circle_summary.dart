@@ -10,7 +10,7 @@ class CircleSummary {
     required this.type,
     required this.memberCount,
     required this.createdAt,
-    this.petId = 'lovebird',
+    this.petId = 'fox',
     this.petName = 'Momo',
     this.petLevel = 1,
     this.petEnergy = 100,

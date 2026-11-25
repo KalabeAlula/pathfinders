@@ -74,7 +74,7 @@ Future<List<PetCareAction>> pumpCard(WidgetTester tester) async {
             child: CompanionCard(
               circleId: 'c1',
               currentUserId: 'u1',
-              pet: EthiopianPet.waliaIbex,
+              pet: EthiopianPet.dog,
               groupType: GroupType.family,
             ),
           ),
@@ -92,11 +92,11 @@ void main() {
     await pumpCard(tester);
 
     expect(find.text('Walia'), findsOneWidget);
-    expect(find.text('Walia Ibex'), findsOneWidget);
-    expect(find.text('ዋልያ · Resting'), findsOneWidget);
-    expect(find.text('Native to Simien Mountains cliffs'), findsOneWidget);
+    expect(find.text('Dachshund'), findsOneWidget);
+    expect(find.text('ውሻ · Resting'), findsOneWidget);
+    expect(find.text('Native to Every cozy home'), findsOneWidget);
     expect(find.text('FAMILY'), findsOneWidget);
-    expect(find.text(EthiopianPet.waliaIbex.funFact), findsOneWidget);
+    expect(find.text(EthiopianPet.dog.funFact), findsOneWidget);
     expect(find.text('Level 2'), findsOneWidget);
     expect(find.text('60 XP to level 3'), findsOneWidget);
     expect(find.text('Happy'), findsOneWidget);

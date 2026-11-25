@@ -1,73 +1,51 @@
-/// Companions native to Ethiopia, grouped by the social shape they mirror.
+/// Companions the circle adopts and cares for together.
 ///
-/// [id] values are persisted in `circles.pet_id`, and the database enforces the
-/// same group-type mapping, so changing an id is a migration.
+/// [id] values are persisted in `circles.pet_id` and validated by the
+/// database, so changing an id requires a migration.
 enum EthiopianPet {
-  lovebird(
-    id: 'lovebird',
-    commonName: 'Black-winged Lovebird',
-    scientificName: 'Agapornis taranta',
-    amharicName: 'ፍቅር ወፍ',
-    habitat: 'Ethiopian highlands',
-    funFact: 'Pairs bond for life and preen each other every day.',
-    avatarAsset: 'assets/pets/lovebird.png',
-    defaultName: 'Fikir',
-    emoji: '🦜',
+  fox(
+    id: 'fox',
+    commonName: 'Fox',
+    scientificName: 'Vulpes vulpes',
+    amharicName: 'ቀበሮ',
+    habitat: 'Highland ridges',
+    funFact: 'Clever, quick-footed, and always first to spot a shortcut.',
+    avatarAsset: 'assets/pets/fox.png',
+    defaultName: 'Foxy',
+    emoji: '🦊',
   ),
-  ethiopianWolf(
-    id: 'ethiopian_wolf',
-    commonName: 'Ethiopian Wolf',
-    scientificName: 'Canis simensis',
-    amharicName: 'ቀይ ቀበሮ',
-    habitat: 'Bale and Simien Mountains',
-    funFact: 'Africa’s rarest canid hunts alone but dens with a loyal mate.',
-    avatarAsset: 'assets/pets/ethiopian_wolf.png',
-    defaultName: 'Sene',
-    emoji: '🐺',
+  seagull(
+    id: 'seagull',
+    commonName: 'Seagull',
+    scientificName: 'Larus canus',
+    amharicName: 'የባሕር ወፍ',
+    habitat: 'Open skies and coasts',
+    funFact: 'Keeps watch from above and never misses a snack stop.',
+    avatarAsset: 'assets/pets/seagull.png',
+    defaultName: 'Gulliver',
+    emoji: '🕊️',
   ),
-  gelada(
-    id: 'gelada',
-    commonName: 'Gelada',
-    scientificName: 'Theropithecus gelada',
-    amharicName: 'ጨለዳ',
-    habitat: 'Simien Mountains plateau',
-    funFact: 'Troops groom and chatter all day to keep friendships strong.',
-    avatarAsset: 'assets/pets/gelada.png',
-    defaultName: 'Chele',
-    emoji: '🐒',
+  dog(
+    id: 'dog',
+    commonName: 'Dachshund',
+    scientificName: 'Canis familiaris',
+    amharicName: 'ውሻ',
+    habitat: 'Every cozy home',
+    funFact: 'Small legs, boundless loyalty, and always ready for a walk.',
+    avatarAsset: 'assets/pets/dog.png',
+    defaultName: 'Salchicha',
+    emoji: '🐶',
   ),
-  baleMonkey(
-    id: 'bale_monkey',
-    commonName: 'Bale Monkey',
-    scientificName: 'Chlorocebus djamdjamensis',
-    amharicName: 'የባሌ ዝንጀሮ',
-    habitat: 'Bale Mountains bamboo forest',
-    funFact: 'Agile troops leap through bamboo and play chase for hours.',
-    avatarAsset: 'assets/pets/bale_monkey.png',
-    defaultName: 'Bale',
-    emoji: '🐵',
-  ),
-  waliaIbex(
-    id: 'walia_ibex',
-    commonName: 'Walia Ibex',
-    scientificName: 'Capra walie',
-    amharicName: 'ዋልያ',
-    habitat: 'Simien Mountains cliffs',
-    funFact: 'Herds post lookouts on cliff edges to guard the young.',
-    avatarAsset: 'assets/pets/walia_ibex.png',
-    defaultName: 'Walia',
-    emoji: '🐐',
-  ),
-  ethiopianLion(
-    id: 'lion',
-    commonName: 'Black-maned Ethiopian Lion',
-    scientificName: 'Panthera leo',
-    amharicName: 'አንበሳ',
-    habitat: 'Bale Mountains and southern savanna',
-    funFact: 'A pride raises its cubs together and guards the whole family.',
-    avatarAsset: 'assets/pets/lion.png',
-    defaultName: 'Anbessa',
-    emoji: '🦁',
+  orangutan(
+    id: 'orangutan',
+    commonName: 'Orangutan',
+    scientificName: 'Pongo pygmaeus',
+    amharicName: 'ኦራንጉታን',
+    habitat: 'Canopy treetops',
+    funFact: 'Builds a fresh leafy nest every night and loves unhurried company.',
+    avatarAsset: 'assets/pets/orangutan.png',
+    defaultName: 'Bobo',
+    emoji: '🦧',
   );
 
   const EthiopianPet({
@@ -94,7 +72,7 @@ enum EthiopianPet {
   /// Fallback used when the badge asset cannot be decoded.
   final String emoji;
 
-  static const fallback = lovebird;
+  static const fallback = fox;
 
   static EthiopianPet byId(String? id) => tryById(id) ?? fallback;
 
@@ -102,6 +80,12 @@ enum EthiopianPet {
     for (final pet in values) {
       if (pet.id == id) return pet;
     }
-    return null;
+    return switch (id) {
+      'lovebird' || 'lion' => fox,
+      'ethiopian_wolf' => seagull,
+      'bale_monkey' || 'walia_ibex' => dog,
+      'gelada' => orangutan,
+      _ => null,
+    };
   }
 }

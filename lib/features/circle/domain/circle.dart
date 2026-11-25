@@ -13,7 +13,7 @@ class Circle {
     required this.createdAt,
     this.type = GroupType.friends,
     this.createdBy,
-    this.petId = 'lovebird',
+    this.petId = 'fox',
     this.petName = 'Momo',
     this.petLevel = 1,
     this.petMood = 'content',

@@ -46,7 +46,6 @@ dependencies:
   shared_preferences: ^2.5.6
   image_picker: ^1.2.4
   flutter_local_notifications: ^22.3.3
-  lottie: ^3.8.2
   firebase_core: ^5.1.0
   firebase_messaging: ^17.0.1
   timezone: ^0.11.2
@@ -104,14 +103,12 @@ flutter:
   assets:
     - assets/branding/
     - assets/pets/
-    # Flutter asset dirs are not recursive: each sticker folder is listed so a
-    # dropped-in <mood>.json ships without another pubspec change.
-    - assets/pets/ethiopian_wolf/
-    - assets/pets/gelada/
-    - assets/pets/walia_ibex/
-    - assets/pets/lovebird/
-    - assets/pets/lion/
-    - assets/pets/bale_monkey/
+    # Flutter asset dirs are not recursive: each pet folder is listed so
+    # dropped-in <mood>_<n>.webp stickers ship without another pubspec change.
+    - assets/pets/fox/
+    - assets/pets/seagull/
+    - assets/pets/dog/
+    - assets/pets/orangutan/
     - assets/avatars/
 
   fonts:

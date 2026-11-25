@@ -10,21 +10,21 @@ enum GroupType {
     label: 'Couple',
     capacity: 2,
     blurb: 'For the two of you, and everything you share.',
-    petIds: ['lovebird', 'ethiopian_wolf'],
+    petIds: ['fox', 'seagull', 'dog', 'orangutan'],
   ),
   friends(
     dbValue: 'friends',
     label: 'Friends',
     capacity: 4,
     blurb: 'The crew you make plans with and actually keep them.',
-    petIds: ['gelada', 'bale_monkey'],
+    petIds: ['fox', 'seagull', 'dog', 'orangutan'],
   ),
   family(
     dbValue: 'family',
     label: 'Family',
     capacity: 6,
     blurb: 'A wider table for the people who always show up.',
-    petIds: ['walia_ibex', 'lion'],
+    petIds: ['fox', 'seagull', 'dog', 'orangutan'],
   );
 
   const GroupType({

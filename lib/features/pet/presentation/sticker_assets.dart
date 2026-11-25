@@ -2,19 +2,16 @@ import 'package:flutter/services.dart';
 
 import '../domain/pet_mood.dart';
 
-/// Where a pet's vector sticker for [mood] belongs:
-/// `assets/pets/<pet id>/<mood>.json`.
-///
-/// Stickers are transparent, full-bleed art sized to the square, so the
-/// widget can swap them in without changing its layout.
-String petStickerAssetPath(String petId, PetMood mood) =>
-    'assets/pets/$petId/${mood.name}.json';
+/// Default animated WebP path for [petId] and [mood]:
+/// `assets/pets/<pet id>/<mood>_<index>.webp`.
+String petStickerAssetPath(String petId, PetMood mood, {int index = 1}) =>
+    'assets/pets/$petId/${mood.name}_$index.webp';
 
 /// Which sticker files this build actually ships.
 ///
 /// Resolution reads the asset manifest instead of a hand-written list, so
-/// dropping a new Lottie file under `assets/pets/` lights that state up with
-/// no code change, and everything else keeps the procedural portrait.
+/// dropping additional `<mood>_<n>.webp` expressions under `assets/pets/<id>/`
+/// lights them up with no code change.
 class PetStickerAssets {
   PetStickerAssets._();
 
@@ -24,5 +21,19 @@ class PetStickerAssets {
     return _index[bundle] ??= AssetManifest.loadFromAssetBundle(bundle)
         .then((manifest) => manifest.listAssets().toSet())
         .catchError((Object _) => <String>{});
+  }
+
+  /// All bundled expression paths for [petId] in [mood], sorted cleanly.
+  static List<String> expressionsFor(
+    Set<String> manifest,
+    String petId,
+    PetMood mood,
+  ) {
+    final prefix = 'assets/pets/$petId/${mood.name}_';
+    final matches = manifest
+        .where((path) => path.startsWith(prefix) && path.endsWith('.webp'))
+        .toList()
+      ..sort();
+    return matches;
   }
 }
