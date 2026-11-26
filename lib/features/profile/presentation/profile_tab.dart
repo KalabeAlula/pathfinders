@@ -212,6 +212,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                     fallbackInitials: profile.displayName.isEmpty
                         ? '?'
                         : profile.displayName.substring(0, 1).toUpperCase(),
+                    animate: true, // Animate header avatar
                   ),
                 ),
                 const SizedBox(width: AppSpacing.lg),
@@ -1033,7 +1034,10 @@ class _AvatarTile extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    AnimalAvatarView(avatarId: avatar.id),
+                    AnimalAvatarView(
+                      avatarId: avatar.id,
+                      animate: selected, // Animate only selected tile
+                    ),
                     if (selected)
                       Positioned(
                         right: 0,

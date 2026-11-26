@@ -16,6 +16,7 @@ class MemberAvatar extends StatelessWidget {
     this.isApproximate = false,
     this.showStatusBadge = true,
     this.badgeBorderColor,
+    this.animate = false,
   });
 
   final UserProfile profile;
@@ -25,6 +26,10 @@ class MemberAvatar extends StatelessWidget {
   final bool isApproximate;
   final bool showStatusBadge;
   final Color? badgeBorderColor;
+
+  /// If true, loads animated WebP avatar from Supabase (profile headers/groups).
+  /// If false, uses static PNG (chat bubbles, map pins).
+  final bool animate;
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +89,7 @@ class MemberAvatar extends StatelessWidget {
                     avatarId: animal.id,
                     size: size,
                     fallbackInitials: profile.initials,
+                    animate: animate,
                   ),
           ),
           if (showStatusBadge)

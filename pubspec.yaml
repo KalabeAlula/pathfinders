@@ -105,8 +105,9 @@ flutter:
     - assets/branding/
     - assets/pets/
     # Animated WebP stickers now hosted in Supabase Storage (pet-stickers bucket).
-    # Only static PNG avatars remain bundled.
+    # Static PNG avatars bundled for Mapbox pins/offline/placeholders.
     - assets/avatars/
+    - assets/avatars/converted/
 
   fonts:
     - family: PhosphorDuotone

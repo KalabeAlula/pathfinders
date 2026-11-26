@@ -716,7 +716,7 @@ class _ChatTabState extends ConsumerState<ChatTab> with WidgetsBindingObserver {
                                             message.senderId ==
                                             widget.currentUserId,
                                         currentUserId: widget.currentUserId,
-                                        members: _memberProfiles,
+                                        members: widget.members,
                                         applyingDestination: _applying.contains(
                                           message.id,
                                         ),
@@ -858,7 +858,7 @@ class _MessageRow extends StatelessWidget {
   final ChatMessage message;
   final bool isMine;
   final String currentUserId;
-  final List<UserProfile> members;
+  final List<CircleMember> members;
   final ValueChanged<String> onVote;
   final ValueChanged<ChatPollOption> onMakeDestination;
   final bool applyingDestination;
@@ -927,7 +927,9 @@ class _MessageRow extends StatelessWidget {
         mutedColor: mutedColor,
         quote: quote,
         isMine: isMine,
-        members: members,
+        members: [
+          for (final m in members) m.profile,
+        ], // Extract UserProfiles for mentions
         mentionColor: isMine ? scheme.onPrimary : scheme.primary,
         mentionBackground: (isMine ? scheme.onPrimary : scheme.primary)
             .withValues(alpha: isMine ? 0.22 : 0.14),
@@ -943,7 +945,7 @@ class _MessageRow extends StatelessWidget {
             : MainAxisAlignment.start,
         children: [
           if (!isMine) ...[
-            _SenderAvatar(message: message),
+            _SenderAvatar(message: message, members: members),
             const SizedBox(width: 8),
           ],
           Flexible(
@@ -974,9 +976,10 @@ class _MessageRow extends StatelessWidget {
 }
 
 class _SenderAvatar extends StatelessWidget {
-  const _SenderAvatar({required this.message});
+  const _SenderAvatar({required this.message, required this.members});
 
   final ChatMessage message;
+  final List<CircleMember> members;
 
   @override
   Widget build(BuildContext context) {
@@ -995,14 +998,23 @@ class _SenderAvatar extends StatelessWidget {
         ),
       );
     }
+
+    // Resolve avatarId from members list (no DB migration needed!)
+    final member = members.cast<CircleMember?>().firstWhere(
+      (m) => m?.profile.id == message.senderId,
+      orElse: () => null,
+    );
+
     return MemberAvatar(
       profile: UserProfile(
         id: message.senderId,
         displayName: message.senderName,
         avatarColor: message.senderAvatarColor,
+        avatarId: member?.profile.avatarId, // ← Resolved from members list
       ),
       size: 28,
       showStatusBadge: false,
+      animate: false, // Static in chat scroll for performance
     );
   }
 }
