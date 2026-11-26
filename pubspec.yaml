@@ -50,6 +50,7 @@ dependencies:
   firebase_messaging: ^17.0.1
   timezone: ^0.11.2
   flutter_timezone: ^5.1.1
+  flutter_cache_manager: ^3.4.1
 
 dev_dependencies:
   flutter_test:
@@ -103,12 +104,8 @@ flutter:
   assets:
     - assets/branding/
     - assets/pets/
-    # Flutter asset dirs are not recursive: each pet folder is listed so
-    # dropped-in <mood>_<n>.webp stickers ship without another pubspec change.
-    - assets/pets/fox/
-    - assets/pets/seagull/
-    - assets/pets/dog/
-    - assets/pets/orangutan/
+    # Animated WebP stickers now hosted in Supabase Storage (pet-stickers bucket).
+    # Only static PNG avatars remain bundled.
     - assets/avatars/
 
   fonts:

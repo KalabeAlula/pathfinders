@@ -7,6 +7,7 @@ import '../../domain/ethiopian_pet.dart';
 import '../../domain/pet_mood.dart';
 import '../pet_mood_visuals.dart';
 import '../sticker_assets.dart';
+import 'cached_sticker.dart';
 import 'pet_avatar.dart';
 
 /// A companion portrait that moves with the circle's mood.
@@ -80,8 +81,7 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
     if (oldWidget.pet != widget.pet || oldWidget.mood != widget.mood) {
       _expressionIndex = 0;
     }
-    if (oldWidget.mood != widget.mood &&
-        widget.mood == PetMood.celebrating) {
+    if (oldWidget.mood != widget.mood && widget.mood == PetMood.celebrating) {
       _celebrate();
     }
   }
@@ -141,10 +141,7 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
                 color: accent,
               ),
             if (_showBubble)
-              _SpeechBubble(
-                label: widget.pet.tapReply,
-                size: widget.size,
-              ),
+              _SpeechBubble(label: widget.pet.tapReply, size: widget.size),
           ],
         );
       },
@@ -176,7 +173,6 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
     final tickerEnabled = TickerMode.valuesOf(context).enabled;
     final disableAnimations = MediaQuery.disableAnimationsOf(context);
     final animate = tickerEnabled && !disableAnimations;
-    final bundle = DefaultAssetBundle.of(context);
 
     final fallback = _ProceduralSticker(
       key: ValueKey('${pet.id}-${widget.mood.name}-fallback'),
@@ -197,29 +193,46 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
       );
     }
 
-    final String? resolvedAsset;
+    final String? resolvedSource;
     if (widget.stickerAsset != null) {
-      resolvedAsset = widget.stickerAsset;
+      resolvedSource = widget.stickerAsset;
     } else {
       final expressions = PetStickerAssets.expressionsFor(pet.id, widget.mood);
-      resolvedAsset = expressions.isEmpty
+      resolvedSource = expressions.isEmpty
           ? null
           : expressions[_expressionIndex % expressions.length];
     }
 
-    if (resolvedAsset == null) {
+    if (resolvedSource == null) {
       return _crossFade(fallback);
     }
 
-    return _crossFade(
-      _AnimatedImageSticker(
-        key: ValueKey(resolvedAsset),
-        asset: resolvedAsset,
-        size: widget.size,
-        bundle: bundle,
-        fallback: fallback,
-      ),
-    );
+    // Check if it's a URL (remote) or asset path (local)
+    final isRemote =
+        resolvedSource.startsWith('http://') ||
+        resolvedSource.startsWith('https://');
+
+    if (isRemote) {
+      return _crossFade(
+        CachedNetworkSticker(
+          key: ValueKey(resolvedSource),
+          url: resolvedSource,
+          size: widget.size,
+          fallback: fallback,
+        ),
+      );
+    } else {
+      final bundle = DefaultAssetBundle.of(context);
+      return _crossFade(
+        _AnimatedImageSticker(
+          key: ValueKey(resolvedSource),
+          asset: resolvedSource,
+          size: widget.size,
+          bundle: bundle,
+          fallback: fallback,
+        ),
+      );
+    }
   }
 
   Widget _crossFade(Widget child) {
@@ -306,19 +319,24 @@ class _XpBadgeState extends State<_XpBadge>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
-    _dy = Tween<double>(begin: 0, end: -52).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
-    );
+    _dy = Tween<double>(
+      begin: 0,
+      end: -52,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
     _opacity = TweenSequence([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 0, end: 1)
-            .chain(CurveTween(curve: Curves.easeIn)),
+        tween: Tween<double>(
+          begin: 0,
+          end: 1,
+        ).chain(CurveTween(curve: Curves.easeIn)),
         weight: 20,
       ),
       TweenSequenceItem(tween: ConstantTween(1.0), weight: 50),
       TweenSequenceItem(
-        tween: Tween<double>(begin: 1, end: 0)
-            .chain(CurveTween(curve: Curves.easeOut)),
+        tween: Tween<double>(
+          begin: 1,
+          end: 0,
+        ).chain(CurveTween(curve: Curves.easeOut)),
         weight: 30,
       ),
     ]).animate(_ctrl);
@@ -401,9 +419,7 @@ class _SpeechBubble extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: Theme.of(context)
-              .textTheme
-              .labelMedium
+          style: Theme.of(context).textTheme.labelMedium
               ?.copyWith(color: scheme.onSurface),
         ),
       ),
@@ -412,7 +428,7 @@ class _SpeechBubble extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Animated WebP image
+// Animated WebP image (local asset)
 // ---------------------------------------------------------------------------
 
 class _AnimatedImageSticker extends StatelessWidget {
@@ -628,9 +644,7 @@ class _HeartBurst extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         clipBehavior: Clip.none,
-        children: [
-          for (var i = 0; i < _angles.length; i++) _heart(i),
-        ],
+        children: [for (var i = 0; i < _angles.length; i++) _heart(i)],
       ),
     );
   }
@@ -893,10 +907,7 @@ class _Particles extends StatelessWidget {
       ),
       child: Opacity(
         opacity: math.sin(progress * math.pi).clamp(0.0, 1.0),
-        child: Transform.scale(
-          scale: 0.55 + progress * 0.6,
-          child: child,
-        ),
+        child: Transform.scale(scale: 0.55 + progress * 0.6, child: child),
       ),
     );
   }

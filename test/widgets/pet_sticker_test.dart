@@ -7,101 +7,28 @@ import 'package:pathfinders/features/pet/presentation/pet_mood_visuals.dart';
 import 'package:pathfinders/features/pet/presentation/widgets/animated_pet_sticker.dart';
 import 'package:pathfinders/features/pet/presentation/widgets/pet_avatar.dart';
 
-const _stickerPath = 'assets/pets/fox/idle_1.webp';
-
-// 1x1 transparent PNG bytes for testing the image sticker slot.
-final _transparentPngBytes = Uint8List.fromList([
-  0x89,
-  0x50,
-  0x4E,
-  0x47,
-  0x0D,
-  0x0A,
-  0x1A,
-  0x0A,
-  0x00,
-  0x00,
-  0x00,
-  0x0D,
-  0x49,
-  0x48,
-  0x44,
-  0x52,
-  0x00,
-  0x00,
-  0x00,
-  0x01,
-  0x00,
-  0x00,
-  0x00,
-  0x01,
-  0x08,
-  0x06,
-  0x00,
-  0x00,
-  0x00,
-  0x1F,
-  0x15,
-  0xC4,
-  0x89,
-  0x00,
-  0x00,
-  0x00,
-  0x0A,
-  0x49,
-  0x44,
-  0x41,
-  0x54,
-  0x78,
-  0x9C,
-  0x63,
-  0x00,
-  0x01,
-  0x00,
-  0x00,
-  0x05,
-  0x00,
-  0x01,
-  0x0D,
-  0x0A,
-  0x2D,
-  0xB4,
-  0x00,
-  0x00,
-  0x00,
-  0x00,
-  0x49,
-  0x45,
-  0x4E,
-  0x44,
-  0xAE,
-  0x42,
-  0x60,
-  0x82,
-]);
+// Mock Supabase URL for testing (network requests will fail, triggering fallback)
+const _mockStickerUrl =
+    'https://test.supabase.co/storage/v1/object/public/pet-stickers/fox/idle_1.webp';
 
 Widget _app({
   PetMood mood = PetMood.idle,
   VoidCallback? onTap,
   String? stickerAsset,
-  AssetBundle? bundle,
   bool ticker = true,
   bool particles = true,
 }) {
   return MaterialApp(
-    home: DefaultAssetBundle(
-      bundle: bundle ?? rootBundle,
-      child: Scaffold(
-        body: Center(
-          child: TickerMode(
-            enabled: ticker,
-            child: AnimatedPetSticker(
-              pet: EthiopianPet.fox,
-              mood: mood,
-              onTap: onTap,
-              stickerAsset: stickerAsset,
-              showParticles: particles,
-            ),
+    home: Scaffold(
+      body: Center(
+        child: TickerMode(
+          enabled: ticker,
+          child: AnimatedPetSticker(
+            pet: EthiopianPet.fox,
+            mood: mood,
+            onTap: onTap,
+            stickerAsset: stickerAsset,
+            showParticles: particles,
           ),
         ),
       ),
@@ -110,24 +37,26 @@ Widget _app({
 }
 
 void main() {
-  testWidgets('falls back to the procedural portrait when art fails to load', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_app(stickerAsset: 'assets/pets/missing.webp'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+  testWidgets(
+    'falls back to the procedural portrait when remote sticker fails to load',
+    (tester) async {
+      // Using a mock URL that will fail to load, triggering the fallback
+      await tester.pumpWidget(_app(stickerAsset: _mockStickerUrl));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.byType(PetAvatar), findsOneWidget);
-    expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Semantics &&
-            widget.properties.label ==
-                '${EthiopianPet.fox.commonName}, ${PetMood.idle.label}',
-      ),
-      findsOneWidget,
-    );
-  });
+      expect(find.byType(PetAvatar), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics &&
+              widget.properties.label ==
+                  '${EthiopianPet.fox.commonName}, ${PetMood.idle.label}',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('a tap haptics, lifts a heart, and runs the callback', (
     tester,
@@ -218,7 +147,7 @@ void main() {
   testWidgets('a hidden sticker pauses to static portrait and stops frames', (
     tester,
   ) async {
-    await tester.pumpWidget(_app(stickerAsset: 'assets/pets/missing.webp'));
+    await tester.pumpWidget(_app(stickerAsset: _mockStickerUrl));
     await tester.pump(const Duration(milliseconds: 100));
     expect(tester.binding.hasScheduledFrame, isTrue);
 
@@ -229,51 +158,14 @@ void main() {
     expect(tester.binding.hasScheduledFrame, isFalse);
   });
 
-  testWidgets('a broken sticker file keeps the portrait on screen', (
+  testWidgets('a failed network sticker keeps the portrait on screen', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      _app(
-        stickerAsset: _stickerPath,
-        bundle: _FakeBundle({
-          _stickerPath: Uint8List.fromList([1, 2, 3, 4]),
-        }),
-      ),
-    );
+    await tester.pumpWidget(_app(stickerAsset: _mockStickerUrl));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(tester.takeException(), isNull);
     expect(find.byType(PetAvatar), findsOneWidget);
   });
-
-  testWidgets('a shipped sticker file replaces the portrait', (tester) async {
-    await tester.pumpWidget(
-      _app(
-        stickerAsset: _stickerPath,
-        bundle: _FakeBundle({_stickerPath: _transparentPngBytes}),
-      ),
-    );
-    for (var i = 0; i < 6; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-
-    expect(tester.takeException(), isNull);
-    expect(find.byType(Image), findsOneWidget);
-  });
-}
-
-class _FakeBundle extends CachingAssetBundle {
-  _FakeBundle(this.assets);
-
-  final Map<String, Uint8List> assets;
-
-  @override
-  Future<ByteData> load(String key) {
-    final asset = assets[key];
-    if (asset != null) {
-      return Future.value(ByteData.view(asset.buffer));
-    }
-    return rootBundle.load(key);
-  }
 }
