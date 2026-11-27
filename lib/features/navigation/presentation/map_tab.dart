@@ -288,6 +288,15 @@ class _MapTabState extends ConsumerState<MapTab> {
   }
 
   @override
+  void didUpdateWidget(covariant MapTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.members != oldWidget.members) {
+      _mapMembers = widget.members;
+      _scheduleSync();
+    }
+  }
+
+  @override
   void dispose() {
     _appVisibility.removeListener(_onVisibilityChanged);
     _annotationTimer?.cancel();

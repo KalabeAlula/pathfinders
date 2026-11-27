@@ -41,13 +41,16 @@ CircleMember _member(UserProfile profile) {
 }
 
 void main() {
-  test('every catalog avatar has a unique id and a shipped asset', () {
+  test('every catalog avatar has a unique id, shipped PNG, and WebP URL', () {
+    expect(AnimalAvatar.catalog, hasLength(23));
     final ids = AnimalAvatar.catalog.map((avatar) => avatar.id).toSet();
     expect(ids, hasLength(AnimalAvatar.catalog.length));
 
     for (final avatar in AnimalAvatar.catalog) {
-      expect(avatar.id, startsWith('avatar_'));
+      expect(avatar.id, isNotEmpty);
       expect(avatar.name, isNotEmpty);
+      expect(avatar.animatedUrl, isNotNull);
+      expect(avatar.animatedUrl, endsWith('${avatar.id}.webp'));
       expect(
         File(avatar.assetPath).existsSync(),
         isTrue,
@@ -56,22 +59,28 @@ void main() {
     }
   });
 
-  test('unknown or missing ids fall back to the wolf portrait', () {
+  test('unknown or missing ids fall back to cuddleBear, legacy ids map cleanly', () {
     expect(AnimalAvatar.tryById('avatar_dragon'), isNull);
     expect(AnimalAvatar.tryById(null), isNull);
     expect(AnimalAvatar.byId('avatar_dragon').id, AnimalAvatar.fallbackId);
     expect(AnimalAvatar.byId(null).id, AnimalAvatar.fallbackId);
-    expect(AnimalAvatar.assetFor(null), AnimalAvatar.wolf.assetPath);
+    expect(AnimalAvatar.assetFor(null), AnimalAvatar.cuddleBear.assetPath);
+
+    // Legacy DB ids map to upgraded animated avatars.
+    final mappedWolf = AnimalAvatar.tryById('avatar_wolf');
+    expect(mappedWolf, isNotNull);
+    expect(mappedWolf!.animatedUrl, isNotNull);
+    expect(mappedWolf.assetPath, startsWith('assets/avatars/converted/'));
   });
 
   test('map pins resolve each member avatar id to its catalog asset', () {
     final view = MapCircleView.from(
       members: [
         _member(
-          _profile(id: 'u1', name: 'Kaleab', avatarId: 'avatar_lion'),
+          _profile(id: 'u1', name: 'Kaleab', avatarId: 'party_king'),
         ),
         _member(_profile(id: 'u2', name: 'Hana', avatarId: 'avatar_deer')),
-        _member(_profile(id: 'u3', name: 'Meron', avatarId: 'avatar_owl')),
+        _member(_profile(id: 'u3', name: 'Meron', avatarId: 'ice_monk')),
         // Rows written before avatars existed carry no id.
         _member(_profile(id: 'u4', name: 'Dawit')),
       ],
@@ -84,19 +93,19 @@ void main() {
 
     expect(
       AnimalAvatar.assetFor(pins['u1']!.avatarId),
-      'assets/avatars/lion.png',
+      AnimalAvatar.partyKing.assetPath,
     );
     expect(
       AnimalAvatar.assetFor(pins['u2']!.avatarId),
-      'assets/avatars/deer.png',
+      AnimalAvatar.scout.assetPath,
     );
     expect(
       AnimalAvatar.assetFor(pins['u3']!.avatarId),
-      'assets/avatars/owl.png',
+      AnimalAvatar.iceMonk.assetPath,
     );
     expect(
       AnimalAvatar.assetFor(pins['u4']!.avatarId),
-      'assets/avatars/wolf.png',
+      AnimalAvatar.cuddleBear.assetPath,
     );
 
     expect(pins['u1']!.isCurrentUser, isTrue);

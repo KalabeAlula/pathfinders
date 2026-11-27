@@ -2,9 +2,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../domain/pet_mood.dart';
 
+const String _fallbackSupabaseUrl = 'https://ijqweyrwyfmtkfsscarg.supabase.co';
+
 /// Supabase Storage public URL for [petId] and [mood] animated WebP sticker.
 ///
-/// Falls back to a safe placeholder URL for unit tests where Supabase isn't initialized.
+/// Falls back to the project's public Storage URL when Supabase isn't
+/// initialized yet (e.g. unit tests or early Web frames).
 String petStickerUrl(String petId, PetMood mood, {int index = 1}) {
   try {
     final client = Supabase.instance.client;
@@ -12,8 +15,7 @@ String petStickerUrl(String petId, PetMood mood, {int index = 1}) {
         .from('pet-stickers')
         .getPublicUrl('$petId/${mood.name}_$index.webp');
   } catch (_) {
-    // Fallback for unit tests where Supabase isn't initialized
-    return 'https://placeholder.supabase.co/storage/v1/object/public/pet-stickers/$petId/${mood.name}_$index.webp';
+    return '$_fallbackSupabaseUrl/storage/v1/object/public/pet-stickers/$petId/${mood.name}_$index.webp';
   }
 }
 

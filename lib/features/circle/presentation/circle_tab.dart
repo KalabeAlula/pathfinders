@@ -484,6 +484,7 @@ class _MemberRow extends StatelessWidget {
                 isPaused: status?.isPaused ?? false,
                 isApproximate: status?.isApproximate ?? false,
                 showStatusBadge: status != null,
+                animate: true, // Animate in group/circle view
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(

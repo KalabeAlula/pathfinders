@@ -106,7 +106,6 @@ flutter:
     - assets/pets/
     # Animated WebP stickers now hosted in Supabase Storage (pet-stickers bucket).
     # Static PNG avatars bundled for Mapbox pins/offline/placeholders.
-    - assets/avatars/
     - assets/avatars/converted/
 
   fonts:

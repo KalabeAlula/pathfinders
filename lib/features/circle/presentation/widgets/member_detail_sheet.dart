@@ -119,6 +119,7 @@ class MemberDetailSheet extends ConsumerWidget {
                   isApproximate: status?.isApproximate ?? false,
                   showStatusBadge: status != null,
                   badgeBorderColor: scheme.surfaceContainerLow,
+                  animate: true, // Animate in detail sheet
                 ),
                 const SizedBox(width: 16),
                 Expanded(

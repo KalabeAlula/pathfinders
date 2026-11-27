@@ -88,7 +88,7 @@ void main() {
     await pumpProfile(tester);
 
     expect(find.text('Kaleab'), findsWidgets);
-    expect(find.text('Simien Wolf'), findsWidgets);
+    expect(find.text('Outlaw'), findsWidgets);
     expect(find.text('kaleab@example.com'), findsOneWidget);
     expect(find.text('March 2026'), findsOneWidget);
     expect(find.text('Save name'), findsOneWidget);
@@ -161,7 +161,7 @@ void main() {
     final saveButton = find.byKey(const ValueKey('profile-avatar-save'));
     expect(tester.widget<FilledButton>(saveButton).onPressed, isNull);
 
-    await tester.tap(find.byKey(const ValueKey('avatar-avatar_lion')));
+    await tester.tap(find.byKey(const ValueKey('avatar-party_king')));
     await tester.pump();
 
     expect(tester.widget<FilledButton>(saveButton).onPressed, isNotNull);
@@ -169,8 +169,8 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(repository.avatars, ['avatar_lion']);
+    expect(repository.avatars, ['party_king']);
     expect(find.text('Avatar updated.'), findsOneWidget);
-    expect(find.text('Golden Lion'), findsWidgets);
+    expect(find.text('Party King'), findsWidgets);
   });
 }

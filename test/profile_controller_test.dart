@@ -107,11 +107,11 @@ void main() {
   test('selecting an animal saves its catalog id', () async {
     final error = await container
         .read(profileControllerProvider('u1').notifier)
-        .updateAvatar('avatar_ibex');
+        .updateAvatar('bush_ranger');
 
     expect(error, isNull);
-    expect(repository.avatars, ['avatar_ibex']);
-    expect(container.read(controller).value?.avatarId, 'avatar_ibex');
+    expect(repository.avatars, ['bush_ranger']);
+    expect(container.read(controller).value?.avatarId, 'bush_ranger');
   });
 
   test('unknown animal ids are refused without a write', () async {

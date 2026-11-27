@@ -63,6 +63,7 @@ class MemberCard extends StatelessWidget {
                         isPaused: status?.isPaused ?? false,
                         isApproximate: status?.isApproximate ?? false,
                         showStatusBadge: status != null,
+                        animate: true, // Animate in member cards
                       ),
                       const Spacer(),
                       if (status == null)

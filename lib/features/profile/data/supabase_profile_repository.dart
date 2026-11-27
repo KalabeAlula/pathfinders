@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
+import '../domain/animal_avatar.dart';
 import '../domain/profile_details.dart';
 import '../domain/profile_failure.dart';
 import '../domain/profile_repository.dart';
@@ -101,7 +102,7 @@ class SupabaseProfileRepository implements ProfileRepository {
 
   static String _avatarId(Object? value) {
     final id = value is String ? value.trim() : '';
-    return id.isEmpty ? 'avatar_wolf' : id;
+    return id.isEmpty ? AnimalAvatar.fallbackId : id;
   }
 
   static ProfileFailure _mapFailure(sb.PostgrestException error) {

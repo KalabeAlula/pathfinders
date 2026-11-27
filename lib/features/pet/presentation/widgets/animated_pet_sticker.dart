@@ -1,13 +1,14 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../app/widgets/animated_webp_sticker.dart';
 import '../../domain/ethiopian_pet.dart';
 import '../../domain/pet_mood.dart';
 import '../pet_mood_visuals.dart';
 import '../sticker_assets.dart';
-import 'cached_sticker.dart';
 import 'pet_avatar.dart';
 
 /// A companion portrait that moves with the circle's mood.
@@ -172,7 +173,10 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
     final pet = widget.pet;
     final tickerEnabled = TickerMode.valuesOf(context).enabled;
     final disableAnimations = MediaQuery.disableAnimationsOf(context);
-    final animate = tickerEnabled && !disableAnimations;
+    // On Web (especially Windows browsers with reduced-motion/animation-effects
+    // turned off), disableAnimations can be true even when the user expects
+    // animated WebP stickers, so only pause when TickerMode is off.
+    final animate = kIsWeb ? tickerEnabled : (tickerEnabled && !disableAnimations);
 
     final fallback = _ProceduralSticker(
       key: ValueKey('${pet.id}-${widget.mood.name}-fallback'),
@@ -184,8 +188,13 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
     );
 
     // Pause animated decoding when hidden (e.g. offscreen IndexedStack tab)
-    // or when reduced-motion is enabled — show the static PNG portrait.
+    // or when reduced-motion is enabled on native — show the static PNG portrait.
     if (!animate) {
+      if (kDebugMode && !tickerEnabled) {
+        debugPrint(
+          'AnimatedPetSticker(${pet.id}): paused because TickerMode is disabled',
+        );
+      }
       return PetAvatar(
         key: ValueKey('${pet.id}-paused'),
         pet: pet,
@@ -214,11 +223,12 @@ class _AnimatedPetStickerState extends State<AnimatedPetSticker>
 
     if (isRemote) {
       return _crossFade(
-        CachedNetworkSticker(
+        AnimatedWebpSticker(
           key: ValueKey(resolvedSource),
           url: resolvedSource,
           size: widget.size,
           fallback: fallback,
+          semanticLabel: '${pet.commonName}, ${widget.mood.label}',
         ),
       );
     } else {

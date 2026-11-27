@@ -1,92 +1,31 @@
-/// The curated animal portraits a member can wear across the app.
+/// The curated character portraits a member can wear across the app.
 ///
 /// Ids are stored in `profiles.avatar_id`, so they must stay stable even if an
 /// asset is redrawn. [byId] always answers with a usable avatar so a stale or
 /// missing id never leaves a pin or header blank.
 ///
-/// Supports both legacy Ethiopian animal avatars (static PNGs) and new animated
-/// Fortnite-style character avatars (animated WebPs from Supabase Storage).
+/// Each avatar has a bundled static PNG in `assets/avatars/converted/` (for
+/// Mapbox pins, placeholders, and offline fallback) and an animated WebP in
+/// Supabase Storage (`avatar-stickers` bucket). Legacy Ethiopian animal ids
+/// are mapped to corresponding new animated avatars so existing DB rows upgrade
+/// seamlessly.
 class AnimalAvatar {
   const AnimalAvatar({
     required this.id,
     required this.name,
     required this.assetPath,
     this.animatedUrl,
-    this.isLegacy = false,
   });
 
   final String id;
   final String name;
   final String assetPath; // Static PNG for Mapbox/offline/placeholder
   final String? animatedUrl; // Animated WebP URL from Supabase Storage
-  final bool isLegacy; // True for old Ethiopian animals
 
   static const String fallbackId = 'cuddle_bear';
   static const String _supabaseUrl = 'https://ijqweyrwyfmtkfsscarg.supabase.co';
   static const String _storagePath =
       '/storage/v1/object/public/avatar-stickers';
-
-  // ========== LEGACY ETHIOPIAN ANIMALS (backward compatibility) ==========
-  static const AnimalAvatar wolf = AnimalAvatar(
-    id: 'avatar_wolf',
-    name: 'Simien Wolf',
-    assetPath: 'assets/avatars/wolf.png',
-    isLegacy: true,
-  );
-  static const AnimalAvatar lion = AnimalAvatar(
-    id: 'avatar_lion',
-    name: 'Golden Lion',
-    assetPath: 'assets/avatars/lion.png',
-    isLegacy: true,
-  );
-  static const AnimalAvatar lovebird = AnimalAvatar(
-    id: 'avatar_lovebird',
-    name: 'Lovebird',
-    assetPath: 'assets/avatars/lovebird.png',
-    isLegacy: true,
-  );
-  static const AnimalAvatar ibex = AnimalAvatar(
-    id: 'avatar_ibex',
-    name: 'Walia Ibex',
-    assetPath: 'assets/avatars/ibex.png',
-    isLegacy: true,
-  );
-  static const AnimalAvatar gelada = AnimalAvatar(
-    id: 'avatar_gelada',
-    name: 'Gelada',
-    assetPath: 'assets/avatars/gelada.png',
-    isLegacy: true,
-  );
-  static const AnimalAvatar monkey = AnimalAvatar(
-    id: 'avatar_monkey',
-    name: 'Bale Monkey',
-    assetPath: 'assets/avatars/monkey.png',
-    isLegacy: true,
-  );
-  static const AnimalAvatar owl = AnimalAvatar(
-    id: 'avatar_owl',
-    name: 'Bubo Owl',
-    assetPath: 'assets/avatars/owl.png',
-    isLegacy: true,
-  );
-  static const AnimalAvatar bear = AnimalAvatar(
-    id: 'avatar_bear',
-    name: 'Highland Bear',
-    assetPath: 'assets/avatars/bear.png',
-    isLegacy: true,
-  );
-  static const AnimalAvatar deer = AnimalAvatar(
-    id: 'avatar_deer',
-    name: 'Mountain Deer',
-    assetPath: 'assets/avatars/deer.png',
-    isLegacy: true,
-  );
-  static const AnimalAvatar cat = AnimalAvatar(
-    id: 'avatar_cat',
-    name: 'Abyssinian Cat',
-    assetPath: 'assets/avatars/cat.png',
-    isLegacy: true,
-  );
 
   // ========== NEW ANIMATED FORTNITE-STYLE AVATARS ==========
   static const AnimalAvatar cuddleBear = AnimalAvatar(
@@ -228,28 +167,39 @@ class AnimalAvatar {
     animatedUrl: '$_supabaseUrl$_storagePath/cash_grab.webp',
   );
 
-  /// Catalog of all 33 avatars (23 new + 10 legacy).
-  /// New animated avatars shown first in picker.
+  /// Catalog of the 23 animated character avatars shown in the picker.
   static const List<AnimalAvatar> catalog = [
-    // New animated characters (shown in picker)
     cuddleBear, techBandit, darkKnight, roboSoldier, partyKing, bushRanger,
     skullTrooper, tomatoHead, tacOps, outlaw, iceMonk, loveRanger,
     dabChampion, astroAce, bunnyBrawler, blueHoodie, goGo, grumpyWitch,
     gingerbread, llamaLoot, scout, hypeDancer, cashGrab,
-    // Legacy (not shown in picker, but resolved by ID for existing users)
-    wolf, lion, lovebird, ibex, gelada, monkey, owl, bear, deer, cat,
   ];
+
+  /// Maps legacy Ethiopian animal ids still stored in `profiles.avatar_id` to
+  /// their upgraded animated counterparts.
+  static const Map<String, AnimalAvatar> _legacyAliases = {
+    'avatar_wolf': outlaw,
+    'avatar_lion': partyKing,
+    'avatar_lovebird': loveRanger,
+    'avatar_ibex': bushRanger,
+    'avatar_gelada': techBandit,
+    'avatar_monkey': hypeDancer,
+    'avatar_owl': iceMonk,
+    'avatar_bear': cuddleBear,
+    'avatar_deer': scout,
+    'avatar_cat': bunnyBrawler,
+  };
 
   static AnimalAvatar byId(String? id) => tryById(id) ?? cuddleBear;
 
   /// Null for ids this build does not know, so callers can fall back to
-  /// initials rather than showing the wrong animal.
+  /// initials rather than showing the wrong avatar.
   static AnimalAvatar? tryById(String? id) {
     if (id == null) return null;
     for (final avatar in catalog) {
       if (avatar.id == id) return avatar;
     }
-    return null;
+    return _legacyAliases[id];
   }
 
   static String assetFor(String? id) => byId(id).assetPath;

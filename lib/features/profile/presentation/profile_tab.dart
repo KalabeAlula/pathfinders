@@ -130,11 +130,14 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
       final profile = next.value;
       if (profile == null) return;
       final previousProfile = previous?.value;
+      final currentAvatarId = AnimalAvatar.byId(profile.avatarId).id;
+      final previousAvatarId = previousProfile == null
+          ? null
+          : AnimalAvatar.byId(previousProfile.avatarId).id;
       final avatarChanged =
-          previousProfile == null ||
-          previousProfile.avatarId != profile.avatarId;
-      if (avatarChanged && _draftAvatarId == previousProfile?.avatarId) {
-        _draftAvatarId = profile.avatarId;
+          previousAvatarId == null || previousAvatarId != currentAvatarId;
+      if (avatarChanged && _draftAvatarId == previousAvatarId) {
+        _draftAvatarId = currentAvatarId;
       }
       if (!_nameFocus.hasFocus &&
           (previousProfile == null ||
@@ -157,13 +160,16 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
       return const SafeArea(child: Center(child: CircularProgressIndicator()));
     }
 
+    final canonicalProfileAvatarId = AnimalAvatar.byId(profile.avatarId).id;
     if (!_hydrated) {
       _hydrated = true;
       _nameController.text = profile.displayName;
-      _draftAvatarId = profile.avatarId;
+      _draftAvatarId = canonicalProfileAvatarId;
     }
 
-    final selectedAvatarId = _draftAvatarId ?? profile.avatarId;
+    final selectedAvatarId = AnimalAvatar.byId(
+      _draftAvatarId ?? canonicalProfileAvatarId,
+    ).id;
     final trimmedName = _nameController.text.trim();
     final nameDirty = trimmedName != profile.displayName;
     final canSaveName =
@@ -171,7 +177,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
         nameDirty &&
         trimmedName.isNotEmpty &&
         trimmedName.length <= maxDisplayNameLength;
-    final avatarDirty = selectedAvatarId != profile.avatarId;
+    final avatarDirty = selectedAvatarId != canonicalProfileAvatarId;
 
     return SafeArea(
       bottom: false,

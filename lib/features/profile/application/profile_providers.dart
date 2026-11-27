@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../auth/application/auth_providers.dart';
+import '../../circle/application/circle_providers.dart';
 import '../data/supabase_profile_repository.dart';
 import '../domain/animal_avatar.dart';
 import '../domain/profile_details.dart';
@@ -94,6 +95,9 @@ class ProfileController extends _$ProfileController {
     state = AsyncData(optimistic);
     try {
       await write();
+      // Refresh the active circle snapshot immediately so MapTab, CircleTab,
+      // and ChatTab reflect the new avatar/name without waiting on realtime.
+      if (ref.mounted) ref.invalidate(circleSnapshotProvider(userId));
       return null;
     } on ProfileFailure catch (error) {
       if (ref.mounted) state = AsyncData(previous);
