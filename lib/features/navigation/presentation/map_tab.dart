@@ -719,15 +719,19 @@ class _MapTabState extends ConsumerState<MapTab> {
 
   void _applyOrnamentMargins(MapboxMap map) {
     if (kIsWeb) return;
-    final topMargin = MediaQuery.paddingOf(context).top + 8;
+    final topPadding = MediaQuery.paddingOf(context).top;
+    // Place the scale bar in the gap between the status bar clock and the
+    // search bar so the search bar never covers it.
+    final scaleBarTop = (topPadding - 6).clamp(0.0, double.infinity);
+    final compassTop = topPadding + 8;
     unawaited(
       map.scaleBar
-          .updateSettings(ScaleBarSettings(marginTop: topMargin))
+          .updateSettings(ScaleBarSettings(marginTop: scaleBarTop))
           .catchError((_) {}),
     );
     unawaited(
       map.compass
-          .updateSettings(CompassSettings(marginTop: topMargin))
+          .updateSettings(CompassSettings(marginTop: compassTop))
           .catchError((_) {}),
     );
   }
@@ -1028,7 +1032,7 @@ class _MapTabState extends ConsumerState<MapTab> {
 
     _applyStandardStyle();
 
-    final annotations = MapboxLiveAnnotations(map, iconScale: 0.55);
+    final annotations = MapboxLiveAnnotations(map, iconScale: 0.62);
     annotations.onMemberTapped = (memberId) {
       for (final member in _currentMembers) {
         if (member.profile.id == memberId) {

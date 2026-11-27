@@ -65,12 +65,12 @@ abstract final class MapMarkerImages {
     required bool isCurrentUser,
   }) async {
     // Extra height below the circle holds the location triangle; the
-    // annotation is anchored at the triangle tip. Drawn at 2x resolution so
+    // annotation is anchored at the triangle tip. Drawn at 2.5x resolution so
     // character artwork stays sharp at on-map display sizes.
-    const width = 224.0;
-    const height = 288.0;
-    const center = Offset(width / 2, 100);
-    const radius = 82.0;
+    const width = 280.0;
+    const height = 360.0;
+    const center = Offset(width / 2, 125);
+    const radius = 102.5;
     final ringColor = approximate ? const Color(0xFFE0A93E) : accent;
 
     final recorder = ui.PictureRecorder();
@@ -78,46 +78,46 @@ abstract final class MapMarkerImages {
 
     // Anchor triangle, drawn first so the badge overlaps its base.
     final triangle = Path()
-      ..moveTo(width / 2 - 24, center.dy + radius - 8)
-      ..lineTo(width / 2, height - 4)
-      ..lineTo(width / 2 + 24, center.dy + radius - 8)
+      ..moveTo(width / 2 - 30, center.dy + radius - 10)
+      ..lineTo(width / 2, height - 5)
+      ..lineTo(width / 2 + 30, center.dy + radius - 10)
       ..close();
 
     canvas.drawPath(
-      triangle.shift(const Offset(0, 4)),
+      triangle.shift(const Offset(0, 5)),
       Paint()
         ..color = const Color(0x3D000000)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
     );
     canvas.drawPath(triangle, Paint()..color = Colors.white);
     canvas.save();
-    canvas.translate(width / 2, center.dy + radius - 8);
+    canvas.translate(width / 2, center.dy + radius - 10);
     canvas.scale(0.72);
-    canvas.translate(-width / 2, -(center.dy + radius - 8));
+    canvas.translate(-width / 2, -(center.dy + radius - 10));
     canvas.drawPath(triangle, Paint()..color = ringColor);
     canvas.restore();
 
     // Shadow and outer ring. The local member gets a wider double ring so
     // "You" reads at a glance even among four peers.
     canvas.drawCircle(
-      center + const Offset(0, 6),
-      radius + (isCurrentUser ? 12 : 8),
+      center + const Offset(0, 7.5),
+      radius + (isCurrentUser ? 15 : 10),
       Paint()
         ..color = const Color(0x45000000)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12.5),
     );
     canvas.drawCircle(
       center,
-      radius + (isCurrentUser ? 14 : 10),
+      radius + (isCurrentUser ? 17.5 : 12.5),
       Paint()..color = Colors.white,
     );
     canvas.drawCircle(
       center,
-      radius + (isCurrentUser ? 12 : 8),
+      radius + (isCurrentUser ? 15 : 10),
       Paint()
         ..color = ringColor
         ..style = PaintingStyle.stroke
-        ..strokeWidth = isCurrentUser ? 9.0 : 7.0,
+        ..strokeWidth = isCurrentUser ? 11.25 : 8.75,
     );
 
     final image = await _loadAvatar(AnimalAvatar.byId(avatarId).assetPath);
@@ -139,7 +139,7 @@ abstract final class MapMarkerImages {
           text: initials,
           style: TextStyle(
             color: Color.lerp(accent, Colors.black, 0.28),
-            fontSize: initials.length > 2 ? 48 : 60,
+            fontSize: initials.length > 2 ? 60 : 75,
             fontWeight: FontWeight.w800,
             height: 1,
           ),
@@ -164,8 +164,8 @@ abstract final class MapMarkerImages {
         final data = await rootBundle.load(assetPath);
         final codec = await ui.instantiateImageCodec(
           data.buffer.asUint8List(),
-          targetWidth: 384,
-          targetHeight: 384,
+          targetWidth: 480,
+          targetHeight: 480,
         );
         final frame = await codec.getNextFrame();
         return frame.image;

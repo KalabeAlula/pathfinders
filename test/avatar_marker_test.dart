@@ -114,7 +114,7 @@ void main() {
     expect(pins['u2']!.isCurrentUser, isFalse);
   });
 
-  testWidgets('memberAvatar renders crisp 2x bitmap dimensions', (
+  testWidgets('memberAvatar renders crisp 2.5x bitmap dimensions', (
     tester,
   ) async {
     MapMarkerImages.clearCache();
@@ -130,8 +130,8 @@ void main() {
     final codec = await tester.runAsync(() => ui.instantiateImageCodec(bytes!));
     final frame = await tester.runAsync(() => codec!.getNextFrame());
     final image = frame!.image;
-    expect(image.width, 224);
-    expect(image.height, 288);
+    expect(image.width, 280);
+    expect(image.height, 360);
     image.dispose();
   });
 }
