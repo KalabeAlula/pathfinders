@@ -65,11 +65,12 @@ abstract final class MapMarkerImages {
     required bool isCurrentUser,
   }) async {
     // Extra height below the circle holds the location triangle; the
-    // annotation is anchored at the triangle tip.
-    const width = 112.0;
-    const height = 144.0;
-    const center = Offset(width / 2, 50);
-    const radius = 41.0;
+    // annotation is anchored at the triangle tip. Drawn at 2x resolution so
+    // character artwork stays sharp at on-map display sizes.
+    const width = 224.0;
+    const height = 288.0;
+    const center = Offset(width / 2, 100);
+    const radius = 82.0;
     final ringColor = approximate ? const Color(0xFFE0A93E) : accent;
 
     final recorder = ui.PictureRecorder();
@@ -77,46 +78,46 @@ abstract final class MapMarkerImages {
 
     // Anchor triangle, drawn first so the badge overlaps its base.
     final triangle = Path()
-      ..moveTo(width / 2 - 12, center.dy + radius - 4)
-      ..lineTo(width / 2, height - 2)
-      ..lineTo(width / 2 + 12, center.dy + radius - 4)
+      ..moveTo(width / 2 - 24, center.dy + radius - 8)
+      ..lineTo(width / 2, height - 4)
+      ..lineTo(width / 2 + 24, center.dy + radius - 8)
       ..close();
 
     canvas.drawPath(
-      triangle.shift(const Offset(0, 2)),
+      triangle.shift(const Offset(0, 4)),
       Paint()
         ..color = const Color(0x3D000000)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
     );
     canvas.drawPath(triangle, Paint()..color = Colors.white);
     canvas.save();
-    canvas.translate(width / 2, center.dy + radius - 4);
+    canvas.translate(width / 2, center.dy + radius - 8);
     canvas.scale(0.72);
-    canvas.translate(-width / 2, -(center.dy + radius - 4));
+    canvas.translate(-width / 2, -(center.dy + radius - 8));
     canvas.drawPath(triangle, Paint()..color = ringColor);
     canvas.restore();
 
     // Shadow and outer ring. The local member gets a wider double ring so
     // "You" reads at a glance even among four peers.
     canvas.drawCircle(
-      center + const Offset(0, 3),
-      radius + (isCurrentUser ? 6 : 4),
+      center + const Offset(0, 6),
+      radius + (isCurrentUser ? 12 : 8),
       Paint()
         ..color = const Color(0x45000000)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
     );
     canvas.drawCircle(
       center,
-      radius + (isCurrentUser ? 7 : 5),
+      radius + (isCurrentUser ? 14 : 10),
       Paint()..color = Colors.white,
     );
     canvas.drawCircle(
       center,
-      radius + (isCurrentUser ? 6 : 4),
+      radius + (isCurrentUser ? 12 : 8),
       Paint()
         ..color = ringColor
         ..style = PaintingStyle.stroke
-        ..strokeWidth = isCurrentUser ? 4.5 : 3.5,
+        ..strokeWidth = isCurrentUser ? 9.0 : 7.0,
     );
 
     final image = await _loadAvatar(AnimalAvatar.byId(avatarId).assetPath);
@@ -128,7 +129,7 @@ abstract final class MapMarkerImages {
         image,
         Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
         face,
-        Paint()..filterQuality = FilterQuality.medium,
+        Paint()..filterQuality = FilterQuality.high,
       );
       canvas.restore();
     } else {
@@ -138,7 +139,7 @@ abstract final class MapMarkerImages {
           text: initials,
           style: TextStyle(
             color: Color.lerp(accent, Colors.black, 0.28),
-            fontSize: initials.length > 2 ? 24 : 30,
+            fontSize: initials.length > 2 ? 48 : 60,
             fontWeight: FontWeight.w800,
             height: 1,
           ),
@@ -163,8 +164,8 @@ abstract final class MapMarkerImages {
         final data = await rootBundle.load(assetPath);
         final codec = await ui.instantiateImageCodec(
           data.buffer.asUint8List(),
-          targetWidth: 192,
-          targetHeight: 192,
+          targetWidth: 384,
+          targetHeight: 384,
         );
         final frame = await codec.getNextFrame();
         return frame.image;

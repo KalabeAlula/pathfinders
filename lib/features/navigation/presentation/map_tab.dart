@@ -704,6 +704,7 @@ class _MapTabState extends ConsumerState<MapTab> {
   void _onMapCreated(MapboxMap map) {
     if (!mounted || !_mapAttached) return;
     _map = map;
+    _applyOrnamentMargins(map);
     map.addInteraction(
       TapInteraction.onMap(_handleMapTap),
       interactionID: 'picker-tap',
@@ -714,6 +715,21 @@ class _MapTabState extends ConsumerState<MapTab> {
         interactionID: 'picker-long-tap',
       );
     }
+  }
+
+  void _applyOrnamentMargins(MapboxMap map) {
+    if (kIsWeb) return;
+    final topMargin = MediaQuery.paddingOf(context).top + 8;
+    unawaited(
+      map.scaleBar
+          .updateSettings(ScaleBarSettings(marginTop: topMargin))
+          .catchError((_) {}),
+    );
+    unawaited(
+      map.compass
+          .updateSettings(CompassSettings(marginTop: topMargin))
+          .catchError((_) {}),
+    );
   }
 
   Future<void> _handleMapTap(MapContentGestureContext context) async {
@@ -996,6 +1012,10 @@ class _MapTabState extends ConsumerState<MapTab> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _applyStandardStyle();
+    final map = _map;
+    if (map != null && _mapAttached) {
+      _applyOrnamentMargins(map);
+    }
   }
 
   void _onStyleLoaded(StyleLoadedEventData event) {
@@ -1008,7 +1028,7 @@ class _MapTabState extends ConsumerState<MapTab> {
 
     _applyStandardStyle();
 
-    final annotations = MapboxLiveAnnotations(map, iconScale: 0.5);
+    final annotations = MapboxLiveAnnotations(map, iconScale: 0.55);
     annotations.onMemberTapped = (memberId) {
       for (final member in _currentMembers) {
         if (member.profile.id == memberId) {

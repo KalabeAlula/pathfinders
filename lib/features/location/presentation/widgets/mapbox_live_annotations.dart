@@ -80,7 +80,7 @@ class MapRouteLine {
 /// so the browser draws the same snapshot with a GeoJSON source and style
 /// layers instead; the GL JS render loop keeps them glued to the basemap.
 class MapboxLiveAnnotations {
-  MapboxLiveAnnotations(this._map, {this.iconScale = 0.46});
+  MapboxLiveAnnotations(this._map, {this.iconScale = 0.55});
 
   final MapboxMap _map;
   final double iconScale;

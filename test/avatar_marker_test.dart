@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,7 @@ import 'package:pathfinders/features/location/domain/geo_point.dart';
 import 'package:pathfinders/features/location/domain/member_status.dart';
 import 'package:pathfinders/features/location/domain/privacy_mode.dart';
 import 'package:pathfinders/features/location/presentation/widgets/map_circle_view.dart';
+import 'package:pathfinders/features/location/presentation/widgets/map_marker_images.dart';
 import 'package:pathfinders/features/navigation/application/navigation_state.dart';
 import 'package:pathfinders/features/profile/domain/animal_avatar.dart';
 
@@ -110,5 +112,26 @@ void main() {
 
     expect(pins['u1']!.isCurrentUser, isTrue);
     expect(pins['u2']!.isCurrentUser, isFalse);
+  });
+
+  testWidgets('memberAvatar renders crisp 2x bitmap dimensions', (
+    tester,
+  ) async {
+    MapMarkerImages.clearCache();
+    final bytes = await tester.runAsync(
+      () => MapMarkerImages.memberAvatar(
+        avatarId: AnimalAvatar.partyKing.id,
+        initials: 'KL',
+        accent: const Color(0xFF3F6FA8),
+        background: Colors.white,
+      ),
+    );
+    expect(bytes, isNotNull);
+    final codec = await tester.runAsync(() => ui.instantiateImageCodec(bytes!));
+    final frame = await tester.runAsync(() => codec!.getNextFrame());
+    final image = frame!.image;
+    expect(image.width, 224);
+    expect(image.height, 288);
+    image.dispose();
   });
 }
