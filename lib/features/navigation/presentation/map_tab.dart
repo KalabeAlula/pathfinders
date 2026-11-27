@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart'
-    show TargetPlatform, defaultTargetPlatform, kIsWeb, visibleForTesting;
+    show TargetPlatform, defaultTargetPlatform, kDebugMode, kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart' hide NavigationDestination;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart'
@@ -15,6 +15,7 @@ import '../../../core/config/mapbox_config.dart';
 import '../../chat/application/chat_providers.dart';
 import '../../circle/application/circle_providers.dart';
 import '../../circle/domain/circle_member.dart';
+import '../../circle/domain/circle_snapshot.dart';
 import '../../location/application/telemetry_providers.dart';
 import '../../location/data/last_known_location_store.dart';
 import '../../location/domain/device_telemetry.dart';
@@ -31,6 +32,7 @@ import '../domain/navigation_destination.dart';
 import '../domain/navigation_failure.dart';
 import '../domain/place_suggestion.dart';
 import '../domain/route_geometry.dart';
+import '../../profile/application/profile_providers.dart';
 import 'venue_selection.dart';
 import 'widgets/map_search_bar.dart';
 import 'widgets/trip_cockpit.dart';
@@ -256,6 +258,7 @@ class _MapTabState extends ConsumerState<MapTab> {
   void _attachNativeMap() {
     _mapAttached = true;
     _viewport = _buildViewport();
+    _scheduleSync();
   }
 
   /// Drops every handle into the native map before Flutter removes the view.
@@ -292,6 +295,9 @@ class _MapTabState extends ConsumerState<MapTab> {
     super.didUpdateWidget(oldWidget);
     if (widget.members != oldWidget.members) {
       _mapMembers = widget.members;
+      _scheduleSync();
+    }
+    if (widget.active && !oldWidget.active) {
       _scheduleSync();
     }
   }
@@ -1056,6 +1062,13 @@ class _MapTabState extends ConsumerState<MapTab> {
       navigation: navigation,
       scheme: Theme.of(context).colorScheme,
     );
+    if (kDebugMode) {
+      for (final pin in view.pins) {
+        if (pin.id == widget.currentUserId) {
+          debugPrint('[MapTab] sync self pin signature=${pin.signature}');
+        }
+      }
+    }
 
     unawaited(
       annotations.sync(
@@ -1269,11 +1282,15 @@ class _MapTabState extends ConsumerState<MapTab> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final navigation = ref.watch(navigationControllerProvider(widget.circleId));
+    final liveProfile = ref
+        .watch(profileControllerProvider(widget.currentUserId))
+        .value;
     final snapshotMembers = ref
         .watch(circleSnapshotProvider(widget.currentUserId))
         .value
         ?.members;
-    final members = snapshotMembers ?? widget.members;
+    final sourceMembers = snapshotMembers ?? widget.members;
+    final members = CircleSnapshot.applyLiveProfile(sourceMembers, liveProfile);
     _mapMembers = members;
 
     ref.listen(navigationControllerProvider(widget.circleId), (previous, next) {
@@ -1283,7 +1300,23 @@ class _MapTabState extends ConsumerState<MapTab> {
     });
     ref.listen(
       circleSnapshotProvider(widget.currentUserId),
-      (_, _) => _scheduleSync(),
+      (_, next) {
+        final members = next.value?.members;
+        if (members != null) {
+          _mapMembers = CircleSnapshot.applyLiveProfile(members, liveProfile);
+          _scheduleSync();
+        }
+      },
+    );
+    ref.listen(
+      profileControllerProvider(widget.currentUserId),
+      (_, next) {
+        final profile = next.value;
+        if (profile != null) {
+          _mapMembers = CircleSnapshot.applyLiveProfile(_currentMembers, profile);
+          _scheduleSync();
+        }
+      },
     );
     ref.listen(
       telemetryControllerProvider(widget.currentUserId)

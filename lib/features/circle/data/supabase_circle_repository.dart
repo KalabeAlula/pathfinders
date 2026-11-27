@@ -24,6 +24,15 @@ class SupabaseCircleRepository implements CircleRepository {
   final sb.SupabaseClient _client;
   final String userId;
   int _channelSequence = 0;
+  final Set<void Function()> _refreshers = {};
+
+  /// Triggers an immediate re-fetch on all active circle streams without
+  /// tearing down their Realtime channels.
+  void forceRefresh() {
+    for (final refresh in List<void Function()>.of(_refreshers)) {
+      refresh();
+    }
+  }
 
   @override
   Stream<List<CircleSummary>> watchCircles() {
@@ -63,6 +72,13 @@ class SupabaseCircleRepository implements CircleRepository {
       });
     }
 
+    void immediateRefresh() {
+      debounce?.cancel();
+      if (!changes.isClosed) changes.add(null);
+    }
+
+    _refreshers.add(immediateRefresh);
+
     var channel = _client.channel(channelName);
     for (final table in tables) {
       channel = channel.onPostgresChanges(
@@ -89,6 +105,7 @@ class SupabaseCircleRepository implements CircleRepository {
         }
       }
     } finally {
+      _refreshers.remove(immediateRefresh);
       debounce?.cancel();
       await changes.close();
       await _client.removeChannel(channel);

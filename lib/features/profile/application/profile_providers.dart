@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../auth/application/auth_providers.dart';
 import '../../circle/application/circle_providers.dart';
+import '../../circle/data/supabase_circle_repository.dart';
 import '../data/supabase_profile_repository.dart';
 import '../domain/animal_avatar.dart';
 import '../domain/profile_details.dart';
@@ -78,6 +80,13 @@ class ProfileController extends _$ProfileController {
     if (avatar == null) return 'That companion is not available.';
     if (avatar.id == profile.avatarId) return null;
 
+    if (kDebugMode) {
+      debugPrint(
+        '[ProfileController] updateAvatar($userId): '
+        '${profile.avatarId} -> ${avatar.id}',
+      );
+    }
+
     return _persist(
       optimistic: profile.copyWith(avatarId: avatar.id),
       previous: profile,
@@ -96,8 +105,19 @@ class ProfileController extends _$ProfileController {
     try {
       await write();
       // Refresh the active circle snapshot immediately so MapTab, CircleTab,
-      // and ChatTab reflect the new avatar/name without waiting on realtime.
-      if (ref.mounted) ref.invalidate(circleSnapshotProvider(userId));
+      // and ChatTab persist the new avatar/name without tearing down the stream.
+      if (ref.mounted) {
+        try {
+          final circleRepo = ref.read(circleRepositoryProvider(userId));
+          if (circleRepo is SupabaseCircleRepository) {
+            circleRepo.forceRefresh();
+          } else {
+            ref.invalidate(circleSnapshotProvider(userId));
+          }
+        } catch (_) {
+          // In unit tests where circle repository is not configured.
+        }
+      }
       return null;
     } on ProfileFailure catch (error) {
       if (ref.mounted) state = AsyncData(previous);

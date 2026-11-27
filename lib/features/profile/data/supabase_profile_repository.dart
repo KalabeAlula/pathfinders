@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../domain/animal_avatar.dart';
@@ -63,11 +64,29 @@ class SupabaseProfileRepository implements ProfileRepository {
   @override
   Future<void> updateAvatar(String avatarId) async {
     try {
-      await _client
+      final updated = await _client
           .from('profiles')
           .update({'avatar_id': avatarId})
-          .eq('id', userId);
+          .eq('id', userId)
+          .select('id, avatar_id')
+          .maybeSingle();
+      if (kDebugMode) {
+        debugPrint(
+          '[SupabaseProfileRepository] updateAvatar($avatarId) -> $updated',
+        );
+      }
+      if (updated == null) {
+        throw const ProfileFailure(
+          'Could not save your avatar. Sign in again and try again.',
+        );
+      }
     } on sb.PostgrestException catch (error) {
+      if (kDebugMode) {
+        debugPrint(
+          '[SupabaseProfileRepository] updateAvatar($avatarId) error: '
+          '${error.code} ${error.message}',
+        );
+      }
       throw _mapFailure(error);
     }
   }

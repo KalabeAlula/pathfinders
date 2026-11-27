@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -26,6 +27,7 @@ import '../../features/nudges/application/nudge_providers.dart';
 import '../../features/nudges/presentation/warmth_actions.dart';
 import '../../features/nudges/presentation/widgets/warmth_banner.dart';
 import '../../features/profile/presentation/profile_tab.dart';
+import '../../features/profile/application/profile_providers.dart';
 import 'active_tab.dart';
 import 'main_shell_scaffold.dart';
 
@@ -42,7 +44,16 @@ class MainShellScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final circle = snapshot.circle;
+    final myProfile = ref.watch(profileControllerProvider(currentUserId)).value;
+    final activeSnapshot = snapshot.withLiveProfile(myProfile);
+    if (kDebugMode) {
+      final liveMember = activeSnapshot.memberById(currentUserId);
+      debugPrint(
+        '[MainShellScreen] myProfile=${myProfile?.avatarId} '
+        'activeMember=${liveMember?.profile.avatarId}',
+      );
+    }
+    final circle = activeSnapshot.circle;
     final circleId = circle.id;
     final tab = ref.watch(activeTabControllerProvider);
     final unreadChats = ref.watch(
@@ -113,11 +124,13 @@ class MainShellScreen extends ConsumerWidget {
         ref.read(activeTabControllerProvider.notifier).select(target);
 
     void openMember(CircleMember member) {
+      final liveMember =
+          activeSnapshot.memberById(member.profile.id) ?? member;
       showMemberDetailSheet(
         context,
-        memberId: member.profile.id,
-        initialMember: member,
-        isCurrentUser: member.profile.id == currentUserId,
+        memberId: liveMember.profile.id,
+        initialMember: liveMember,
+        isCurrentUser: liveMember.profile.id == currentUserId,
         currentUserId: currentUserId,
       );
     }
@@ -191,14 +204,14 @@ class MainShellScreen extends ConsumerWidget {
       children: [
         CircleTab(
           key: ValueKey('circle-$circleId'),
-          snapshot: snapshot,
+          snapshot: activeSnapshot,
           currentUserId: currentUserId,
         ),
         ChatTab(
           key: ValueKey('chat-$circleId'),
           circleId: circleId,
           currentUserId: currentUserId,
-          members: snapshot.members,
+          members: activeSnapshot.members,
           active: tab == AppTab.chat,
           onShowLocation: showSharedLocation,
         ),
@@ -206,7 +219,7 @@ class MainShellScreen extends ConsumerWidget {
           key: ValueKey('map-$circleId'),
           circleId: circleId,
           currentUserId: currentUserId,
-          members: snapshot.members,
+          members: activeSnapshot.members,
           onMemberTap: openMember,
           onChat: () => select(AppTab.chat),
           active: tab == AppTab.map,
@@ -217,7 +230,7 @@ class MainShellScreen extends ConsumerWidget {
           currentUserId: currentUserId,
           circleName: circle.name,
           authors: {
-            for (final member in snapshot.members)
+            for (final member in activeSnapshot.members)
               member.profile.id: member.profile,
           },
           onPlanMeetup: showSharedLocation,

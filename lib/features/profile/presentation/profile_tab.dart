@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -33,17 +36,25 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
   String? _nameError;
   bool _savingName = false;
   bool _savingAvatar = false;
+  bool _avatarSaved = false;
   bool _hydrated = false;
+  Timer? _savedTimer;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController();
-    _nameFocus = FocusNode();
+    _nameFocus = FocusNode()..addListener(_onNameFocusChanged);
+  }
+
+  void _onNameFocusChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _savedTimer?.cancel();
+    _nameFocus.removeListener(_onNameFocusChanged);
     _nameController.dispose();
     _nameFocus.dispose();
     super.dispose();
@@ -74,15 +85,28 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
   }
 
   Future<void> _saveAvatar(String avatarId) async {
-    setState(() => _savingAvatar = true);
+    if (kDebugMode) {
+      debugPrint('[ProfileTab] Save avatar tapped -> $avatarId');
+    }
+    setState(() {
+      _savingAvatar = true;
+      _avatarSaved = false;
+    });
     final error = await ref
         .read(profileControllerProvider(widget.currentUserId).notifier)
         .updateAvatar(avatarId);
     if (!mounted) return;
-    setState(() => _savingAvatar = false);
+    setState(() {
+      _savingAvatar = false;
+      _avatarSaved = error == null;
+    });
     if (error == null) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Avatar updated.')));
+      _savedTimer?.cancel();
+      _savedTimer = Timer(const Duration(seconds: 2), () {
+        if (mounted) setState(() => _avatarSaved = false);
+      });
     } else {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(error)));
@@ -258,104 +282,203 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
               helper: 'Your circle sees this everywhere.',
             ),
             const SizedBox(height: AppSpacing.sm),
-            BentoCard(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+            Container(
+              padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _nameError != null
+                      ? scheme.error
+                      : _nameFocus.hasFocus
+                      ? scheme.primary.withValues(alpha: 0.6)
+                      : scheme.outlineVariant.withValues(alpha: 0.6),
+                ),
+              ),
+              child: Row(
                 children: [
-                  TextField(
-                    key: const ValueKey('profile-name-field'),
-                    controller: _nameController,
-                    focusNode: _nameFocus,
-                    maxLength: maxDisplayNameLength,
-                    textCapitalization: TextCapitalization.words,
-                    textInputAction: TextInputAction.done,
-                    onChanged: (_) => setState(() => _nameError = null),
-                    onSubmitted: (_) {
-                      if (canSaveName) _saveName(profile);
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'How should the crew call you?',
-                      errorText: _nameError,
-                      counterText:
-                          '${_nameController.text.characters.length}/'
-                          '$maxDisplayNameLength',
-                      prefixIcon: const Icon(Icons.badge_outlined, size: 20),
+                  Icon(
+                    Icons.badge_outlined,
+                    size: 20,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      key: const ValueKey('profile-name-field'),
+                      controller: _nameController,
+                      focusNode: _nameFocus,
+                      maxLength: maxDisplayNameLength,
+                      textCapitalization: TextCapitalization.words,
+                      textInputAction: TextInputAction.done,
+                      onChanged: (_) => setState(() => _nameError = null),
+                      onSubmitted: (_) {
+                        if (canSaveName) _saveName(profile);
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'How should the crew call you?',
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        focusedErrorBorder: InputBorder.none,
+                        filled: false,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                        counterText:
+                            _nameFocus.hasFocus &&
+                                _nameController.text.characters.length >= 30
+                            ? '${_nameController.text.characters.length}/'
+                                  '$maxDisplayNameLength'
+                            : '',
+                      ),
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: FilledButton(
-                      key: const ValueKey('profile-name-save'),
-                      onPressed: canSaveName ? () => _saveName(profile) : null,
-                      child: _savingName
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Save name'),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    key: const ValueKey('profile-name-save'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      minimumSize: const Size(0, 36),
+                      shape: const StadiumBorder(),
                     ),
+                    onPressed: canSaveName ? () => _saveName(profile) : null,
+                    child: _savingName
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Save'),
                   ),
                 ],
               ),
             ),
+            if (_nameError != null) ...[
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Text(
+                  _nameError!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.error,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: AppSpacing.xl),
-            _SectionLabel(
-              title: 'Choose your animal',
-              helper: 'This portrait marks you on the live map.',
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Choose your avatar',
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Marks you on the map & in chat',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                if (_avatarSaved && !avatarDirty)
+                  Padding(
+                    padding: const EdgeInsets.only(right: AppSpacing.xs),
+                    child: Text(
+                      'Saved ✓',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                FilledButton.icon(
+                  key: const ValueKey('profile-avatar-save'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: avatarDirty
+                        ? scheme.primary
+                        : scheme.surfaceContainerHighest,
+                    foregroundColor: avatarDirty
+                        ? scheme.onPrimary
+                        : scheme.onSurfaceVariant,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    minimumSize: const Size(0, 36),
+                    shape: const StadiumBorder(),
+                  ),
+                  onPressed: avatarDirty && !_savingAvatar
+                      ? () => _saveAvatar(selectedAvatarId)
+                      : null,
+                  icon: _savingAvatar
+                      ? SizedBox(
+                          width: 15,
+                          height: 15,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: scheme.onPrimary,
+                          ),
+                        )
+                      : const Icon(Icons.check_rounded, size: 17),
+                  label: const Text('Save'),
+                ),
+              ],
             ),
             const SizedBox(height: AppSpacing.sm),
             BentoCard(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final columns = constraints.maxWidth >= 620 ? 5 : 4;
-                      final tileWidth =
-                          (constraints.maxWidth -
-                              AppSpacing.sm * (columns - 1)) /
-                          columns;
-                      return Wrap(
-                        spacing: AppSpacing.sm,
-                        runSpacing: AppSpacing.md,
-                        children: [
-                          for (final avatar in AnimalAvatar.catalog)
-                            SizedBox(
-                              width: tileWidth,
-                              child: _AvatarTile(
-                                avatar: avatar,
-                                selected: avatar.id == selectedAvatarId,
-                                onTap: () =>
-                                    setState(() => _draftAvatarId = avatar.id),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: FilledButton.tonalIcon(
-                      key: const ValueKey('profile-avatar-save'),
-                      onPressed: avatarDirty && !_savingAvatar
-                          ? () => _saveAvatar(selectedAvatarId)
-                          : null,
-                      icon: _savingAvatar
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.check_rounded, size: 18),
-                      label: const Text('Save avatar'),
-                    ),
-                  ),
-                ],
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.md,
+              ),
+              child: SizedBox(
+                height: 228,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final visibleColumns = constraints.maxWidth >= 620
+                        ? 6.35
+                        : 4.35;
+                    final tileWidth =
+                        (constraints.maxWidth -
+                            AppSpacing.sm * (visibleColumns - 1)) /
+                        visibleColumns;
+                    return GridView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs,
+                      ),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: AppSpacing.sm,
+                        crossAxisSpacing: AppSpacing.md,
+                        mainAxisExtent: tileWidth,
+                      ),
+                      itemCount: AnimalAvatar.catalog.length,
+                      itemBuilder: (context, index) {
+                        final avatar = AnimalAvatar.catalog[index];
+                        return _AvatarTile(
+                          avatar: avatar,
+                          selected: avatar.id == selectedAvatarId,
+                          onTap: () => setState(() {
+                            _draftAvatarId = avatar.id;
+                            _avatarSaved = false;
+                          }),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.xl),
@@ -1021,51 +1144,57 @@ class _AvatarTile extends StatelessWidget {
         button: true,
         label: avatar.name,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.max,
           children: [
-            AspectRatio(
-              aspectRatio: 1,
-              child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: selected
-                      ? scheme.primaryContainer
-                      : Colors.transparent,
-                  border: Border.all(
-                    color: selected ? scheme.primary : Colors.transparent,
-                    width: 2.5,
-                  ),
-                ),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    AnimalAvatarView(
-                      avatarId: avatar.id,
-                      animate: selected, // Animate only selected tile
+            Expanded(
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: selected
+                          ? scheme.primaryContainer
+                          : scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+                      border: Border.all(
+                        color: selected
+                            ? scheme.primary
+                            : scheme.outlineVariant.withValues(alpha: 0.45),
+                        width: selected ? 2.5 : 1,
+                      ),
                     ),
-                    if (selected)
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: scheme.primary,
-                            border: Border.all(
-                              color: scheme.surfaceContainerLowest,
-                              width: 1.5,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        AnimalAvatarView(
+                          avatarId: avatar.id,
+                          animate: selected, // Animate only selected tile
+                        ),
+                        if (selected)
+                          Positioned(
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: scheme.primary,
+                                border: Border.all(
+                                  color: scheme.surfaceContainerLowest,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.check_rounded,
+                                size: 11,
+                                color: scheme.onPrimary,
+                              ),
                             ),
                           ),
-                          child: Icon(
-                            Icons.check_rounded,
-                            size: 11,
-                            color: scheme.onPrimary,
-                          ),
-                        ),
-                      ),
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),

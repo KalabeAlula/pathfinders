@@ -15,6 +15,11 @@ abstract final class MapMarkerImages {
   static final Map<String, Future<Uint8List>> _cache = {};
   static final Map<String, Future<ui.Image?>> _avatarImages = {};
 
+  static void clearCache() {
+    _cache.clear();
+    _avatarImages.clear();
+  }
+
   static Future<Uint8List> memberAvatar({
     required String avatarId,
     required String initials,

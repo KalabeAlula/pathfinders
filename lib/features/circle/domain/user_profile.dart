@@ -32,4 +32,12 @@ class UserProfile {
   }
 
   String get firstName => displayName.split(' ').first;
+
+  UserProfile copyWith({String? displayName, String? avatarId}) => UserProfile(
+    id: id,
+    displayName: displayName ?? this.displayName,
+    avatarColor: avatarColor,
+    avatarId: avatarId ?? this.avatarId,
+    statusLine: statusLine,
+  );
 }

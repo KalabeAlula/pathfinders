@@ -91,8 +91,14 @@ void main() {
     expect(find.text('Outlaw'), findsWidgets);
     expect(find.text('kaleab@example.com'), findsOneWidget);
     expect(find.text('March 2026'), findsOneWidget);
-    expect(find.text('Save name'), findsOneWidget);
-    expect(find.text('Save avatar'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('profile-name-save')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('profile-avatar-save')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('saves the edited display name', (tester) async {

@@ -15,6 +15,7 @@ import '../../../location/presentation/widgets/background_location_disclosure.da
 import '../../../nudges/application/nudge_providers.dart';
 import '../../../nudges/domain/nudge.dart';
 import '../../../nudges/domain/nudge_repository.dart';
+import '../../../profile/application/profile_providers.dart';
 import '../../application/circle_providers.dart';
 import '../../domain/circle_member.dart';
 import '../../domain/group_type.dart';
@@ -76,8 +77,23 @@ class MemberDetailSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final snapshot = ref.watch(circleSnapshotProvider(currentUserId)).value;
-    final member = snapshot?.memberById(memberId) ?? initialMember;
+    final liveProfile = isCurrentUser
+        ? ref.watch(profileControllerProvider(currentUserId)).value
+        : null;
+    final snapshot = ref
+        .watch(circleSnapshotProvider(currentUserId))
+        .value
+        ?.withLiveProfile(liveProfile);
+    var member = snapshot?.memberById(memberId) ?? initialMember;
+    if (isCurrentUser && liveProfile != null) {
+      member = CircleMember(
+        profile: member.profile.copyWith(
+          displayName: liveProfile.displayName,
+          avatarId: liveProfile.avatarId,
+        ),
+        status: member.status,
+      );
+    }
     final circle = snapshot?.circle;
     final warmth = NudgeWarmth.defaultFor(circle?.type ?? GroupType.fallback);
     final status = member.status;
