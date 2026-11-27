@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -38,7 +36,6 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
   bool _savingAvatar = false;
   bool _avatarSaved = false;
   bool _hydrated = false;
-  Timer? _savedTimer;
 
   @override
   void initState() {
@@ -53,7 +50,6 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
 
   @override
   void dispose() {
-    _savedTimer?.cancel();
     _nameFocus.removeListener(_onNameFocusChanged);
     _nameController.dispose();
     _nameFocus.dispose();
@@ -103,8 +99,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
     if (error == null) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Avatar updated.')));
-      _savedTimer?.cancel();
-      _savedTimer = Timer(const Duration(seconds: 2), () {
+      Future<void>.delayed(const Duration(seconds: 2), () {
         if (mounted) setState(() => _avatarSaved = false);
       });
     } else {
@@ -1144,57 +1139,53 @@ class _AvatarTile extends StatelessWidget {
         button: true,
         label: avatar.name,
         child: Column(
-          mainAxisSize: MainAxisSize.max,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: Center(
-                child: AspectRatio(
-                  aspectRatio: 1,
-                  child: Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: selected
-                          ? scheme.primaryContainer
-                          : scheme.surfaceContainerHighest.withValues(alpha: 0.55),
-                      border: Border.all(
-                        color: selected
-                            ? scheme.primary
-                            : scheme.outlineVariant.withValues(alpha: 0.45),
-                        width: selected ? 2.5 : 1,
-                      ),
+            AspectRatio(
+              aspectRatio: 1,
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected
+                      ? scheme.primaryContainer
+                      : scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+                  border: Border.all(
+                    color: selected
+                        ? scheme.primary
+                        : scheme.outlineVariant.withValues(alpha: 0.45),
+                    width: selected ? 2.5 : 1,
+                  ),
+                ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    AnimalAvatarView(
+                      avatarId: avatar.id,
+                      animate: selected, // Animate only selected tile
                     ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        AnimalAvatarView(
-                          avatarId: avatar.id,
-                          animate: selected, // Animate only selected tile
-                        ),
-                        if (selected)
-                          Positioned(
-                            right: 0,
-                            bottom: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: scheme.primary,
-                                border: Border.all(
-                                  color: scheme.surfaceContainerLowest,
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.check_rounded,
-                                size: 11,
-                                color: scheme.onPrimary,
-                              ),
+                    if (selected)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: scheme.primary,
+                            border: Border.all(
+                              color: scheme.surfaceContainerLowest,
+                              width: 1.5,
                             ),
                           ),
-                      ],
-                    ),
-                  ),
+                          child: Icon(
+                            Icons.check_rounded,
+                            size: 11,
+                            color: scheme.onPrimary,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
